@@ -67,7 +67,6 @@ service cloud.firestore {
       return data.id is string &&
              data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
              data.number is string && data.number.size() >= 1 && data.number.size() <= 10 &&
-             data.position in ['FORWARD', 'MIDFIELDER', 'DEFENDER', 'GOALKEEPER'] &&
              data.ovr is number && data.ovr >= 0 && data.ovr <= 100 &&
              data.win is number && data.loss is number && data.draw is number &&
              data.goalsScored is number && data.goalsConceded is number &&

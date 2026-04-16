@@ -8,7 +8,6 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "number": { "type": "string" },
-        "position": { "type": "string" },
         "ovr": { "type": "string" },
         "device": { "type": "string" },
         "uid": { "type": "string" },

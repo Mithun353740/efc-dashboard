@@ -107,6 +107,17 @@ export const INITIAL_LEADERS: Leader[] = [
   },
 ];
 
+export function calculateOVR(win: number, loss: number, draw: number, goalsScored: number, goalsConceded: number): number {
+  const totalMatches = win + loss + draw;
+  if (totalMatches === 0) return 60;
+  const winPct = win / totalMatches;
+  const gamesFactor = Math.min(totalMatches, 20) / 20;
+  const goalDiff = goalsScored - goalsConceded;
+  const gdFactor = Math.max(-10, Math.min(goalDiff, 20));
+  let ovr = 60 + (winPct * 25) + (gamesFactor * 5) + (gdFactor * 0.45);
+  return Math.min(99, Math.max(40, Math.round(ovr)));
+}
+
 export const INITIAL_PLAYERS: Player[] = [
   {
     id: '1',
@@ -190,6 +201,7 @@ export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2?
     else if (result === 'L') updated.loss++;
     else updated.draw++;
     updated.form = [...(updated.form || []), result].slice(-5);
+    updated.ovr = calculateOVR(updated.win, updated.loss, updated.draw, updated.goalsScored, updated.goalsConceded);
     return updated;
   };
 

@@ -2,7 +2,7 @@ export interface Player {
   id: string;
   name: string;
   number: string;
-  position: string;
+  position?: string;
   ovr: number;
   win: number;
   loss: number;

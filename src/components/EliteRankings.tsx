@@ -45,7 +45,7 @@ export default function EliteRankings() {
 
                 <h3 className="text-xl font-black text-brand-dark dark:text-white tracking-tight">{player.name}</h3>
                 <p className="text-[10px] font-bold text-slate-400 tracking-widest mt-1">
-                  {player.position} • {player.ovr} OVR
+                  #{player.number} • {player.ovr} OVR
                 </p>
 
                 <div className="grid grid-cols-4 gap-4 mt-8 pt-6 border-t border-slate-200 dark:border-white/10">

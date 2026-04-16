@@ -66,7 +66,7 @@ export default function PlayerStats() {
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black truncate">{player.name}</p>
                 <p className={cn("text-[9px] font-bold uppercase", selectedPlayer?.id === player.id ? "text-slate-400 dark:text-brand-dark/60" : "text-slate-400")}>
-                  #{player.number} • {player.position}
+                  #{player.number} • {player.device}
                 </p>
               </div>
               <ChevronRight size={14} className={cn("transition-transform", selectedPlayer?.id === player.id ? "translate-x-0" : "-translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100")} />
@@ -102,8 +102,8 @@ export default function PlayerStats() {
                       <p className="text-xl font-black">#{selectedPlayer.number}</p>
                     </div>
                     <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-md border border-white/10">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">POSITION</p>
-                      <p className="text-xl font-black">{selectedPlayer.position}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">DEVICE</p>
+                      <p className="text-xl font-black">{selectedPlayer.device || 'N/A'}</p>
                     </div>
                     <div className="bg-brand-green px-6 py-2 rounded-full text-brand-dark">
                       <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">OVERALL</p>

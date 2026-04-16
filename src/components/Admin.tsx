@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, saveLeader, deleteLeader } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, saveLeader, deleteLeader, calculateOVR } from '../lib/store';
 import { Player, Leader } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
@@ -37,7 +37,7 @@ export default function Admin() {
   }, []);
   
   // Player Form
-  const DEFAULT_PLAYER = { name: '', number: '', position: 'FORWARD', ovr: '80', device: 'PS5', uid: '', image: '' };
+  const DEFAULT_PLAYER = { name: '', number: '', device: 'PS5', uid: '', image: '' };
   const [newPlayer, setNewPlayer] = useState(DEFAULT_PLAYER);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [playerMsg, setPlayerMsg] = useState({ text: '', type: '' });
@@ -143,8 +143,14 @@ export default function Admin() {
       id: editingPlayerId || (typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11)),
       name: newPlayer.name.toUpperCase(),
       number: newPlayer.number,
-      position: newPlayer.position,
-      ovr: Number(newPlayer.ovr) || 80,
+      position: 'ANY',
+      ovr: calculateOVR(
+        existingPlayer ? existingPlayer.win : 0,
+        existingPlayer ? existingPlayer.loss : 0,
+        existingPlayer ? existingPlayer.draw : 0,
+        existingPlayer ? existingPlayer.goalsScored : 0,
+        existingPlayer ? existingPlayer.goalsConceded : 0
+      ),
       win: existingPlayer ? existingPlayer.win : 0,
       loss: existingPlayer ? existingPlayer.loss : 0,
       draw: existingPlayer ? existingPlayer.draw : 0,
@@ -348,8 +354,6 @@ export default function Admin() {
                                   setNewPlayer({
                                     name: p.name,
                                     number: p.number,
-                                    position: p.position,
-                                    ovr: String(p.ovr),
                                     device: p.device,
                                     uid: p.uid,
                                     image: p.image
@@ -360,7 +364,7 @@ export default function Admin() {
                               >
                                 <div>
                                   <p className="text-[10px] font-black">{p.name}</p>
-                                  <p className="text-[8px] font-bold text-slate-500">#{p.number} • {p.position}</p>
+                                  <p className="text-[8px] font-bold text-slate-500">#{p.number}</p>
                                 </div>
                                 <div className="px-2 py-0.5 bg-brand-green/10 text-brand-green text-[7px] font-black rounded uppercase">
                                   EDIT
@@ -404,22 +408,6 @@ export default function Admin() {
                         </AnimatePresence>
                       </div>
                       <Input label="UID (GAME ID)" value={newPlayer.uid} onChange={v => setNewPlayer({...newPlayer, uid: v})} placeholder="VORTEX_123" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input label="OVR" value={newPlayer.ovr} onChange={v => setNewPlayer({...newPlayer, ovr: v})} placeholder="80" type="number" />
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">POSITION</label>
-                        <select 
-                          value={newPlayer.position} 
-                          onChange={e => setNewPlayer({...newPlayer, position: e.target.value})}
-                          className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-green outline-none transition-all appearance-none"
-                        >
-                          <option value="FORWARD">FORWARD</option>
-                          <option value="MIDFIELDER">MIDFIELDER</option>
-                          <option value="DEFENDER">DEFENDER</option>
-                          <option value="GOALKEEPER">GOALKEEPER</option>
-                        </select>
-                      </div>
                     </div>
                     <Input label="DEVICE" value={newPlayer.device} onChange={v => setNewPlayer({...newPlayer, device: v})} placeholder="PS5 / PC" />
                     <div className="space-y-1">
