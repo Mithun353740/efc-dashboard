@@ -24,3 +24,14 @@ export interface Leader {
   initials: string;
   playerId?: string;
 }
+
+export interface MatchRecord {
+  id: string;
+  timestamp: number;
+  p1Id: string;
+  p1Name: string;
+  p1Score: number;
+  p2Id?: string;
+  p2Name: string;
+  p2Score: number;
+}

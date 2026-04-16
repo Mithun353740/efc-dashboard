@@ -1,4 +1,4 @@
-import { Player, Leader } from '../types';
+import { Player, Leader, MatchRecord } from '../types';
 import { db, auth } from '../firebase';
 import { 
   collection, 
@@ -176,6 +176,18 @@ export function subscribeToLeaders(callback: (leaders: Leader[]) => void) {
   });
 }
 
+export function subscribeToMatches(callback: (matches: MatchRecord[]) => void) {
+  const path = 'matches';
+  // Sorting by timestamp descending (newest first)
+  const q = query(collection(db, path), orderBy('timestamp', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
+    callback(matches);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.GET, path);
+  });
+}
+
 // Write operations
 export async function savePlayer(player: Player) {
   const path = `players/${player.id}`;
@@ -213,10 +225,82 @@ export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2?
     batch.set(doc(db, 'players', p2.id), updatedP2);
   }
 
+  const matchRef = doc(collection(db, 'matches'));
+  const matchRecord: MatchRecord = {
+    id: matchRef.id,
+    timestamp: Date.now(),
+    p1Id: p1.id,
+    p1Name: p1.name,
+    p1Score,
+    p2Id: p2?.id,
+    p2Name: p2 ? p2.name : 'External Player',
+    p2Score,
+  };
+  batch.set(matchRef, matchRecord);
+
   try {
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-update');
+  }
+}
+
+export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2Score: number, players: Player[]) {
+  const batch = writeBatch(db);
+
+  const getResult = (myScore: number, oppScore: number) => myScore > oppScore ? 'W' : myScore < oppScore ? 'L' : 'D';
+
+  const revertAndApply = (p: Player, oldMyScore: number, oldOppScore: number, newMyScore: number, newOppScore: number) => {
+    const oldResult = getResult(oldMyScore, oldOppScore);
+    const newResult = getResult(newMyScore, newOppScore);
+
+    const updated = { ...p };
+    updated.goalsScored = updated.goalsScored - oldMyScore + newMyScore;
+    updated.goalsConceded = updated.goalsConceded - oldOppScore + newOppScore;
+    
+    if (oldResult === 'W') updated.win--;
+    else if (oldResult === 'L') updated.loss--;
+    else updated.draw--;
+
+    if (newResult === 'W') updated.win++;
+    else if (newResult === 'L') updated.loss++;
+    else updated.draw++;
+
+    // Prevent negative stats just in case
+    updated.win = Math.max(0, updated.win);
+    updated.loss = Math.max(0, updated.loss);
+    updated.draw = Math.max(0, updated.draw);
+    updated.goalsScored = Math.max(0, updated.goalsScored);
+    updated.goalsConceded = Math.max(0, updated.goalsConceded);
+
+    updated.ovr = calculateOVR(updated.win, updated.loss, updated.draw, updated.goalsScored, updated.goalsConceded);
+    return updated;
+  };
+
+  const p1 = players.find(p => p.id === oldMatch.p1Id);
+  if (p1) {
+    const updatedP1 = revertAndApply(p1, oldMatch.p1Score, oldMatch.p2Score, newP1Score, newP2Score);
+    batch.set(doc(db, 'players', p1.id), updatedP1);
+  }
+
+  if (oldMatch.p2Id) {
+    const p2 = players.find(p => p.id === oldMatch.p2Id);
+    if (p2) {
+      const updatedP2 = revertAndApply(p2, oldMatch.p2Score, oldMatch.p1Score, newP2Score, newP1Score);
+      batch.set(doc(db, 'players', p2.id), updatedP2);
+    }
+  }
+
+  // Update match record
+  batch.update(doc(db, 'matches', oldMatch.id), {
+    p1Score: newP1Score,
+    p2Score: newP2Score,
+  });
+
+  try {
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'batch-match-edit');
   }
 }
 

@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Player, Leader } from './types';
-import { subscribeToPlayers, subscribeToLeaders, bootstrapData, sortRankedPlayers, testFirestoreConnection } from './lib/store';
+import { Player, Leader, MatchRecord } from './types';
+import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, bootstrapData, sortRankedPlayers, testFirestoreConnection } from './lib/store';
 
 interface FirebaseContextType {
   players: Player[];
   rankedPlayers: Player[];
   leaders: Leader[];
+  matches: MatchRecord[];
   isLoading: boolean;
 }
 
@@ -14,6 +15,7 @@ const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined
 export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [leaders, setLeaders] = useState<Leader[]>([]);
+  const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
   const [isLoadingLeaders, setIsLoadingLeaders] = useState(true);
 
@@ -38,6 +40,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    const unsubMatches = subscribeToMatches((data) => {
+      if (mounted) {
+        setMatches(data);
+      }
+    });
+
     // Fallback: don't hang forever if collections are completely empty and snapshot takes time
     const timeout = setTimeout(() => {
       if (mounted) {
@@ -50,6 +58,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       unsubPlayers();
       unsubLeaders();
+      unsubMatches();
       clearTimeout(timeout);
     };
   }, []);
@@ -71,6 +80,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     players,
     rankedPlayers: sortRankedPlayers(players),
     leaders: enrichedLeaders,
+    matches,
     isLoading
   };
 
@@ -88,3 +98,4 @@ export function useFirebase() {
   }
   return context;
 }
+

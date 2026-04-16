@@ -2,17 +2,18 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, saveLeader, deleteLeader, calculateOVR } from '../lib/store';
-import { Player, Leader } from '../types';
+import { savePlayer, deletePlayer, addMatch, editMatch, saveLeader, deleteLeader, calculateOVR } from '../lib/store';
+import { Player, Leader, MatchRecord } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
 import { auth, loginAnonymously } from '../firebase';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
+import { History } from 'lucide-react';
 
 export default function Admin() {
-  const { players, leaders } = useFirebase();
+  const { players, leaders, matches } = useFirebase();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership'>('players');
+  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   
   React.useEffect(() => {
@@ -52,6 +53,9 @@ export default function Admin() {
   const [match, setMatch] = useState({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false });
   const [matchMsg, setMatchMsg] = useState({ text: '', type: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingMatch, setEditingMatch] = useState<MatchRecord | null>(null);
+  const [editMatchScore1, setEditMatchScore1] = useState('');
+  const [editMatchScore2, setEditMatchScore2] = useState('');
   
   // Suggestions
   const [p1Search, setP1Search] = useState('');
@@ -300,6 +304,20 @@ export default function Admin() {
     }
   };
 
+  const handleEditMatchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMatch || editMatchScore1 === '' || editMatchScore2 === '') return;
+    
+    try {
+      await editMatch(editingMatch, Number(editMatchScore1), Number(editMatchScore2), players);
+      setEditingMatch(null);
+      setEditMatchScore1('');
+      setEditMatchScore2('');
+    } catch (err) {
+      console.error('Error editing match:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#020617] text-white p-8">
       {/* Header */}
@@ -335,6 +353,7 @@ export default function Admin() {
           <NavBtn active={activeTab === 'players'} onClick={() => setActiveTab('players')} icon={<Users size={18} />} label="PLAYERS" />
           <NavBtn active={activeTab === 'matches'} onClick={() => setActiveTab('matches')} icon={<LayoutDashboard size={18} />} label="MATCHES" />
           <NavBtn active={activeTab === 'leadership'} onClick={() => setActiveTab('leadership')} icon={<ShieldCheck size={18} />} label="LEADERSHIP" />
+          <NavBtn active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History size={18} />} label="MATCH HISTORY" />
         </div>
 
         {/* Main Content */}
@@ -574,7 +593,7 @@ export default function Admin() {
                   {matchMsg.text && <p className={cn("text-[10px] font-bold text-center mt-2", matchMsg.type === 'success' ? 'text-brand-green' : 'text-red-500')}>{matchMsg.text}</p>}
                 </form>
               </motion.div>
-            ) : (
+            ) : activeTab === 'leadership' ? (
               <motion.div key="leadership" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Add Leader */}
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
@@ -696,7 +715,46 @@ export default function Admin() {
                   </div>
                 </div>
               </motion.div>
-            )}
+            ) : activeTab === 'history' ? (
+              <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+                  <h3 className="text-xl font-black mb-6 tracking-tight">MATCH HISTORY (LAST 7 DAYS)</h3>
+                  <div className="space-y-4">
+                    {matches.length === 0 ? (
+                      <p className="text-slate-400 text-sm font-bold">No match history available.</p>
+                    ) : (
+                      matches.filter(m => Date.now() - m.timestamp <= 7 * 24 * 60 * 60 * 1000).map(m => (
+                        <div key={m.id} className="bg-white/5 border border-white/10 p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex-1 flex flex-col gap-1">
+                            <span className="text-[10px] text-slate-500 font-bold tracking-widest">{new Date(m.timestamp).toLocaleString()}</span>
+                            <div className="flex items-center gap-4 text-sm font-black uppercase whitespace-nowrap">
+                              <span className={m.p1Score > m.p2Score ? 'text-brand-green' : m.p1Score < m.p2Score ? 'text-red-500' : 'text-slate-300'}>{m.p1Name} <span className="text-white bg-white/10 px-2 py-0.5 rounded ml-2">{m.p1Score}</span></span>
+                              <span className="text-slate-500 text-[10px]">VS</span>
+                              <span className={m.p2Score > m.p1Score ? 'text-brand-green' : m.p2Score < m.p1Score ? 'text-red-500' : 'text-slate-300'}><span className="text-white bg-white/10 px-2 py-0.5 rounded mr-2">{m.p2Score}</span> {m.p2Name}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {editingMatch?.id === m.id ? (
+                              <div className="flex items-center gap-2 bg-[#0f172a] p-2 rounded-xl">
+                                <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-green outline-none" value={editMatchScore1} onChange={e => setEditMatchScore1(e.target.value)} placeholder="Score 1" />
+                                <span className="text-slate-500 font-bold text-xs">-</span>
+                                <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-green outline-none" value={editMatchScore2} onChange={e => setEditMatchScore2(e.target.value)} placeholder="Score 2" />
+                                <button onClick={handleEditMatchSubmit} className="bg-brand-green text-brand-dark px-3 py-2 rounded text-[10px] font-black tracking-widest hover:scale-105 transition-all ml-2">SAVE</button>
+                                <button onClick={() => setEditingMatch(null)} className="bg-white/10 text-white px-3 py-2 rounded text-[10px] font-black tracking-widest hover:bg-white/20 transition-all">CANCEL</button>
+                              </div>
+                            ) : (
+                              <button onClick={() => { setEditingMatch(m); setEditMatchScore1(m.p1Score.toString()); setEditMatchScore2(m.p2Score.toString()); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase">
+                                EDIT SCORE
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ) : null}
           </AnimatePresence>
         </div>
       </div>
