@@ -42,7 +42,7 @@ export default function Leadership() {
               className="relative pt-12"
             >
               <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-2xl p-8 h-full flex flex-col items-center text-center transition-colors">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full border-4 border-white dark:border-brand-dark shadow-lg overflow-hidden grayscale">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full border-4 border-white dark:border-brand-dark shadow-lg overflow-hidden">
                   <img src={leader.image} alt={leader.name} className="w-full h-full object-cover" />
                 </div>
 

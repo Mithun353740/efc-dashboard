@@ -22,7 +22,7 @@ export default function Legion() {
             className="group"
           >
             <div className="bg-white dark:bg-white/5 rounded-xl overflow-hidden shadow-sm border border-slate-100 dark:border-white/10 transition-all hover:shadow-xl hover:-translate-y-1">
-              <div className="aspect-[4/5] overflow-hidden grayscale group-hover:grayscale-0 transition-all duration-500">
+              <div className="aspect-[4/5] overflow-hidden transition-all duration-500">
                 <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
               </div>
               <div className="p-4">

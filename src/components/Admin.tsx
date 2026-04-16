@@ -61,32 +61,55 @@ export default function Admin() {
   const [playerToDelete, setPlayerToDelete] = useState<string | null>(null);
   const [leaderToDelete, setLeaderToDelete] = useState<string | null>(null);
 
-  const compressImage = (base64Str: string, maxWidth = 400, maxHeight = 400): Promise<string> => {
+  const compressImage = (base64Str: string, maxWidth = 1600, maxHeight = 1600): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.src = base64Str;
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+        let currentWidth = img.width;
+        let currentHeight = img.height;
 
-        if (width > height) {
-          if (width > maxWidth) {
-            height *= maxWidth / width;
-            width = maxWidth;
+        let finalWidth = currentWidth;
+        let finalHeight = currentHeight;
+
+        if (finalWidth > finalHeight) {
+          if (finalWidth > maxWidth) {
+            finalHeight *= maxWidth / finalWidth;
+            finalWidth = maxWidth;
           }
         } else {
-          if (height > maxHeight) {
-            width *= maxHeight / height;
-            height = maxHeight;
+          if (finalHeight > maxHeight) {
+            finalWidth *= maxHeight / finalHeight;
+            finalHeight = maxHeight;
           }
         }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
+        let canvas = document.createElement('canvas');
+        let ctx = canvas.getContext('2d');
+        canvas.width = currentWidth;
+        canvas.height = currentHeight;
+        ctx?.drawImage(img, 0, 0);
+
+        // Step-down resizing for crystal clear quality
+        while (currentWidth * 0.5 > finalWidth) {
+          currentWidth *= 0.5;
+          currentHeight *= 0.5;
+          const stepCanvas = document.createElement('canvas');
+          stepCanvas.width = currentWidth;
+          stepCanvas.height = currentHeight;
+          const stepCtx = stepCanvas.getContext('2d');
+          stepCtx?.drawImage(canvas, 0, 0, currentWidth, currentHeight);
+          canvas = stepCanvas;
+        }
+
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = finalWidth;
+        finalCanvas.height = finalHeight;
+        const finalCtx = finalCanvas.getContext('2d');
+        if (finalCtx) finalCtx.imageSmoothingQuality = 'high';
+        finalCtx?.drawImage(canvas, 0, 0, finalWidth, finalHeight);
+
+        resolve(finalCanvas.toDataURL('image/jpeg', 0.98));
       };
     });
   };
@@ -101,11 +124,19 @@ export default function Admin() {
 
       const reader = new FileReader();
       reader.onloadend = async () => {
-        const compressed = await compressImage(reader.result as string);
+        let finalImage = reader.result as string;
+        
+        // If the file is under 600KB, DO NOT compress it. 
+        // This preserves 100% untouched, pixel-perfect original quality.
+        // Base64 adds ~33% size, so 600KB raw = ~800KB base64, safely under Firestore 1MB limit.
+        if (file.size > 600 * 1024) {
+          finalImage = await compressImage(reader.result as string);
+        }
+
         if (target === 'player') {
-          setNewPlayer({ ...newPlayer, image: compressed });
+          setNewPlayer({ ...newPlayer, image: finalImage });
         } else {
-          setNewLeader({ ...newLeader, image: compressed });
+          setNewLeader({ ...newLeader, image: finalImage });
         }
       };
       reader.readAsDataURL(file);
@@ -411,16 +442,25 @@ export default function Admin() {
                     </div>
                     <Input label="DEVICE" value={newPlayer.device} onChange={v => setNewPlayer({...newPlayer, device: v})} placeholder="PS5 / PC" />
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">PICTURE (OPTIONAL)</label>
+                      <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">PICTURE (UPLOAD OR PASTE URL)</label>
                       <div className="flex items-center gap-4">
                         <label className="flex-1 cursor-pointer bg-white/5 border border-white/10 border-dashed p-4 rounded-xl text-center hover:bg-white/10 transition-all">
                           <span className="text-[10px] font-bold text-slate-400">
-                            {newPlayer.image ? '✅ IMAGE SELECTED' : 'UPLOAD PICTURE'}
+                            {newPlayer.image && newPlayer.image.startsWith('data:') ? '✅ UPLOADED' : 'UPLOAD FROM DEVICE'}
                           </span>
                           <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'player')} className="hidden" />
                         </label>
+                        <div className="flex-[2]">
+                          <input 
+                            type="text" 
+                            value={newPlayer.image && !newPlayer.image.startsWith('data:') ? newPlayer.image : ''} 
+                            onChange={e => setNewPlayer({...newPlayer, image: e.target.value})} 
+                            className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-green outline-none transition-all"
+                            placeholder="OR PASTE DIRECT IMAGE URL"
+                          />
+                        </div>
                         {newPlayer.image && (
-                          <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/20">
+                          <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/20 shrink-0">
                             <img src={newPlayer.image} className="w-full h-full object-cover" alt="Preview" />
                           </div>
                         )}

@@ -60,7 +60,7 @@ export default function PlayerStats() {
                 selectedPlayer?.id === player.id ? "bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark shadow-xl shadow-brand-dark/20" : "hover:bg-slate-50 dark:hover:bg-white/5"
               )}
             >
-              <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-100 dark:border-white/10 grayscale group-hover:grayscale-0 transition-all">
+              <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-100 dark:border-white/10 transition-all">
                 <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
               </div>
               <div className="flex-1 min-w-0">
@@ -88,7 +88,7 @@ export default function PlayerStats() {
             >
               {/* Header Card */}
               <div className="relative bg-brand-dark dark:bg-white/5 rounded-[2.5rem] p-12 overflow-hidden text-white border dark:border-white/10">
-                <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 grayscale pointer-events-none">
+                <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 pointer-events-none">
                   <img src={selectedPlayer.image} alt="" className="w-full h-full object-cover object-top" />
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-r from-brand-dark dark:from-black via-brand-dark/80 dark:via-black/80 to-transparent" />

@@ -53,7 +53,7 @@ export default function Rankings() {
                     <td className="p-6">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden border border-slate-200 dark:border-white/10">
-                          <img src={player.image} alt={player.name} className="w-full h-full object-cover grayscale" />
+                          <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
                         </div>
                         <div>
                           <p className="text-sm font-black text-brand-dark dark:text-white leading-none">{player.name}</p>

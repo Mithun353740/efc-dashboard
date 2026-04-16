@@ -39,7 +39,7 @@ export default function EliteRankings() {
               </span>
 
               <div className="relative z-10">
-                <div className="w-full aspect-square mb-6 overflow-hidden rounded-xl grayscale group-hover:grayscale-0 transition-all duration-500">
+                <div className="w-full aspect-square mb-6 overflow-hidden rounded-xl transition-all duration-500">
                   <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
                 </div>
 

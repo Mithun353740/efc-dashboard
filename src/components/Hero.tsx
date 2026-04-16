@@ -15,7 +15,7 @@ export default function Hero({ player }: HeroProps) {
     <section className="relative h-[600px] overflow-hidden bg-brand-dark dark:bg-black transition-colors">
       {/* Background with blurred stadium feel */}
       <div 
-        className="absolute inset-0 opacity-40 bg-cover bg-center grayscale"
+        className="absolute inset-0 opacity-40 bg-cover bg-center"
         style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=2000&auto=format&fit=crop)' }}
       />
       <div className="absolute inset-0 bg-gradient-to-r from-brand-dark dark:from-black via-brand-dark/80 dark:via-black/80 to-transparent" />
@@ -55,7 +55,7 @@ export default function Hero({ player }: HeroProps) {
             transition={{ duration: 1, ease: 'easeOut' }}
             src={player.image}
             alt={player.name}
-            className="h-full w-full object-cover object-top mask-gradient grayscale"
+            className="h-full w-full object-cover object-top mask-gradient"
           />
         </div>
       </div>
