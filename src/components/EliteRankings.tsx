@@ -45,9 +45,14 @@ export default function EliteRankings() {
                 </div>
 
                 <h3 className="text-xl font-black text-brand-dark dark:text-white tracking-tight">{player.name}</h3>
-                <p className="text-[10px] font-bold text-slate-400 tracking-widest mt-1">
-                  #{player.number} • {player.ovr} OVR
-                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="bg-brand-dark dark:bg-white/10 text-white px-2 py-1 flex items-center justify-center rounded-md text-[10px] font-black tracking-widest">
+                    #{index + 1} RANK
+                  </span>
+                  <span className="bg-brand-green text-brand-dark px-2 py-1 flex items-center justify-center rounded-md text-[10px] font-black tracking-widest">
+                    {player.ovr} OVR
+                  </span>
+                </div>
 
                 <div className="grid grid-cols-4 gap-4 mt-8 pt-6 border-t border-slate-200 dark:border-white/10">
                   <Stat label="W" value={player.win} />

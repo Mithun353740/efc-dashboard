@@ -71,6 +71,7 @@ export default function Navbar() {
 
       <div className="hidden md:flex items-center gap-8">
         {[
+          { label: 'HOME', path: '/' },
           { label: 'RANKINGS', path: '/rankings' },
           { label: 'ANALYTICS', path: '/stats' },
           { label: 'TOURNAMENT', path: '/tournament' },

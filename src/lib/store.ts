@@ -189,6 +189,58 @@ export function subscribeToMatches(callback: (matches: MatchRecord[]) => void) {
 }
 
 // Write operations
+export function computePlayerStats(player: Player, allMatches: MatchRecord[]): Player {
+  let win = 0, loss = 0, draw = 0, goalsScored = 0, goalsConceded = 0;
+  
+  const playerMatches = allMatches
+    .filter(m => m.p1Id === player.id || m.p2Id === player.id)
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  playerMatches.forEach(m => {
+    const isP1 = m.p1Id === player.id;
+    const myScore = isP1 ? Number(m.p1Score) : Number(m.p2Score);
+    const oppScore = isP1 ? Number(m.p2Score) : Number(m.p1Score);
+    
+    goalsScored += myScore;
+    goalsConceded += oppScore;
+    
+    if (myScore > oppScore) win++;
+    else if (myScore < oppScore) loss++;
+    else draw++;
+  });
+
+  const form = playerMatches.slice(-5).map(m => {
+    const isP1 = m.p1Id === player.id;
+    const myScore = isP1 ? Number(m.p1Score) : Number(m.p2Score);
+    const oppScore = isP1 ? Number(m.p2Score) : Number(m.p1Score);
+    return myScore > oppScore ? 'W' : myScore < oppScore ? 'L' : 'D';
+  });
+
+  return {
+    ...player,
+    win,
+    loss,
+    draw,
+    goalsScored,
+    goalsConceded,
+    form,
+    ovr: calculateOVR(win, loss, draw, goalsScored, goalsConceded)
+  };
+}
+
+export async function recalculateAllStats(players: Player[], allMatches: MatchRecord[]) {
+  const batch = writeBatch(db);
+  players.forEach(p => {
+    const updatedPlayer = computePlayerStats(p, allMatches);
+    batch.set(doc(db, 'players', p.id), updatedPlayer);
+  });
+  try {
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'batch-recalculate-stats');
+  }
+}
+
 export async function savePlayer(player: Player) {
   const path = `players/${player.id}`;
   console.log('Saving player to Firestore:', path, player);
@@ -201,30 +253,9 @@ export async function savePlayer(player: Player) {
   }
 }
 
-export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2?: Player) {
+export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2: Player | undefined, allMatches: MatchRecord[], tournament?: string) {
   const batch = writeBatch(db);
   
-  const updatePlayerData = (p: Player, myScore: number, oppScore: number) => {
-    const result = myScore > oppScore ? 'W' : myScore < oppScore ? 'L' : 'D';
-    const updated = { ...p };
-    updated.goalsScored += myScore;
-    updated.goalsConceded += oppScore;
-    if (result === 'W') updated.win++;
-    else if (result === 'L') updated.loss++;
-    else updated.draw++;
-    updated.form = [...(updated.form || []), result].slice(-5);
-    updated.ovr = calculateOVR(updated.win, updated.loss, updated.draw, updated.goalsScored, updated.goalsConceded);
-    return updated;
-  };
-
-  const updatedP1 = updatePlayerData(p1, p1Score, p2Score);
-  batch.set(doc(db, 'players', p1.id), updatedP1);
-
-  if (p2) {
-    const updatedP2 = updatePlayerData(p2, p2Score, p1Score);
-    batch.set(doc(db, 'players', p2.id), updatedP2);
-  }
-
   const matchRef = doc(collection(db, 'matches'));
   const matchRecord: MatchRecord = {
     id: matchRef.id,
@@ -235,8 +266,19 @@ export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2?
     p2Id: p2?.id,
     p2Name: p2 ? p2.name : 'External Player',
     p2Score,
+    tournament: tournament || 'Friendly',
   };
   batch.set(matchRef, matchRecord);
+  
+  const updatedMatches = [...allMatches, matchRecord];
+
+  const updatedP1 = computePlayerStats(p1, updatedMatches);
+  batch.set(doc(db, 'players', p1.id), updatedP1);
+
+  if (p2) {
+    const updatedP2 = computePlayerStats(p2, updatedMatches);
+    batch.set(doc(db, 'players', p2.id), updatedP2);
+  }
 
   try {
     await batch.commit();
@@ -245,57 +287,37 @@ export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2?
   }
 }
 
-export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2Score: number, players: Player[]) {
+export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2Score: number, players: Player[], allMatches: MatchRecord[], newTournament?: string) {
   const batch = writeBatch(db);
 
-  const getResult = (myScore: number, oppScore: number) => myScore > oppScore ? 'W' : myScore < oppScore ? 'L' : 'D';
-
-  const revertAndApply = (p: Player, oldMyScore: number, oldOppScore: number, newMyScore: number, newOppScore: number) => {
-    const oldResult = getResult(oldMyScore, oldOppScore);
-    const newResult = getResult(newMyScore, newOppScore);
-
-    const updated = { ...p };
-    updated.goalsScored = updated.goalsScored - oldMyScore + newMyScore;
-    updated.goalsConceded = updated.goalsConceded - oldOppScore + newOppScore;
-    
-    if (oldResult === 'W') updated.win--;
-    else if (oldResult === 'L') updated.loss--;
-    else updated.draw--;
-
-    if (newResult === 'W') updated.win++;
-    else if (newResult === 'L') updated.loss++;
-    else updated.draw++;
-
-    // Prevent negative stats just in case
-    updated.win = Math.max(0, updated.win);
-    updated.loss = Math.max(0, updated.loss);
-    updated.draw = Math.max(0, updated.draw);
-    updated.goalsScored = Math.max(0, updated.goalsScored);
-    updated.goalsConceded = Math.max(0, updated.goalsConceded);
-
-    updated.ovr = calculateOVR(updated.win, updated.loss, updated.draw, updated.goalsScored, updated.goalsConceded);
-    return updated;
+  const updatedMatchRecord: MatchRecord = {
+    ...oldMatch,
+    p1Score: newP1Score,
+    p2Score: newP2Score,
+    tournament: newTournament || oldMatch.tournament || 'Friendly',
   };
+  
+  batch.update(doc(db, 'matches', oldMatch.id), {
+    p1Score: newP1Score,
+    p2Score: newP2Score,
+    tournament: updatedMatchRecord.tournament,
+  });
+
+  const updatedMatches = allMatches.map(m => m.id === oldMatch.id ? updatedMatchRecord : m);
 
   const p1 = players.find(p => p.id === oldMatch.p1Id);
   if (p1) {
-    const updatedP1 = revertAndApply(p1, oldMatch.p1Score, oldMatch.p2Score, newP1Score, newP2Score);
+    const updatedP1 = computePlayerStats(p1, updatedMatches);
     batch.set(doc(db, 'players', p1.id), updatedP1);
   }
 
   if (oldMatch.p2Id) {
     const p2 = players.find(p => p.id === oldMatch.p2Id);
     if (p2) {
-      const updatedP2 = revertAndApply(p2, oldMatch.p2Score, oldMatch.p1Score, newP2Score, newP1Score);
+      const updatedP2 = computePlayerStats(p2, updatedMatches);
       batch.set(doc(db, 'players', p2.id), updatedP2);
     }
   }
-
-  // Update match record
-  batch.update(doc(db, 'matches', oldMatch.id), {
-    p1Score: newP1Score,
-    p2Score: newP2Score,
-  });
 
   try {
     await batch.commit();
@@ -304,49 +326,26 @@ export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2
   }
 }
 
-export async function deleteMatchFromHistory(matchRecord: MatchRecord, players: Player[]) {
+export async function deleteMatchFromHistory(matchRecord: MatchRecord, players: Player[], allMatches: MatchRecord[]) {
   const batch = writeBatch(db);
 
-  const getResult = (myScore: number, oppScore: number) => myScore > oppScore ? 'W' : myScore < oppScore ? 'L' : 'D';
+  batch.delete(doc(db, 'matches', matchRecord.id));
 
-  const revert = (p: Player, oldMyScore: number, oldOppScore: number) => {
-    const oldResult = getResult(oldMyScore, oldOppScore);
-
-    const updated = { ...p };
-    updated.goalsScored = updated.goalsScored - oldMyScore;
-    updated.goalsConceded = updated.goalsConceded - oldOppScore;
-    
-    if (oldResult === 'W') updated.win--;
-    else if (oldResult === 'L') updated.loss--;
-    else updated.draw--;
-
-    // Prevent negative stats just in case
-    updated.win = Math.max(0, updated.win);
-    updated.loss = Math.max(0, updated.loss);
-    updated.draw = Math.max(0, updated.draw);
-    updated.goalsScored = Math.max(0, updated.goalsScored);
-    updated.goalsConceded = Math.max(0, updated.goalsConceded);
-
-    updated.ovr = calculateOVR(updated.win, updated.loss, updated.draw, updated.goalsScored, updated.goalsConceded);
-    return updated;
-  };
+  const updatedMatches = allMatches.filter(m => m.id !== matchRecord.id);
 
   const p1 = players.find(p => p.id === matchRecord.p1Id);
   if (p1) {
-    const updatedP1 = revert(p1, matchRecord.p1Score, matchRecord.p2Score);
+    const updatedP1 = computePlayerStats(p1, updatedMatches);
     batch.set(doc(db, 'players', p1.id), updatedP1);
   }
 
   if (matchRecord.p2Id) {
     const p2 = players.find(p => p.id === matchRecord.p2Id);
     if (p2) {
-      const updatedP2 = revert(p2, matchRecord.p2Score, matchRecord.p1Score);
+      const updatedP2 = computePlayerStats(p2, updatedMatches);
       batch.set(doc(db, 'players', p2.id), updatedP2);
     }
   }
-
-  // Delete match record
-  batch.delete(doc(db, 'matches', matchRecord.id));
 
   try {
     await batch.commit();

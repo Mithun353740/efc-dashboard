@@ -76,7 +76,7 @@ export default function Rankings() {
                     </td>
                     <td className="p-6">
                       <div className="flex gap-1">
-                        {player.form?.length ? player.form.map((res, i) => (
+                        {(player.win > 0 || player.loss > 0 || player.draw > 0) && player.form?.length ? player.form.map((res, i) => (
                           <div key={i} className={cn(
                             "w-2 h-2 rounded-full",
                             res === 'W' ? 'bg-brand-green' : res === 'L' ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-700'

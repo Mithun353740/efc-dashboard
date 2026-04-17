@@ -4,12 +4,23 @@ import { useFirebase } from '../FirebaseContext';
 export default function Leadership() {
   const { leaders } = useFirebase();
 
+  const roleOrder: Record<string, number> = {
+    'President': 1,
+    'Captain': 2,
+    'Vice-Captain': 3,
+    'Co-Founder': 4
+  };
+
+  const sortedLeaders = [...leaders].sort((a, b) => {
+    return (roleOrder[a.role] || 99) - (roleOrder[b.role] || 99);
+  });
+
   return (
     <section className="py-20 bg-white dark:bg-brand-dark transition-colors">
       <div className="max-w-7xl mx-auto px-8 grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-4">
           <h2 className="text-5xl font-black text-brand-dark dark:text-white tracking-tighter leading-[0.9] mb-6">
-            eFC<br />LEADERSHIP
+            QVC<br />LEADERSHIP
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-8">
             The tactical masterminds and strategic visionaries guiding Quantum Vortex eFC to global esports dominance.
@@ -32,7 +43,7 @@ export default function Leadership() {
         </div>
 
         <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {leaders.map((leader, index) => (
+          {sortedLeaders.map((leader, index) => (
             <motion.div
               key={leader.id}
               initial={{ opacity: 0, scale: 0.95 }}

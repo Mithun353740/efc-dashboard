@@ -27,7 +27,12 @@ function Home() {
     </div>
   );
 
-  if (rankedPlayers.length === 0) return <div className="p-20 text-center font-black text-slate-300 italic text-4xl">NO PLAYERS REGISTERED</div>;
+  if (rankedPlayers.length === 0) return (
+    <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center">
+      <div className="text-brand-green font-black animate-pulse tracking-widest mb-4">SYNCING ENGINE...</div>
+      <p className="text-slate-500 text-xs tracking-widest font-bold">AWAITING ROSTER DATA</p>
+    </div>
+  );
   
   return (
     <>

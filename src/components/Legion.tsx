@@ -27,7 +27,11 @@ export default function Legion() {
               </div>
               <div className="p-4">
                 <h3 className="text-xs font-black text-brand-dark dark:text-white tracking-tight truncate">{player.name}</h3>
-                <p className="text-[8px] font-bold text-slate-400 tracking-widest mt-1 uppercase">{player.position}</p>
+                <div className="mt-2 flex items-center">
+                  <span className="bg-brand-green text-brand-dark px-2 py-1 rounded-sm text-[11px] font-black tracking-widest">
+                    {player.ovr} OVR
+                  </span>
+                </div>
                 
                 <div className="grid grid-cols-4 gap-2 mt-4 pt-3 border-t border-slate-50 dark:border-white/10">
                   <MiniStat label="W" value={player.win} />

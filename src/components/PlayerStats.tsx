@@ -1,18 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ChevronRight, Trophy, Target, Zap } from 'lucide-react';
+import { Search, ChevronRight, Trophy, Target, Zap, Filter, ChevronDown } from 'lucide-react';
 import { useFirebase } from '../FirebaseContext';
 import { cn } from '../lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
 import { Player } from '../types';
+import { computePlayerStats } from '../lib/store';
 
 export default function PlayerStats() {
-  const { rankedPlayers: players } = useFirebase();
+  const { rankedPlayers: players, matches } = useFirebase();
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [search, setSearch] = useState('');
   const [searchParams] = useSearchParams();
   const playerIdParam = searchParams.get('id');
+  const [filter, setFilter] = useState('All Time');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
     if (playerIdParam) {
@@ -26,11 +29,52 @@ export default function PlayerStats() {
     }
   }, [players, playerIdParam, selectedPlayer]);
 
-  const chartData = selectedPlayer ? [
-    { name: 'WINS', value: selectedPlayer.win, color: '#22c55e' },
-    { name: 'DRAWS', value: selectedPlayer.draw, color: '#94a3b8' },
-    { name: 'LOSSES', value: selectedPlayer.loss, color: '#ef4444' },
-    { name: 'GOALS', value: selectedPlayer.goalsScored, color: '#38bdf8' },
+  const availableSeasons = useMemo(() => {
+    const seasons = new Set<string>();
+    matches.forEach(m => {
+      const d = new Date(m.timestamp);
+      const y = d.getFullYear();
+      const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+      const sY = isLateJan ? y - 1 : y;
+      seasons.add(`${sY}/${sY + 1}`);
+    });
+    // Ensure current season
+    const d = new Date();
+    const y = d.getFullYear();
+    const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+    const sY = isLateJan ? y - 1 : y;
+    seasons.add(`${sY}/${sY + 1}`);
+    return Array.from(seasons).sort().reverse();
+  }, [matches]);
+
+  const availableTournaments = ["QVFC Elite League Cup", "Vortex Champions Cup", "Vortex Domestic Cup"];
+
+  const computedPlayer = useMemo(() => {
+    if (!selectedPlayer) return null;
+    if (filter === 'All Time') return selectedPlayer;
+
+    let filteredMatches = matches;
+    
+    if (filter.includes('/')) {
+      filteredMatches = matches.filter(m => {
+        const d = new Date(m.timestamp);
+        const y = d.getFullYear();
+        const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+        const sY = isLateJan ? y - 1 : y;
+        return `${sY}/${sY + 1}` === filter;
+      });
+    } else {
+      filteredMatches = matches.filter(m => (m.tournament || 'Friendly') === filter);
+    }
+
+    return computePlayerStats(selectedPlayer, filteredMatches);
+  }, [selectedPlayer, filter, matches]);
+
+  const chartData = computedPlayer ? [
+    { name: 'WINS', value: computedPlayer.win, color: '#22c55e' },
+    { name: 'DRAWS', value: computedPlayer.draw, color: '#94a3b8' },
+    { name: 'LOSSES', value: computedPlayer.loss, color: '#ef4444' },
+    { name: 'GOALS', value: computedPlayer.goalsScored, color: '#38bdf8' },
   ] : [];
 
   return (
@@ -87,27 +131,88 @@ export default function PlayerStats() {
               className="max-w-4xl mx-auto space-y-12"
             >
               {/* Header Card */}
-              <div className="relative bg-brand-dark dark:bg-white/5 rounded-[2.5rem] p-12 overflow-hidden text-white border dark:border-white/10">
-                <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 pointer-events-none">
-                  <img src={selectedPlayer.image} alt="" className="w-full h-full object-cover object-top" />
+              <div className="relative bg-brand-dark dark:bg-white/5 rounded-[2.5rem] p-12 text-white border dark:border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.1)]">
+                <div className="absolute inset-0 rounded-[2.5rem] overflow-hidden pointer-events-none">
+                  <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 pointer-events-none">
+                    <img src={selectedPlayer.image} alt="" className="w-full h-full object-cover object-top" />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-brand-dark dark:from-black via-brand-dark/80 dark:via-black/80 to-transparent" />
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-brand-dark dark:from-black via-brand-dark/80 dark:via-black/80 to-transparent" />
+
+                {/* Custom Filter Dropdown positioned top right */}
+                <div className="absolute top-8 right-8 z-50">
+                  <button 
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    className="bg-brand-dark border-brand-green border px-4 py-3 rounded-2xl flex items-center gap-3 hover:scale-[1.02] transition-all font-black text-xs cursor-pointer group shadow-2xl shadow-brand-dark/50"
+                  >
+                    <Filter size={14} className="text-brand-green group-hover:rotate-12 transition-transform" />
+                    <span>{filter.includes('/') ? `${filter} Season` : filter}</span>
+                    <ChevronDown size={14} className={cn("text-brand-green ml-2 transition-transform", isFilterOpen ? "rotate-180" : "")} />
+                  </button>
+
+                  <AnimatePresence>
+                    {isFilterOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 top-full mt-3 w-72 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[60vh] flex flex-col z-50"
+                      >
+                        <div className="p-2 space-y-1 overflow-y-auto min-h-0 custom-scrollbar pr-1">
+                          <button 
+                            onClick={() => { setFilter('All Time'); setIsFilterOpen(false); }}
+                            className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === 'All Time' ? "bg-brand-green text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                          >
+                            All Time
+                          </button>
+                          
+                          <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-green mt-2 bg-brand-green/5 rounded-lg border border-brand-green/10">SEASONS</div>
+                          {availableSeasons.map(s => (
+                            <button 
+                              key={s}
+                              onClick={() => { setFilter(s); setIsFilterOpen(false); }}
+                              className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === s ? "bg-brand-green text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                            >
+                              {s} Season
+                            </button>
+                          ))}
+
+                          <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-green mt-2 bg-brand-green/5 rounded-lg border border-brand-green/10">TOURNAMENTS</div>
+                          {availableTournaments.map(t => (
+                            <button 
+                              key={t}
+                              onClick={() => { setFilter(t); setIsFilterOpen(false); }}
+                              className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === t ? "bg-brand-green text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {isFilterOpen && (
+                  <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsFilterOpen(false)} />
+                )}
 
                 <div className="relative z-10">
                   <span className="text-brand-green font-black text-[10px] tracking-[0.4em] mb-4 block">PLAYER PROFILE</span>
-                  <h1 className="text-7xl font-black tracking-tighter leading-none mb-4">{selectedPlayer.name}</h1>
+                  
+                  <h1 className="text-7xl font-black tracking-tighter leading-none mb-4">{computedPlayer.name}</h1>
                   <div className="flex gap-6 items-center">
                     <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-md border border-white/10">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">JERSEY</p>
-                      <p className="text-xl font-black">#{selectedPlayer.number}</p>
+                      <p className="text-xl font-black">#{computedPlayer.number}</p>
                     </div>
                     <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-md border border-white/10">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">DEVICE</p>
-                      <p className="text-xl font-black">{selectedPlayer.device || 'N/A'}</p>
+                      <p className="text-xl font-black">{computedPlayer.device || 'N/A'}</p>
                     </div>
                     <div className="bg-brand-green px-6 py-2 rounded-full text-brand-dark">
                       <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">OVERALL</p>
-                      <p className="text-xl font-black">{selectedPlayer.ovr}</p>
+                      <p className="text-xl font-black">{computedPlayer.ovr}</p>
                     </div>
                   </div>
                 </div>
@@ -135,9 +240,9 @@ export default function PlayerStats() {
                 </div>
 
                 <div className="space-y-6">
-                  <StatCard icon={<Trophy className="text-brand-green" />} label="POINTS" value={selectedPlayer.win * 3 + selectedPlayer.draw} />
-                  <StatCard icon={<Target className="text-brand-green" />} label="GOAL DIFF" value={selectedPlayer.goalsScored - selectedPlayer.goalsConceded} />
-                  <StatCard icon={<Zap className="text-brand-green" />} label="WIN RATE" value={`${Math.round((selectedPlayer.win / (selectedPlayer.win + selectedPlayer.loss + selectedPlayer.draw || 1)) * 100)}%`} />
+                  <StatCard icon={<Trophy className="text-brand-green" />} label="POINTS" value={computedPlayer.win * 3 + computedPlayer.draw} />
+                  <StatCard icon={<Target className="text-brand-green" />} label="GOAL DIFF" value={computedPlayer.goalsScored - computedPlayer.goalsConceded} />
+                  <StatCard icon={<Zap className="text-brand-green" />} label="WIN RATE" value={`${Math.round((computedPlayer.win / (computedPlayer.win + computedPlayer.loss + computedPlayer.draw || 1)) * 100)}%`} />
                 </div>
               </div>
 
@@ -145,7 +250,7 @@ export default function PlayerStats() {
               <div className="bg-white dark:bg-white/5 rounded-3xl p-8 border border-slate-100 dark:border-white/10 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors">
                 <h3 className="text-lg font-black text-brand-dark dark:text-white mb-6 tracking-tight">RECENT FORM</h3>
                 <div className="flex gap-4">
-                  {selectedPlayer.form?.length ? selectedPlayer.form.map((res, i) => (
+                  {(computedPlayer.win > 0 || computedPlayer.loss > 0 || computedPlayer.draw > 0) && computedPlayer.form?.length ? computedPlayer.form.map((res, i) => (
                     <div key={i} className={cn(
                       "flex-1 py-4 rounded-2xl flex flex-col items-center justify-center border transition-all",
                       res === 'W' ? "bg-brand-green/10 border-brand-green/20 text-brand-green" :

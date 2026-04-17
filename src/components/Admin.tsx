@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck } from 'lucide-react';
+import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, calculateOVR } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, calculateOVR, recalculateAllStats } from '../lib/store';
 import { Player, Leader, MatchRecord } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
@@ -36,9 +36,24 @@ export default function Admin() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Soft auto-sync ghost data in background if needed
+  React.useEffect(() => {
+    if (authStatus === 'authenticated' && players.length > 0) {
+      const needsSync = players.some(p => p.form?.length > 0 && p.win === 0 && p.loss === 0 && p.draw === 0);
+      if (needsSync && !isResyncing) {
+        setIsResyncing(true);
+        recalculateAllStats(players, matches)
+          .catch(e => console.error("Auto Resync Failed: ", e))
+          .finally(() => setIsResyncing(false));
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus, players]);
+
   
   // Player Form
-  const DEFAULT_PLAYER = { name: '', number: '', device: 'PS5', uid: '', image: '', win: 0, loss: 0, draw: 0, goalsScored: 0, goalsConceded: 0 };
+  const DEFAULT_PLAYER = { name: '', number: '', device: 'PS5', uid: '', image: '' };
   const [newPlayer, setNewPlayer] = useState(DEFAULT_PLAYER);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [playerMsg, setPlayerMsg] = useState({ text: '', type: '' });
@@ -50,7 +65,7 @@ export default function Admin() {
   const [leaderMsg, setLeaderMsg] = useState({ text: '', type: '' });
   
   // Match Form
-  const [match, setMatch] = useState({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false });
+  const [match, setMatch] = useState({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'QVFC Elite League Cup' });
   const [matchMsg, setMatchMsg] = useState({ text: '', type: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingMatch, setEditingMatch] = useState<MatchRecord | null>(null);
@@ -64,6 +79,7 @@ export default function Admin() {
   const [leaderPlayerSearch, setLeaderPlayerSearch] = useState('');
   const [playerToDelete, setPlayerToDelete] = useState<string | null>(null);
   const [leaderToDelete, setLeaderToDelete] = useState<string | null>(null);
+  const [isResyncing, setIsResyncing] = useState(false);
 
   const compressImage = (base64Str: string, maxWidth = 1600, maxHeight = 1600): Promise<string> => {
     return new Promise((resolve) => {
@@ -179,18 +195,12 @@ export default function Admin() {
       name: newPlayer.name.toUpperCase(),
       number: newPlayer.number,
       position: 'ANY',
-      ovr: calculateOVR(
-        editingPlayerId ? newPlayer.win : (existingPlayer ? existingPlayer.win : 0),
-        editingPlayerId ? newPlayer.loss : (existingPlayer ? existingPlayer.loss : 0),
-        editingPlayerId ? newPlayer.draw : (existingPlayer ? existingPlayer.draw : 0),
-        editingPlayerId ? newPlayer.goalsScored : (existingPlayer ? existingPlayer.goalsScored : 0),
-        editingPlayerId ? newPlayer.goalsConceded : (existingPlayer ? existingPlayer.goalsConceded : 0)
-      ),
-      win: editingPlayerId ? newPlayer.win : (existingPlayer ? existingPlayer.win : 0),
-      loss: editingPlayerId ? newPlayer.loss : (existingPlayer ? existingPlayer.loss : 0),
-      draw: editingPlayerId ? newPlayer.draw : (existingPlayer ? existingPlayer.draw : 0),
-      goalsScored: editingPlayerId ? newPlayer.goalsScored : (existingPlayer ? existingPlayer.goalsScored : 0),
-      goalsConceded: editingPlayerId ? newPlayer.goalsConceded : (existingPlayer ? existingPlayer.goalsConceded : 0),
+      ovr: existingPlayer ? existingPlayer.ovr : calculateOVR(0, 0, 0, 0, 0),
+      win: existingPlayer ? existingPlayer.win : 0,
+      loss: existingPlayer ? existingPlayer.loss : 0,
+      draw: existingPlayer ? existingPlayer.draw : 0,
+      goalsScored: existingPlayer ? existingPlayer.goalsScored : 0,
+      goalsConceded: existingPlayer ? existingPlayer.goalsConceded : 0,
       image: newPlayer.image || existingPlayer?.image || 'https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=400&auto=format&fit=crop',
       form: existingPlayer ? existingPlayer.form : [],
       device: newPlayer.device,
@@ -293,9 +303,9 @@ export default function Admin() {
     if (!p1) return;
 
     try {
-      await addMatch(p1, Number(match.p1Score), Number(match.p2Score), p2);
+      await addMatch(p1, Number(match.p1Score), Number(match.p2Score), p2, matches, match.tournament);
       setMatchMsg({ text: '✅ Match recorded', type: 'success' });
-      setMatch({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false });
+      setMatch({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'Friendly' });
       setP1Search('');
       setP2Search('');
     } catch (err) {
@@ -309,7 +319,7 @@ export default function Admin() {
     if (!editingMatch || editMatchScore1 === '' || editMatchScore2 === '') return;
     
     try {
-      await editMatch(editingMatch, Number(editMatchScore1), Number(editMatchScore2), players);
+      await editMatch(editingMatch, Number(editMatchScore1), Number(editMatchScore2), players, matches);
       setEditingMatch(null);
       setEditMatchScore1('');
       setEditMatchScore2('');
@@ -320,7 +330,7 @@ export default function Admin() {
 
   const handleDeleteMatch = async (m: MatchRecord) => {
     try {
-      await deleteMatchFromHistory(m, players);
+      await deleteMatchFromHistory(m, players, matches);
     } catch (err) {
       console.error('Error deleting match:', err);
     }
@@ -346,6 +356,22 @@ export default function Admin() {
               AUTH REQUIRED
             </div>
           )}
+          <button 
+            onClick={async () => {
+              setIsResyncing(true);
+              try {
+                await recalculateAllStats(players, matches);
+                alert('All player stats resynced successfully based on Match History.');
+              } catch(e) {
+                alert('Failed to resync stats.');
+              }
+              setIsResyncing(false);
+            }} 
+            disabled={isResyncing}
+            className="px-6 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-full text-[10px] font-black tracking-widest transition-all disabled:opacity-50"
+          >
+            {isResyncing ? 'SYNCING...' : 'RESYNC STATS'}
+          </button>
           <button onClick={() => navigate('/')} className="px-6 py-2 bg-white/5 hover:bg-white/10 rounded-full text-[10px] font-black tracking-widest transition-all">
             HOME
           </button>
@@ -414,12 +440,7 @@ export default function Admin() {
                                     number: p.number,
                                     device: p.device,
                                     uid: p.uid,
-                                    image: p.image,
-                                    win: p.win,
-                                    loss: p.loss,
-                                    draw: p.draw,
-                                    goalsScored: p.goalsScored,
-                                    goalsConceded: p.goalsConceded
+                                    image: p.image
                                   });
                                   setPlayerNameSearch(p.name);
                                 }}
@@ -474,36 +495,6 @@ export default function Admin() {
                     </div>
                     <Input label="DEVICE" value={newPlayer.device} onChange={v => setNewPlayer({...newPlayer, device: v})} placeholder="PS5 / PC" />
                     
-                    {editingPlayerId && (
-                      <div className="bg-[#0f172a] p-4 rounded-xl border border-amber-500/20 space-y-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">⚠️ OVERRIDE PLAYER STATS</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-black tracking-widest text-slate-500 uppercase">WINS</label>
-                            <input type="number" value={newPlayer.win.toString()} onChange={e => setNewPlayer({...newPlayer, win: parseInt(e.target.value) || 0})} className="w-full bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-black tracking-widest text-slate-500 uppercase">LOSSES</label>
-                            <input type="number" value={newPlayer.loss.toString()} onChange={e => setNewPlayer({...newPlayer, loss: parseInt(e.target.value) || 0})} className="w-full bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-black tracking-widest text-slate-500 uppercase">DRAWS</label>
-                            <input type="number" value={newPlayer.draw.toString()} onChange={e => setNewPlayer({...newPlayer, draw: parseInt(e.target.value) || 0})} className="w-full bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-black tracking-widest text-slate-500 uppercase">GOALS SCORED</label>
-                            <input type="number" value={newPlayer.goalsScored.toString()} onChange={e => setNewPlayer({...newPlayer, goalsScored: parseInt(e.target.value) || 0})} className="w-full bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-black tracking-widest text-slate-500 uppercase">GOALS CONCEDED</label>
-                            <input type="number" value={newPlayer.goalsConceded.toString()} onChange={e => setNewPlayer({...newPlayer, goalsConceded: parseInt(e.target.value) || 0})} className="w-full bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
                     <div className="space-y-1">
                       <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">PICTURE (UPLOAD OR PASTE URL)</label>
                       <div className="flex items-center gap-4">
@@ -628,6 +619,24 @@ export default function Admin() {
                         )}
                       </div>
                       <input type="number" value={match.p2Score} onChange={e => setMatch({...match, p2Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-green outline-none transition-all" placeholder="0" />
+                    </div>
+                  </div>
+
+                  <div className="w-full space-y-2">
+                    <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">MATCH TYPE / TOURNAMENT</label>
+                    <div className="relative">
+                      <select 
+                        value={match.tournament}
+                        onChange={e => setMatch({...match, tournament: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-brand-green outline-none transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
+                        <option value="Vortex Champions Cup" className="bg-brand-dark">Vortex Champions Cup</option>
+                        <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-brand-green">
+                        <ChevronDown size={16} />
+                      </div>
                     </div>
                   </div>
 

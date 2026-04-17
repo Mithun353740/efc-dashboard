@@ -34,4 +34,5 @@ export interface MatchRecord {
   p2Id?: string;
   p2Name: string;
   p2Score: number;
+  tournament?: string;
 }
