@@ -45,5 +45,10 @@
     -webkit-text-stroke: 1px currentColor;
     color: transparent;
   }
+  @media (min-width: 768px) {
+    .text-outline {
+      -webkit-text-stroke: 2px currentColor;
+    }
+  }
 }
 
