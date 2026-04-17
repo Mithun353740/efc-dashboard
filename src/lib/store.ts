@@ -304,6 +304,57 @@ export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2
   }
 }
 
+export async function deleteMatchFromHistory(matchRecord: MatchRecord, players: Player[]) {
+  const batch = writeBatch(db);
+
+  const getResult = (myScore: number, oppScore: number) => myScore > oppScore ? 'W' : myScore < oppScore ? 'L' : 'D';
+
+  const revert = (p: Player, oldMyScore: number, oldOppScore: number) => {
+    const oldResult = getResult(oldMyScore, oldOppScore);
+
+    const updated = { ...p };
+    updated.goalsScored = updated.goalsScored - oldMyScore;
+    updated.goalsConceded = updated.goalsConceded - oldOppScore;
+    
+    if (oldResult === 'W') updated.win--;
+    else if (oldResult === 'L') updated.loss--;
+    else updated.draw--;
+
+    // Prevent negative stats just in case
+    updated.win = Math.max(0, updated.win);
+    updated.loss = Math.max(0, updated.loss);
+    updated.draw = Math.max(0, updated.draw);
+    updated.goalsScored = Math.max(0, updated.goalsScored);
+    updated.goalsConceded = Math.max(0, updated.goalsConceded);
+
+    updated.ovr = calculateOVR(updated.win, updated.loss, updated.draw, updated.goalsScored, updated.goalsConceded);
+    return updated;
+  };
+
+  const p1 = players.find(p => p.id === matchRecord.p1Id);
+  if (p1) {
+    const updatedP1 = revert(p1, matchRecord.p1Score, matchRecord.p2Score);
+    batch.set(doc(db, 'players', p1.id), updatedP1);
+  }
+
+  if (matchRecord.p2Id) {
+    const p2 = players.find(p => p.id === matchRecord.p2Id);
+    if (p2) {
+      const updatedP2 = revert(p2, matchRecord.p2Score, matchRecord.p1Score);
+      batch.set(doc(db, 'players', p2.id), updatedP2);
+    }
+  }
+
+  // Delete match record
+  batch.delete(doc(db, 'matches', matchRecord.id));
+
+  try {
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, 'batch-match-delete');
+  }
+}
+
 export async function deletePlayer(id: string) {
   const path = `players/${id}`;
   try {

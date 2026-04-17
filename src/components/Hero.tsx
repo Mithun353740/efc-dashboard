@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Player } from '../types';
 import { CLUB_TAGLINE } from '../constants';
+import { Link } from 'react-router-dom';
 
 interface HeroProps {
   player: Player;
@@ -38,9 +39,9 @@ export default function Hero({ player }: HeroProps) {
             </h2>
             
             <div className="flex gap-4">
-              <a href={`/stats?id=${player.id}`} className="bg-brand-green hover:bg-green-500 text-brand-dark font-black text-xs tracking-widest px-8 py-4 rounded-full transition-all hover:scale-105 flex items-center justify-center">
+              <Link to={`/stats?id=${player.id}`} className="bg-brand-green hover:bg-green-500 text-brand-dark font-black text-xs tracking-widest px-8 py-4 rounded-full transition-all hover:scale-105 flex items-center justify-center">
                 VIEW STATS
-              </a>
+              </Link>
               <button className="border border-white/30 hover:border-white text-white font-black text-xs tracking-widest px-8 py-4 rounded-full transition-all hover:bg-white/10">
                 WATCH HIGHLIGHTS
               </button>

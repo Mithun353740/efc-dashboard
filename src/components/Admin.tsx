@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, editMatch, saveLeader, deleteLeader, calculateOVR } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, calculateOVR } from '../lib/store';
 import { Player, Leader, MatchRecord } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
@@ -315,6 +315,14 @@ export default function Admin() {
       setEditMatchScore2('');
     } catch (err) {
       console.error('Error editing match:', err);
+    }
+  };
+
+  const handleDeleteMatch = async (m: MatchRecord) => {
+    try {
+      await deleteMatchFromHistory(m, players);
+    } catch (err) {
+      console.error('Error deleting match:', err);
     }
   };
 
@@ -743,9 +751,14 @@ export default function Admin() {
                                 <button onClick={() => setEditingMatch(null)} className="bg-white/10 text-white px-3 py-2 rounded text-[10px] font-black tracking-widest hover:bg-white/20 transition-all">CANCEL</button>
                               </div>
                             ) : (
-                              <button onClick={() => { setEditingMatch(m); setEditMatchScore1(m.p1Score.toString()); setEditMatchScore2(m.p2Score.toString()); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase">
-                                EDIT SCORE
-                              </button>
+                              <div className="flex gap-2">
+                                <button onClick={() => { setEditingMatch(m); setEditMatchScore1(m.p1Score.toString()); setEditMatchScore2(m.p2Score.toString()); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase">
+                                  EDIT
+                                </button>
+                                <button onClick={() => handleDeleteMatch(m)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>

@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import { cn } from '../lib/utils';
+import { Link } from 'react-router-dom';
 
 export default function EliteRankings() {
   const { rankedPlayers } = useFirebase();
@@ -13,14 +14,14 @@ export default function EliteRankings() {
           <h2 className="text-4xl font-black text-brand-dark dark:text-white tracking-tighter">eFOOTBALL ELITE</h2>
           <p className="text-xs font-bold text-slate-400 tracking-widest mt-2 uppercase">TOP PERFORMERS THIS SEASON</p>
         </div>
-        <a href="/rankings" className="text-[10px] font-black tracking-widest text-brand-dark dark:text-brand-green border-b-2 border-brand-dark dark:border-brand-green pb-1 hover:opacity-70 transition-opacity">
+        <Link to="/rankings" className="text-[10px] font-black tracking-widest text-brand-dark dark:text-brand-green border-b-2 border-brand-dark dark:border-brand-green pb-1 hover:opacity-70 transition-opacity">
           VIEW FULL LEADERBOARD
-        </a>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {topPlayers.map((player, index) => (
-          <a href={`/stats?id=${player.id}`} key={player.id} className="block group">
+          <Link to={`/stats?id=${player.id}`} key={player.id} className="block group">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -56,7 +57,7 @@ export default function EliteRankings() {
                 </div>
               </div>
             </motion.div>
-          </a>
+          </Link>
         ))}
       </div>
     </section>
