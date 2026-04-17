@@ -38,7 +38,7 @@ export default function Admin() {
   }, []);
   
   // Player Form
-  const DEFAULT_PLAYER = { name: '', number: '', device: 'PS5', uid: '', image: '' };
+  const DEFAULT_PLAYER = { name: '', number: '', device: 'PS5', uid: '', image: '', win: 0, loss: 0, draw: 0, goalsScored: 0, goalsConceded: 0 };
   const [newPlayer, setNewPlayer] = useState(DEFAULT_PLAYER);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [playerMsg, setPlayerMsg] = useState({ text: '', type: '' });
@@ -180,17 +180,17 @@ export default function Admin() {
       number: newPlayer.number,
       position: 'ANY',
       ovr: calculateOVR(
-        existingPlayer ? existingPlayer.win : 0,
-        existingPlayer ? existingPlayer.loss : 0,
-        existingPlayer ? existingPlayer.draw : 0,
-        existingPlayer ? existingPlayer.goalsScored : 0,
-        existingPlayer ? existingPlayer.goalsConceded : 0
+        editingPlayerId ? newPlayer.win : (existingPlayer ? existingPlayer.win : 0),
+        editingPlayerId ? newPlayer.loss : (existingPlayer ? existingPlayer.loss : 0),
+        editingPlayerId ? newPlayer.draw : (existingPlayer ? existingPlayer.draw : 0),
+        editingPlayerId ? newPlayer.goalsScored : (existingPlayer ? existingPlayer.goalsScored : 0),
+        editingPlayerId ? newPlayer.goalsConceded : (existingPlayer ? existingPlayer.goalsConceded : 0)
       ),
-      win: existingPlayer ? existingPlayer.win : 0,
-      loss: existingPlayer ? existingPlayer.loss : 0,
-      draw: existingPlayer ? existingPlayer.draw : 0,
-      goalsScored: existingPlayer ? existingPlayer.goalsScored : 0,
-      goalsConceded: existingPlayer ? existingPlayer.goalsConceded : 0,
+      win: editingPlayerId ? newPlayer.win : (existingPlayer ? existingPlayer.win : 0),
+      loss: editingPlayerId ? newPlayer.loss : (existingPlayer ? existingPlayer.loss : 0),
+      draw: editingPlayerId ? newPlayer.draw : (existingPlayer ? existingPlayer.draw : 0),
+      goalsScored: editingPlayerId ? newPlayer.goalsScored : (existingPlayer ? existingPlayer.goalsScored : 0),
+      goalsConceded: editingPlayerId ? newPlayer.goalsConceded : (existingPlayer ? existingPlayer.goalsConceded : 0),
       image: newPlayer.image || existingPlayer?.image || 'https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=400&auto=format&fit=crop',
       form: existingPlayer ? existingPlayer.form : [],
       device: newPlayer.device,
@@ -414,7 +414,12 @@ export default function Admin() {
                                     number: p.number,
                                     device: p.device,
                                     uid: p.uid,
-                                    image: p.image
+                                    image: p.image,
+                                    win: p.win,
+                                    loss: p.loss,
+                                    draw: p.draw,
+                                    goalsScored: p.goalsScored,
+                                    goalsConceded: p.goalsConceded
                                   });
                                   setPlayerNameSearch(p.name);
                                 }}
@@ -468,6 +473,37 @@ export default function Admin() {
                       <Input label="UID (GAME ID)" value={newPlayer.uid} onChange={v => setNewPlayer({...newPlayer, uid: v})} placeholder="VORTEX_123" />
                     </div>
                     <Input label="DEVICE" value={newPlayer.device} onChange={v => setNewPlayer({...newPlayer, device: v})} placeholder="PS5 / PC" />
+                    
+                    {editingPlayerId && (
+                      <div className="bg-[#0f172a] p-4 rounded-xl border border-amber-500/20 space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">⚠️ OVERRIDE PLAYER STATS</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black tracking-widest text-slate-500 uppercase">WINS</label>
+                            <input type="number" value={newPlayer.win.toString()} onChange={e => setNewPlayer({...newPlayer, win: parseInt(e.target.value) || 0})} className="w-full bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black tracking-widest text-slate-500 uppercase">LOSSES</label>
+                            <input type="number" value={newPlayer.loss.toString()} onChange={e => setNewPlayer({...newPlayer, loss: parseInt(e.target.value) || 0})} className="w-full bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black tracking-widest text-slate-500 uppercase">DRAWS</label>
+                            <input type="number" value={newPlayer.draw.toString()} onChange={e => setNewPlayer({...newPlayer, draw: parseInt(e.target.value) || 0})} className="w-full bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black tracking-widest text-slate-500 uppercase">GOALS SCORED</label>
+                            <input type="number" value={newPlayer.goalsScored.toString()} onChange={e => setNewPlayer({...newPlayer, goalsScored: parseInt(e.target.value) || 0})} className="w-full bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black tracking-widest text-slate-500 uppercase">GOALS CONCEDED</label>
+                            <input type="number" value={newPlayer.goalsConceded.toString()} onChange={e => setNewPlayer({...newPlayer, goalsConceded: parseInt(e.target.value) || 0})} className="w-full bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-1">
                       <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">PICTURE (UPLOAD OR PASTE URL)</label>
                       <div className="flex items-center gap-4">
