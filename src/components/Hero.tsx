@@ -20,7 +20,7 @@ export default function Hero({ player }: HeroProps) {
       />
       
       {/* Player Image - Now visible on all devices, scaled proportionally */}
-      <div className="absolute right-0 bottom-0 h-full w-[80%] md:w-1/2 rtl-flip opacity-30 md:opacity-100 z-0 pointer-events-none">
+      <div className="absolute right-0 bottom-0 h-full w-[90%] md:w-1/2 rtl-flip opacity-50 md:opacity-100 z-0 pointer-events-none">
         <motion.img
           initial={{ opacity: 0, scale: 1.1 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -48,7 +48,7 @@ export default function Hero({ player }: HeroProps) {
             <h1 className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white leading-none tracking-tighter mb-2 uppercase break-words hyphens-auto">
               {firstName}
             </h1>
-            <h2 className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-outline text-white leading-none tracking-tighter mb-8 uppercase break-words hyphens-auto">
+            <h2 className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white/50 md:text-outline md:text-white leading-none tracking-tighter mb-8 uppercase break-words hyphens-auto">
               {lastName}
             </h2>
             

@@ -19,7 +19,7 @@ export default function EliteRankings() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
         {topPlayers.map((player, index) => (
           <Link to={`/stats?id=${player.id}`} key={player.id} className="block group">
             <motion.div
@@ -27,15 +27,15 @@ export default function EliteRankings() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className={cn("relative rounded-2xl p-8 overflow-hidden transition-colors", index === 0 ? "bg-brand-green/10 dark:bg-brand-green/5 border-2 border-brand-green shadow-[0_0_30px_rgba(34,197,94,0.15)]" : "bg-[#f1f5f9] dark:bg-white/5 border border-transparent")}
+              className={cn("relative rounded-2xl p-4 md:p-8 overflow-hidden transition-colors", index === 0 ? "bg-brand-green/10 dark:bg-brand-green/5 border-2 border-brand-green shadow-[0_0_30px_rgba(34,197,94,0.15)] col-span-2 lg:col-span-1" : "bg-[#f1f5f9] dark:bg-white/5 border border-transparent")}
             >
               {index === 0 && (
-                <div className="absolute top-0 right-8 bg-brand-green text-brand-dark px-4 py-2 font-black text-[10px] tracking-widest uppercase rounded-b-xl shadow-lg z-20">
+                <div className="absolute top-0 right-4 md:right-8 bg-brand-green text-brand-dark px-2 md:px-4 py-1.5 md:py-2 font-black text-[8px] md:text-[10px] tracking-widest uppercase rounded-b-xl shadow-lg z-20">
                   TOP PERFORMER
                 </div>
               )}
               {/* Background Number */}
-              <span className={cn("absolute -left-4 -top-8 text-[12rem] font-black leading-none select-none", index === 0 ? "text-brand-green/20" : "text-slate-200/50 dark:text-white/5")}>
+              <span className={cn("absolute -left-2 md:-left-4 -top-4 md:-top-8 text-[6rem] md:text-[12rem] font-black leading-none select-none", index === 0 ? "text-brand-green/20" : "text-slate-200/50 dark:text-white/5")}>
                 0{index + 1}
               </span>
 
@@ -44,17 +44,17 @@ export default function EliteRankings() {
                   <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
                 </div>
 
-                <h3 className="text-xl font-black text-brand-dark dark:text-white tracking-tight">{player.name}</h3>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="bg-brand-dark dark:bg-white/10 text-white px-2 py-1 flex items-center justify-center rounded-md text-[10px] font-black tracking-widest">
+                <h3 className="text-sm md:text-xl font-black text-brand-dark dark:text-white tracking-tight leading-tight">{player.name}</h3>
+                <div className="flex items-center gap-1 md:gap-2 mt-2 flex-wrap">
+                  <span className="bg-brand-dark dark:bg-white/10 text-white px-1.5 md:px-2 py-0.5 md:py-1 flex items-center justify-center rounded-md text-[8px] md:text-[10px] font-black tracking-widest">
                     #{index + 1} RANK
                   </span>
-                  <span className="bg-brand-green text-brand-dark px-2 py-1 flex items-center justify-center rounded-md text-[10px] font-black tracking-widest">
+                  <span className="bg-brand-green text-brand-dark px-1.5 md:px-2 py-0.5 md:py-1 flex items-center justify-center rounded-md text-[8px] md:text-[10px] font-black tracking-widest">
                     {player.ovr} OVR
                   </span>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4 mt-8 pt-6 border-t border-slate-200 dark:border-white/10">
+                <div className="grid grid-cols-4 gap-2 md:gap-4 mt-4 md:mt-8 pt-4 md:pt-6 border-t border-slate-200 dark:border-white/10">
                   <Stat label="W" value={player.win} />
                   <Stat label="L" value={player.loss} />
                   <Stat label="D" value={player.draw} />
