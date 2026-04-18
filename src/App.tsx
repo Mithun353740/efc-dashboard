@@ -27,19 +27,21 @@ function Home() {
     </div>
   );
 
-  if (rankedPlayers.length === 0) return (
-    <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center">
-      <div className="text-brand-green font-black animate-pulse tracking-widest mb-4">SYNCING ENGINE...</div>
-      <p className="text-slate-500 text-xs tracking-widest font-bold">AWAITING ROSTER DATA</p>
-    </div>
-  );
-  
   return (
     <>
-      <Hero player={rankedPlayers[0]} />
-      <EliteRankings />
-      <Leadership />
-      <Legion />
+      {rankedPlayers.length > 0 ? (
+        <>
+          <Hero player={rankedPlayers[0]} />
+          <EliteRankings />
+          <Leadership />
+          <Legion />
+        </>
+      ) : (
+        <div className="pt-32 pb-20 px-8 text-center min-h-[50vh] flex flex-col items-center justify-center">
+          <h1 className="text-4xl md:text-6xl font-black text-brand-dark dark:text-white tracking-tighter mb-4">ROSTER EMPTY</h1>
+          <p className="text-slate-500 font-bold tracking-widest">Login to the control center to add players to the club.</p>
+        </div>
+      )}
     </>
   );
 }

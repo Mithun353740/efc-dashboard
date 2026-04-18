@@ -37,45 +37,9 @@ export default function Admin() {
     return () => unsubscribe();
   }, []);
 
-  // Soft auto-sync ghost data in background if needed
-  React.useEffect(() => {
-    if (authStatus === 'authenticated' && players.length > 0) {
-      const needsSync = players.some(p => p.form?.length > 0 && p.win === 0 && p.loss === 0 && p.draw === 0);
-      if (needsSync && !isResyncing) {
-        setIsResyncing(true);
-        recalculateAllStats(players, matches)
-          .catch(e => console.error("Auto Resync Failed: ", e))
-          .finally(() => setIsResyncing(false));
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authStatus, players]);
-
-  
   // Player Form
   const DEFAULT_PLAYER = { name: '', number: '', device: 'PS5', uid: '', image: '' };
   
-  // Auto-fix friendly matches safely
-  useEffect(() => {
-    if (authStatus === 'authenticated' && matches.length > 0) {
-      const friendlyMatches = matches.filter(m => !m.tournament || m.tournament === 'Friendly');
-      if (friendlyMatches.length > 0) {
-        import('firebase/firestore').then(({ writeBatch, doc }) => {
-          import('../firebase').then(({ db }) => {
-            const batch = writeBatch(db);
-            friendlyMatches.forEach(m => {
-              batch.update(doc(db, 'matches', m.id), { tournament: 'QVFC Elite League Cup' });
-            });
-            batch.commit().then(() => {
-              console.log('Fixed Friendly matches to QVFC Elite League Cup');
-            }).catch(console.error);
-          });
-        });
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authStatus, matches.length, players.length > 0]);
-
   const [newPlayer, setNewPlayer] = useState(DEFAULT_PLAYER);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [playerMsg, setPlayerMsg] = useState({ text: '', type: '' });
