@@ -15,19 +15,19 @@ export default function Rankings() {
 
         <div className="bg-white dark:bg-white/5 rounded-3xl shadow-2xl shadow-slate-200/50 dark:shadow-none overflow-hidden border border-slate-100 dark:border-white/10">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] text-left border-collapse">
+            <table className="w-full text-left border-collapse table-fixed lg:table-auto">
               <thead>
                 <tr className="bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark">
-                  <th className="p-6 text-[10px] font-black tracking-widest uppercase">RANK</th>
-                  <th className="p-6 text-[10px] font-black tracking-widest uppercase">PLAYER</th>
-                  <th className="p-6 text-[10px] font-black tracking-widest uppercase text-center">W</th>
-                  <th className="p-6 text-[10px] font-black tracking-widest uppercase text-center">D</th>
-                  <th className="p-6 text-[10px] font-black tracking-widest uppercase text-center">L</th>
-                  <th className="p-6 text-[10px] font-black tracking-widest uppercase text-center">GS</th>
-                  <th className="p-6 text-[10px] font-black tracking-widest uppercase text-center">GC</th>
-                  <th className="p-6 text-[10px] font-black tracking-widest uppercase text-center">GD</th>
-                  <th className="p-6 text-[10px] font-black tracking-widest uppercase text-center">PTS</th>
-                  <th className="p-6 text-[10px] font-black tracking-widest uppercase">FORM</th>
+                  <th className="p-2 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase w-8 lg:w-auto text-center lg:text-left">#</th>
+                  <th className="p-2 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase">PLAYER</th>
+                  <th className="p-1 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">W</th>
+                  <th className="p-1 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">D</th>
+                  <th className="p-1 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">L</th>
+                  <th className="hidden lg:table-cell p-6 text-[10px] font-black tracking-widest uppercase text-center">GS</th>
+                  <th className="hidden lg:table-cell p-6 text-[10px] font-black tracking-widest uppercase text-center">GC</th>
+                  <th className="p-1 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase text-center w-8 lg:w-auto">GD</th>
+                  <th className="p-1 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase text-center w-8 lg:w-auto">PTS</th>
+                  <th className="hidden sm:table-cell p-2 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase">FORM</th>
                 </tr>
               </thead>
               <tbody>
@@ -42,39 +42,39 @@ export default function Rankings() {
                       index < 3 && "bg-brand-green/5 dark:bg-brand-green/10"
                     )}
                   >
-                    <td className="p-6">
+                    <td className="p-2 lg:p-6 text-center lg:text-left">
                       <span className={cn(
-                        "text-lg font-black",
+                        "text-xs lg:text-lg font-black",
                         index === 0 ? "text-brand-green" : index < 3 ? "text-brand-dark dark:text-white" : "text-slate-300 dark:text-slate-700"
                       )}>
-                        #{index + 1}
+                        {index + 1}
                       </span>
                     </td>
-                    <td className="p-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden border border-slate-200 dark:border-white/10">
+                    <td className="p-2 lg:p-6">
+                      <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
+                        <div className="shrink-0 w-6 h-6 lg:w-10 lg:h-10 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden border border-slate-200 dark:border-white/10">
                           <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
                         </div>
-                        <div>
-                          <p className="text-sm font-black text-brand-dark dark:text-white leading-none">{player.name}</p>
-                          <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">#{player.number} • {player.position}</p>
+                        <div className="min-w-0">
+                          <p className="text-[10px] lg:text-sm font-black text-brand-dark dark:text-white leading-none truncate">{player.name}</p>
+                          <p className="hidden sm:block text-[8px] lg:text-[9px] font-bold text-slate-400 mt-1 uppercase truncate">#{player.number} • {player.position}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="p-6 text-center text-sm font-bold text-slate-600 dark:text-slate-400">{player.win}</td>
-                    <td className="p-6 text-center text-sm font-bold text-slate-600 dark:text-slate-400">{player.draw}</td>
-                    <td className="p-6 text-center text-sm font-bold text-slate-600 dark:text-slate-400">{player.loss}</td>
-                    <td className="p-6 text-center text-sm font-bold text-slate-600 dark:text-slate-400">{player.goalsScored}</td>
-                    <td className="p-6 text-center text-sm font-bold text-slate-600 dark:text-slate-400">{player.goalsConceded}</td>
-                    <td className="p-6 text-center text-sm font-black text-brand-dark dark:text-white">
+                    <td className="p-1 lg:p-6 text-center text-[10px] lg:text-sm font-bold text-slate-600 dark:text-slate-400">{player.win}</td>
+                    <td className="p-1 lg:p-6 text-center text-[10px] lg:text-sm font-bold text-slate-600 dark:text-slate-400">{player.draw}</td>
+                    <td className="p-1 lg:p-6 text-center text-[10px] lg:text-sm font-bold text-slate-600 dark:text-slate-400">{player.loss}</td>
+                    <td className="hidden lg:table-cell p-6 text-center text-sm font-bold text-slate-600 dark:text-slate-400">{player.goalsScored}</td>
+                    <td className="hidden lg:table-cell p-6 text-center text-sm font-bold text-slate-600 dark:text-slate-400">{player.goalsConceded}</td>
+                    <td className="p-1 lg:p-6 text-center text-[10px] lg:text-sm font-black text-brand-dark dark:text-white">
                       {player.goalsScored - player.goalsConceded > 0 ? '+' : ''}{player.goalsScored - player.goalsConceded}
                     </td>
-                    <td className="p-6 text-center">
-                      <span className="bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark text-xs font-black px-3 py-1 rounded-full">
+                    <td className="p-1 lg:p-6 text-center">
+                      <span className="bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark text-[10px] lg:text-xs font-black px-1.5 lg:px-3 py-0.5 lg:py-1 rounded-full">
                         {player.win * 3 + player.draw}
                       </span>
                     </td>
-                    <td className="p-6">
+                    <td className="hidden sm:table-cell p-2 lg:p-6">
                       <div className="flex gap-1">
                         {(player.win > 0 || player.loss > 0 || player.draw > 0) && player.form?.length ? player.form.map((res, i) => (
                           <div key={i} className={cn(
