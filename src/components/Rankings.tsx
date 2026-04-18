@@ -15,7 +15,7 @@ export default function Rankings() {
 
         <div className="bg-white dark:bg-white/5 rounded-3xl shadow-2xl shadow-slate-200/50 dark:shadow-none overflow-hidden border border-slate-100 dark:border-white/10">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[800px] text-left border-collapse">
               <thead>
                 <tr className="bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark">
                   <th className="p-6 text-[10px] font-black tracking-widest uppercase">RANK</th>

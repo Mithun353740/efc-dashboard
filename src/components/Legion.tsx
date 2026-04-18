@@ -11,7 +11,7 @@ export default function Legion() {
         <div className="h-[2px] w-full bg-slate-200 dark:bg-white/10" />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+      <div className="flex lg:grid overflow-x-auto lg:overflow-visible overflow-y-hidden lg:grid-cols-6 gap-6 pb-8 lg:pb-0 snap-x custom-scrollbar">
         {players.map((player, index) => (
           <motion.div
             key={player.id}
@@ -19,7 +19,7 @@ export default function Legion() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: index * 0.05 }}
-            className="group"
+            className="group shrink-0 w-[160px] lg:w-auto snap-start"
           >
             <div className="bg-white dark:bg-white/5 rounded-xl overflow-hidden shadow-sm border border-slate-100 dark:border-white/10 transition-all hover:shadow-xl hover:-translate-y-1">
               <div className="aspect-[4/5] overflow-hidden transition-all duration-500">

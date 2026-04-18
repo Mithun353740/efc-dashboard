@@ -17,12 +17,20 @@ export default function PlayerStats() {
   const [filter, setFilter] = useState('All Time');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  const [isMobileStatsView, setIsMobileStatsView] = useState(false);
+
   useEffect(() => {
     if (playerIdParam) {
       const p = players.find(player => player.id === playerIdParam);
-      if (p) setSelectedPlayer(p);
+      if (p) {
+        setSelectedPlayer(p);
+        setIsMobileStatsView(true);
+      }
     } else if (players.length > 0 && !selectedPlayer) {
-      setSelectedPlayer(players[0]);
+      // Don't auto-set on mobile so they can see the roster first
+      if (window.innerWidth > 1024) {
+        setSelectedPlayer(players[0]);
+      }
     } else if (selectedPlayer) {
       const stillExists = players.find(p => p.id === selectedPlayer.id);
       if (stillExists) setSelectedPlayer(stillExists);
@@ -47,7 +55,7 @@ export default function PlayerStats() {
     return Array.from(seasons).sort().reverse();
   }, [matches]);
 
-  const availableTournaments = ["QVFC Elite League Cup", "Vortex Champions Cup", "Vortex Domestic Cup"];
+  const availableTournaments = ["QVFC Elite League Cup", "QVFC Elite League Cup Division 2", "Vortex Champions Cup", "Vortex Domestic Cup"];
 
   const computedPlayer = useMemo(() => {
     if (!selectedPlayer) return null;
@@ -78,9 +86,9 @@ export default function PlayerStats() {
   ] : [];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark flex flex-col lg:flex-row transition-colors">
+    <div className="min-h-[calc(100vh-80px)] bg-[#f8fafc] dark:bg-brand-dark flex flex-col lg:flex-row transition-colors isolate">
       {/* Sidebar Search */}
-      <div className="w-full lg:w-80 bg-white dark:bg-white/5 border-r border-slate-100 dark:border-white/10 flex flex-col h-screen sticky top-0">
+      <div className={cn("w-full lg:w-80 bg-white dark:bg-white/5 border-r border-slate-100 dark:border-white/10 flex flex-col h-[calc(100vh-80px)] lg:sticky top-[80px] z-10", isMobileStatsView && selectedPlayer ? "hidden lg:flex" : "flex")}>
         <div className="p-6 border-b border-slate-100 dark:border-white/10">
           <h2 className="text-xl font-black text-brand-dark dark:text-white tracking-tighter mb-4">eFOOTBALL ROSTER</h2>
           <div className="relative">
@@ -98,7 +106,11 @@ export default function PlayerStats() {
           {players.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map((player) => (
             <button
               key={player.id}
-              onClick={() => setSelectedPlayer(player)}
+              onClick={() => {
+                setSelectedPlayer(player);
+                setIsMobileStatsView(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className={cn(
                 "w-full flex items-center gap-4 p-3 rounded-2xl transition-all text-left group",
                 selectedPlayer?.id === player.id ? "bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark shadow-xl shadow-brand-dark/20" : "hover:bg-slate-50 dark:hover:bg-white/5"
@@ -120,7 +132,7 @@ export default function PlayerStats() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-8 lg:p-12 overflow-y-auto">
+      <div className={cn("flex-1 p-4 lg:p-12 overflow-y-auto lg:block w-full max-w-full", !isMobileStatsView ? "hidden lg:block" : "block")}>
         <AnimatePresence mode="wait">
           {selectedPlayer ? (
             <motion.div
@@ -128,11 +140,17 @@ export default function PlayerStats() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto space-y-12"
+              className="max-w-4xl mx-auto space-y-8 lg:space-y-12"
             >
+              <button 
+                onClick={() => setIsMobileStatsView(false)}
+                className="lg:hidden flex items-center gap-2 text-[10px] font-black text-brand-dark dark:text-white tracking-widest bg-white dark:bg-white/5 px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 mb-4 shadow-sm"
+              >
+                <ChevronRight size={14} className="rotate-180" /> BACK TO ROSTER
+              </button>
               {/* Header Card */}
-              <div className="relative bg-brand-dark dark:bg-white/5 rounded-[2.5rem] p-12 text-white border dark:border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.1)]">
-                <div className="absolute inset-0 rounded-[2.5rem] overflow-hidden pointer-events-none">
+              <div className="relative bg-brand-dark dark:bg-white/5 rounded-[2rem] lg:rounded-[2.5rem] p-6 lg:p-12 text-white border dark:border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.1)]">
+                <div className="absolute inset-0 rounded-[2rem] lg:rounded-[2.5rem] overflow-hidden pointer-events-none">
                   <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 pointer-events-none">
                     <img src={selectedPlayer.image} alt="" className="w-full h-full object-cover object-top" />
                   </div>

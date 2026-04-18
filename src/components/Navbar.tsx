@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
 
 export default function Navbar() {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -16,9 +16,11 @@ export default function Navbar() {
   }, [location.pathname]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('darkMode') === 'true';
-    setIsDark(saved);
-    if (saved) document.documentElement.classList.add('dark');
+    const saved = localStorage.getItem('darkMode');
+    // Default to dark mode if not explicitly set to false
+    const isDarkNow = saved === null ? true : saved === 'true';
+    setIsDark(isDarkNow);
+    if (isDarkNow) document.documentElement.classList.add('dark');
     
     const checkAdmin = () => {
       setIsAdmin(localStorage.getItem('adminLoggedIn') === 'true');
@@ -70,7 +72,7 @@ export default function Navbar() {
             }}
           />
         </div>
-        <span className="font-black italic tracking-tighter text-xl text-brand-dark dark:text-white">
+        <span className="font-black italic tracking-tighter text-2xl text-brand-dark dark:text-brand-green">
           {CLUB_NAME}
         </span>
       </Link>

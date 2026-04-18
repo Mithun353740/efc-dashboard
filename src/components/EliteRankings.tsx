@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 
 export default function EliteRankings() {
   const { rankedPlayers } = useFirebase();
-  const topPlayers = rankedPlayers.slice(0, 3);
+  const topPlayers = rankedPlayers.slice(0, 5);
 
   return (
     <section className="py-20 px-8 max-w-7xl mx-auto">
@@ -19,15 +19,15 @@ export default function EliteRankings() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="flex lg:grid overflow-x-auto lg:overflow-visible overflow-y-hidden lg:grid-cols-5 gap-6 pb-8 lg:pb-0 snap-x custom-scrollbar">
         {topPlayers.map((player, index) => (
-          <Link to={`/stats?id=${player.id}`} key={player.id} className="block group">
+          <Link to={`/stats?id=${player.id}`} key={player.id} className="block group shrink-0 w-[240px] lg:w-auto snap-start">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className={cn("relative rounded-2xl p-4 md:p-8 overflow-hidden transition-colors", index === 0 ? "bg-brand-green/10 dark:bg-brand-green/5 border-2 border-brand-green shadow-[0_0_30px_rgba(34,197,94,0.15)] col-span-2 lg:col-span-1" : "bg-[#f1f5f9] dark:bg-white/5 border border-transparent")}
+              className={cn("relative rounded-2xl p-4 md:p-8 overflow-hidden transition-colors h-full", index === 0 ? "bg-brand-green/10 dark:bg-brand-green/5 border-2 border-brand-green shadow-[0_0_30px_rgba(34,197,94,0.15)] col-span-2 lg:col-span-1" : "bg-[#f1f5f9] dark:bg-white/5 border border-transparent")}
             >
               {index === 0 && (
                 <div className="absolute top-0 right-4 md:right-8 bg-brand-green text-brand-dark px-2 md:px-4 py-1.5 md:py-2 font-black text-[8px] md:text-[10px] tracking-widest uppercase rounded-b-xl shadow-lg z-20">

@@ -6,7 +6,7 @@ import { computePlayerStats } from '../lib/store';
 import { cn } from '../lib/utils';
 import { Trophy, ChevronDown } from 'lucide-react';
 
-const TOURNAMENTS = ["QVFC Elite League Cup", "Vortex Champions Cup", "Vortex Domestic Cup"];
+const TOURNAMENTS = ["QVFC Elite League Cup", "QVFC Elite League Cup Division 2", "Vortex Champions Cup", "Vortex Domestic Cup"];
 
 export default function Tournament() {
   const { rankedPlayers, matches } = useFirebase();

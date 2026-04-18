@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -54,6 +54,28 @@ export default function Admin() {
   
   // Player Form
   const DEFAULT_PLAYER = { name: '', number: '', device: 'PS5', uid: '', image: '' };
+  
+  // Auto-fix friendly matches safely
+  useEffect(() => {
+    if (authStatus === 'authenticated' && matches.length > 0) {
+      const friendlyMatches = matches.filter(m => !m.tournament || m.tournament === 'Friendly');
+      if (friendlyMatches.length > 0) {
+        import('firebase/firestore').then(({ writeBatch, doc }) => {
+          import('../firebase').then(({ db }) => {
+            const batch = writeBatch(db);
+            friendlyMatches.forEach(m => {
+              batch.update(doc(db, 'matches', m.id), { tournament: 'QVFC Elite League Cup' });
+            });
+            batch.commit().then(() => {
+              console.log('Fixed Friendly matches to QVFC Elite League Cup');
+            }).catch(console.error);
+          });
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus, matches.length, players.length > 0]);
+
   const [newPlayer, setNewPlayer] = useState(DEFAULT_PLAYER);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [playerMsg, setPlayerMsg] = useState({ text: '', type: '' });
@@ -71,6 +93,7 @@ export default function Admin() {
   const [editingMatch, setEditingMatch] = useState<MatchRecord | null>(null);
   const [editMatchScore1, setEditMatchScore1] = useState('');
   const [editMatchScore2, setEditMatchScore2] = useState('');
+  const [editMatchTournament, setEditMatchTournament] = useState('');
   
   // Suggestions
   const [p1Search, setP1Search] = useState('');
@@ -302,29 +325,39 @@ export default function Admin() {
 
     if (!p1) return;
 
+    setIsSubmitting(true);
+    setMatchMsg({ text: '', type: '' });
     try {
       await addMatch(p1, Number(match.p1Score), Number(match.p2Score), p2, matches, match.tournament);
       setMatchMsg({ text: '✅ Match recorded', type: 'success' });
-      setMatch({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'Friendly' });
+      setMatch({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'QVFC Elite League Cup' });
       setP1Search('');
       setP2Search('');
     } catch (err) {
       console.error('Error recording match:', err);
       setMatchMsg({ text: `❌ Failed to record match: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleEditMatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingMatch || editMatchScore1 === '' || editMatchScore2 === '') return;
+    if (!editingMatch) return;
+    if (editMatchScore1 === '' || editMatchScore2 === '') {
+      alert("Please ensure both scores are filled to update a match.");
+      return;
+    }
     
     try {
-      await editMatch(editingMatch, Number(editMatchScore1), Number(editMatchScore2), players, matches);
+      await editMatch(editingMatch, Number(editMatchScore1), Number(editMatchScore2), players, matches, editMatchTournament);
       setEditingMatch(null);
       setEditMatchScore1('');
       setEditMatchScore2('');
+      setEditMatchTournament('');
     } catch (err) {
       console.error('Error editing match:', err);
+      alert("Failed to save match: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -550,7 +583,9 @@ export default function Admin() {
                                 <p className="text-[9px] font-bold text-slate-500">#{p.number} • {p.position}</p>
                               </div>
                               {playerToDelete === p.id ? (
-                                <span className="text-[10px] font-black text-white bg-red-500/80 px-3 py-1.5 rounded uppercase tracking-wider">TAP TO CONFIRM</span>
+                                <button type="button" onClick={() => handleDeletePlayer(p.id, true)} disabled={isSubmitting} className="text-[10px] font-black text-white bg-red-500/80 px-3 py-1.5 rounded uppercase tracking-wider disabled:opacity-50">
+                                  {isSubmitting ? 'DELETING...' : 'TAP TO CONFIRM'}
+                                </button>
                               ) : (
                                 <Trash2 size={14} className="text-red-500" />
                               )}
@@ -631,6 +666,7 @@ export default function Admin() {
                         className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-brand-green outline-none transition-all appearance-none cursor-pointer"
                       >
                         <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
+                        <option value="QVFC Elite League Cup Division 2" className="bg-brand-dark">QVFC Elite League Cup Division 2</option>
                         <option value="Vortex Champions Cup" className="bg-brand-dark">Vortex Champions Cup</option>
                         <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
                       </select>
@@ -640,8 +676,8 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  <button className="w-full py-6 bg-brand-green text-brand-dark font-black text-sm tracking-[0.2em] rounded-2xl hover:scale-[1.01] transition-all shadow-xl shadow-brand-green/10">
-                    SUBMIT MATCH RESULTS
+                  <button className="w-full py-6 bg-brand-green text-brand-dark font-black text-sm tracking-[0.2em] rounded-2xl hover:scale-[1.01] transition-all shadow-xl shadow-brand-green/10 disabled:opacity-50 disabled:hover:scale-100" disabled={isSubmitting}>
+                    {isSubmitting ? 'SUBMITTING...' : 'SUBMIT MATCH RESULTS'}
                   </button>
                   {matchMsg.text && <p className={cn("text-[10px] font-bold text-center mt-2", matchMsg.type === 'success' ? 'text-brand-green' : 'text-red-500')}>{matchMsg.text}</p>}
                 </form>
@@ -731,8 +767,8 @@ export default function Admin() {
                     </div>
                     <Input label="QUOTE (OPTIONAL)" value={newLeader.quote} onChange={v => setNewLeader({...newLeader, quote: v})} placeholder="Inspirational quote..." />
                     
-                    <button className="w-full py-4 bg-brand-green text-brand-dark font-black text-xs tracking-widest rounded-xl hover:scale-[1.02] transition-all">
-                      ADD TO LEADERSHIP
+                    <button type="submit" disabled={isSubmitting} className="w-full py-4 bg-brand-green text-brand-dark font-black text-xs tracking-widest rounded-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100">
+                      {isSubmitting ? 'ADDING...' : 'ADD TO LEADERSHIP'}
                     </button>
                     {leaderMsg.text && <p className="text-[10px] font-bold text-brand-green text-center mt-2">{leaderMsg.text}</p>}
                   </form>
@@ -755,10 +791,13 @@ export default function Admin() {
                         </div>
                         <button 
                           onClick={() => leaderToDelete === leader.id ? handleDeleteLeader(leader.id, true) : setLeaderToDelete(leader.id)} 
-                          className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition-all"
+                          disabled={isSubmitting}
+                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50"
                         >
                           {leaderToDelete === leader.id ? (
-                            <span className="text-[10px] font-black text-white bg-red-500/80 px-3 py-1.5 rounded uppercase tracking-wider">CONFIRM</span>
+                            <span className="text-[10px] font-black text-white bg-red-500/80 px-3 py-1.5 rounded uppercase tracking-wider">
+                              {isSubmitting ? 'DELETING...' : 'CONFIRM'}
+                            </span>
                           ) : (
                             <Trash2 size={14} />
                           )}
@@ -779,7 +818,7 @@ export default function Admin() {
                       matches.filter(m => Date.now() - m.timestamp <= 7 * 24 * 60 * 60 * 1000).map(m => (
                         <div key={m.id} className="bg-white/5 border border-white/10 p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div className="flex-1 flex flex-col gap-1">
-                            <span className="text-[10px] text-slate-500 font-bold tracking-widest">{new Date(m.timestamp).toLocaleString()}</span>
+                            <span className="text-[10px] text-slate-500 font-bold tracking-widest">{new Date(m.timestamp).toLocaleString()} • {m.tournament || 'Friendly'}</span>
                             <div className="flex items-center gap-4 text-sm font-black uppercase whitespace-nowrap">
                               <span className={m.p1Score > m.p2Score ? 'text-brand-green' : m.p1Score < m.p2Score ? 'text-red-500' : 'text-slate-300'}>{m.p1Name} <span className="text-white bg-white/10 px-2 py-0.5 rounded ml-2">{m.p1Score}</span></span>
                               <span className="text-slate-500 text-[10px]">VS</span>
@@ -788,16 +827,31 @@ export default function Admin() {
                           </div>
                           <div className="flex items-center gap-2">
                             {editingMatch?.id === m.id ? (
-                              <div className="flex items-center gap-2 bg-[#0f172a] p-2 rounded-xl">
-                                <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-green outline-none" value={editMatchScore1} onChange={e => setEditMatchScore1(e.target.value)} placeholder="Score 1" />
-                                <span className="text-slate-500 font-bold text-xs">-</span>
-                                <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-green outline-none" value={editMatchScore2} onChange={e => setEditMatchScore2(e.target.value)} placeholder="Score 2" />
-                                <button onClick={handleEditMatchSubmit} className="bg-brand-green text-brand-dark px-3 py-2 rounded text-[10px] font-black tracking-widest hover:scale-105 transition-all ml-2">SAVE</button>
-                                <button onClick={() => setEditingMatch(null)} className="bg-white/10 text-white px-3 py-2 rounded text-[10px] font-black tracking-widest hover:bg-white/20 transition-all">CANCEL</button>
+                              <div className="flex flex-col md:flex-row items-center gap-2 bg-[#0f172a] p-2 rounded-xl">
+                                <div className="flex items-center gap-2">
+                                  <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-green outline-none" value={editMatchScore1} onChange={e => setEditMatchScore1(e.target.value)} placeholder="Score 1" />
+                                  <span className="text-slate-500 font-bold text-xs">-</span>
+                                  <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-green outline-none" value={editMatchScore2} onChange={e => setEditMatchScore2(e.target.value)} placeholder="Score 2" />
+                                </div>
+                                <select 
+                                  value={editMatchTournament}
+                                  onChange={e => setEditMatchTournament(e.target.value)}
+                                  className="bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-brand-green outline-none mt-2 md:mt-0 w-full md:w-auto text-center"
+                                >
+                                  <option value="Friendly" className="bg-brand-dark">Friendly</option>
+                                  <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
+                                  <option value="QVFC Elite League Cup Division 2" className="bg-brand-dark">QVFC Elite League Cup Division 2</option>
+                                  <option value="Vortex Champions Cup" className="bg-brand-dark">Vortex Champions Cup</option>
+                                  <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
+                                </select>
+                                <div className="flex gap-2 mt-2 md:mt-0 w-full md:w-auto justify-end">
+                                  <button onClick={handleEditMatchSubmit} className="bg-brand-green text-brand-dark px-3 py-2 rounded text-[10px] font-black tracking-widest hover:scale-105 transition-all">SAVE</button>
+                                  <button onClick={() => setEditingMatch(null)} className="bg-white/10 text-white px-3 py-2 rounded text-[10px] font-black tracking-widest hover:bg-white/20 transition-all">CANCEL</button>
+                                </div>
                               </div>
                             ) : (
                               <div className="flex gap-2">
-                                <button onClick={() => { setEditingMatch(m); setEditMatchScore1(m.p1Score.toString()); setEditMatchScore2(m.p2Score.toString()); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase">
+                                <button onClick={() => { setEditingMatch(m); setEditMatchScore1(m.p1Score.toString()); setEditMatchScore2(m.p2Score.toString()); setEditMatchTournament(m.tournament || 'Friendly'); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase">
                                   EDIT
                                 </button>
                                 <button onClick={() => handleDeleteMatch(m)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all">
