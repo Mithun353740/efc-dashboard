@@ -158,14 +158,14 @@ export default function PlayerStats() {
                 </div>
 
                 {/* Custom Filter Dropdown positioned top right */}
-                <div className="absolute top-8 right-8 z-50">
+                <div className="absolute top-4 right-4 lg:top-8 lg:right-8 z-50">
                   <button 
                     onClick={() => setIsFilterOpen(!isFilterOpen)}
-                    className="bg-brand-dark border-brand-green border px-4 py-3 rounded-2xl flex items-center gap-3 hover:scale-[1.02] transition-all font-black text-xs cursor-pointer group shadow-2xl shadow-brand-dark/50"
+                    className="bg-brand-dark border-brand-green border px-3 py-2 lg:px-4 lg:py-3 rounded-2xl flex items-center gap-2 hover:scale-[1.02] transition-all font-black text-[10px] lg:text-xs cursor-pointer group shadow-2xl shadow-brand-dark/50"
                   >
-                    <Filter size={14} className="text-brand-green group-hover:rotate-12 transition-transform" />
-                    <span>{filter.includes('/') ? `${filter} Season` : filter}</span>
-                    <ChevronDown size={14} className={cn("text-brand-green ml-2 transition-transform", isFilterOpen ? "rotate-180" : "")} />
+                    <Filter size={12} className="text-brand-green group-hover:rotate-12 transition-transform" />
+                    <span className="max-w-[80px] lg:max-w-none truncate">{filter.includes('/') ? `${filter} Season` : filter}</span>
+                    <ChevronDown size={14} className={cn("text-brand-green ml-1 transition-transform", isFilterOpen ? "rotate-180" : "")} />
                   </button>
 
                   <AnimatePresence>
@@ -174,7 +174,7 @@ export default function PlayerStats() {
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 top-full mt-3 w-72 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[60vh] flex flex-col z-50"
+                        className="absolute right-0 top-full mt-2 w-64 lg:w-72 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[60vh] flex flex-col z-50"
                       >
                         <div className="p-2 space-y-1 overflow-y-auto min-h-0 custom-scrollbar pr-1">
                           <button 
@@ -215,22 +215,22 @@ export default function PlayerStats() {
                   <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsFilterOpen(false)} />
                 )}
 
-                <div className="relative z-10">
-                  <span className="text-brand-green font-black text-[10px] tracking-[0.4em] mb-4 block">PLAYER PROFILE</span>
+                <div className="relative z-10 pt-10 lg:pt-0">
+                  <span className="text-brand-green font-black text-[10px] tracking-[0.4em] mb-2 lg:mb-4 block">PLAYER PROFILE</span>
                   
-                  <h1 className="text-7xl font-black tracking-tighter leading-none mb-4">{computedPlayer.name}</h1>
-                  <div className="flex gap-6 items-center">
-                    <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-md border border-white/10">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">JERSEY</p>
-                      <p className="text-xl font-black">#{computedPlayer.number}</p>
+                  <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black tracking-tighter leading-none mb-6 break-words pr-4">{computedPlayer.name}</h1>
+                  <div className="flex flex-wrap gap-3 lg:gap-6 items-center">
+                    <div className="bg-white/10 px-4 py-2 rounded-2xl lg:rounded-full backdrop-blur-md border border-white/10 shrink-0">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">JERSEY</p>
+                      <p className="text-lg lg:text-xl font-black leading-none">#{computedPlayer.number}</p>
                     </div>
-                    <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-md border border-white/10">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">DEVICE</p>
-                      <p className="text-xl font-black">{computedPlayer.device || 'N/A'}</p>
+                    <div className="bg-white/10 px-4 py-2 rounded-2xl lg:rounded-full backdrop-blur-md border border-white/10 shrink-0">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">DEVICE</p>
+                      <p className="text-lg lg:text-xl font-black leading-none">{computedPlayer.device || 'N/A'}</p>
                     </div>
-                    <div className="bg-brand-green px-6 py-2 rounded-full text-brand-dark">
-                      <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">OVERALL</p>
-                      <p className="text-xl font-black">{computedPlayer.ovr}</p>
+                    <div className="bg-brand-green px-6 py-2 rounded-2xl lg:rounded-full text-brand-dark shrink-0">
+                      <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 leading-none mb-1">OVERALL</p>
+                      <p className="text-lg lg:text-xl font-black leading-none">{computedPlayer.ovr}</p>
                     </div>
                   </div>
                 </div>
