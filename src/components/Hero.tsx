@@ -34,10 +34,10 @@ export default function Hero({ player }: HeroProps) {
               #1 RANK • TOP PERFORMER
             </span>
           </div>
-          <h1 className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white leading-none tracking-tighter mb-1 md:mb-2 uppercase break-words hyphens-auto">
+          <h1 className="text-[3rem] xs:text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white leading-none tracking-tighter mb-1 md:mb-2 uppercase break-words hyphens-auto">
             {firstName}
           </h1>
-          <h2 className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white/80 md:text-white/50 md:text-outline leading-none tracking-tighter mb-6 md:mb-8 uppercase break-words hyphens-auto">
+          <h2 className="text-[3rem] xs:text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white/80 md:text-white/50 md:text-outline leading-none tracking-tighter mb-6 md:mb-8 uppercase break-words hyphens-auto">
             {lastName}
           </h2>
           

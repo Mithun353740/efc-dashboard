@@ -21,9 +21,9 @@ export default function EliteRankings() {
         </Link>
       </div>
 
-      <div className="flex overflow-x-auto snap-x custom-scrollbar snap-mandatory sm:grid sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6 pb-4 sm:pb-0">
+      <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6 pb-4 sm:pb-0">
         {topPlayers.map((player, index) => (
-          <Link to={`/stats?id=${player.id}`} key={player.id} className="block group w-[180px] sm:w-auto shrink-0 snap-start">
+          <Link to={`/stats?id=${player.id}`} key={player.id} className="block group w-full shrink-0">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}

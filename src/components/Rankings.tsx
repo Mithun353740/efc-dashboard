@@ -11,25 +11,25 @@ export default function Rankings() {
     <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark py-20 px-8 transition-colors">
       <div className="max-w-7xl mx-auto">
         <div className="mb-12">
-          <h1 className="text-6xl font-black text-brand-dark dark:text-white tracking-tighter leading-none">OFFICIAL<br />eFOOTBALL RANKINGS</h1>
+          <h1 className="text-4xl md:text-6xl font-black text-brand-dark dark:text-white tracking-tighter leading-none">OFFICIAL<br />eFOOTBALL RANKINGS</h1>
           <p className="text-xs font-bold text-slate-400 tracking-[0.3em] mt-4 uppercase">SEASON 2026 GLOBAL PERFORMANCE DATA</p>
         </div>
 
         <div className="bg-white dark:bg-white/5 rounded-3xl shadow-2xl shadow-slate-200/50 dark:shadow-none overflow-hidden border border-slate-100 dark:border-white/10">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse table-fixed lg:table-auto">
+            <table className="w-full text-left border-collapse table-fixed lg:table-auto min-w-[500px]">
               <thead>
                 <tr className="bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark">
-                  <th className="p-2 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase w-8 lg:w-auto text-center lg:text-left">#</th>
-                  <th className="p-2 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase">PLAYER</th>
-                  <th className="p-1 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">W</th>
-                  <th className="p-1 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">D</th>
-                  <th className="p-1 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">L</th>
+                  <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase w-8 lg:w-auto text-center lg:text-left">#</th>
+                  <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase w-24 sm:w-auto">PLAYER</th>
+                  <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">W</th>
+                  <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">D</th>
+                  <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">L</th>
                   <th className="hidden lg:table-cell p-6 text-[10px] font-black tracking-widest uppercase text-center">GS</th>
                   <th className="hidden lg:table-cell p-6 text-[10px] font-black tracking-widest uppercase text-center">GC</th>
-                  <th className="p-1 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase text-center w-8 lg:w-auto">GD</th>
-                  <th className="p-1 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase text-center w-8 lg:w-auto">PTS</th>
-                  <th className="hidden sm:table-cell p-2 lg:p-6 text-[8px] lg:text-[10px] font-black tracking-widest uppercase">FORM</th>
+                  <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center w-8 lg:w-auto">GD</th>
+                  <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center w-8 lg:w-auto">PTS</th>
+                  <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase w-16">FORM</th>
                 </tr>
               </thead>
               <tbody>
@@ -76,8 +76,8 @@ export default function Rankings() {
                         {player.win * 3 + player.draw}
                       </span>
                     </td>
-                    <td className="hidden sm:table-cell p-2 lg:p-6">
-                      <div className="flex gap-1">
+                    <td className="p-2 lg:p-6 text-center">
+                      <div className="flex gap-1 justify-center">
                         {(player.win > 0 || player.loss > 0 || player.draw > 0) && player.form?.length ? player.form.map((res, i) => (
                           <div key={i} className={cn(
                             "w-2 h-2 rounded-full",

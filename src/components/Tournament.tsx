@@ -84,17 +84,17 @@ export default function Tournament() {
 
         <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-3xl overflow-hidden shadow-2xl shadow-slate-200/50 dark:shadow-none transition-colors">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[500px]">
               <thead>
                 <tr className="bg-slate-50 dark:bg-black/20 border-b border-slate-100 dark:border-white/10">
-                  <th className="p-6 text-[10px] font-black text-slate-400 tracking-widest uppercase w-16 text-center">POS</th>
-                  <th className="p-6 text-[10px] font-black text-slate-400 tracking-widest uppercase">CLUB MEMBER</th>
-                  <th className="p-6 text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">P</th>
-                  <th className="p-6 text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">W</th>
-                  <th className="p-6 text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">D</th>
-                  <th className="p-6 text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">L</th>
-                  <th className="p-6 text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">GD</th>
-                  <th className="p-6 text-[10px] font-black text-slate-800 dark:text-white tracking-widest uppercase text-center bg-slate-100 dark:bg-white/5">PTS</th>
+                  <th className="p-3 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase w-12 md:w-16 text-center">POS</th>
+                  <th className="p-3 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase w-32 sm:w-auto">CLUB MEMBER</th>
+                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-6 sm:w-auto">P</th>
+                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-6 sm:w-auto">W</th>
+                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-6 sm:w-auto">D</th>
+                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-6 sm:w-auto">L</th>
+                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-8 sm:w-auto">GD</th>
+                  <th className="p-3 md:p-6 text-[8px] md:text-[10px] font-black text-slate-800 dark:text-white tracking-widest uppercase text-center bg-slate-100 dark:bg-white/5 w-12 sm:w-auto">PTS</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,9 +107,9 @@ export default function Tournament() {
                       key={player.id} 
                       className="border-b border-slate-50 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
                     >
-                      <td className="p-6 text-center">
+                      <td className="p-3 md:p-6 text-center">
                         <span className={cn(
-                          "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black mx-auto",
+                          "w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-[10px] md:text-xs font-black mx-auto",
                           index === 0 ? "bg-yellow-400 text-yellow-900 shadow-[0_0_15px_rgba(250,204,21,0.4)]" :
                           index === 1 ? "bg-slate-300 text-slate-700" :
                           index === 2 ? "bg-amber-600 text-amber-100" :
@@ -118,21 +118,21 @@ export default function Tournament() {
                           {index + 1}
                         </span>
                       </td>
-                      <td className="p-6">
-                        <div className="flex items-center gap-4">
-                          <img src={player.image} alt={player.name} className="w-12 h-12 rounded-full object-cover border-2 border-transparent group-hover:border-brand-green transition-colors" />
-                          <div>
-                            <p className="font-black text-sm text-brand-dark dark:text-white uppercase tracking-tight">{player.name}</p>
-                            <p className="text-[10px] font-bold text-slate-400 tracking-widest">#{player.number}</p>
+                      <td className="p-3 md:p-6">
+                        <div className="flex items-center gap-2 md:gap-4">
+                          <img src={player.image} alt={player.name} className="w-8 h-8 md:w-12 md:h-12 rounded-full object-cover border-2 border-transparent group-hover:border-brand-green transition-colors" />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-black text-[10px] md:text-sm text-brand-dark dark:text-white uppercase tracking-tight truncate">{player.name}</p>
+                            <p className="hidden md:block text-[10px] font-bold text-slate-400 tracking-widest">#{player.number}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="p-6 text-center font-bold text-slate-500">{player.win + player.loss + player.draw}</td>
-                      <td className="p-6 text-center font-bold text-slate-500">{player.win}</td>
-                      <td className="p-6 text-center font-bold text-slate-500">{player.draw}</td>
-                      <td className="p-6 text-center font-bold text-slate-500">{player.loss}</td>
-                      <td className="p-6 text-center font-bold text-slate-500">{player.goalsScored - player.goalsConceded}</td>
-                      <td className="p-6 text-center font-black text-lg text-brand-dark dark:text-white bg-slate-50 dark:bg-white/5">
+                      <td className="p-1 md:p-6 text-center font-bold text-slate-500 text-[10px] md:text-sm">{player.win + player.loss + player.draw}</td>
+                      <td className="p-1 md:p-6 text-center font-bold text-slate-500 text-[10px] md:text-sm">{player.win}</td>
+                      <td className="p-1 md:p-6 text-center font-bold text-slate-500 text-[10px] md:text-sm">{player.draw}</td>
+                      <td className="p-1 md:p-6 text-center font-bold text-slate-500 text-[10px] md:text-sm">{player.loss}</td>
+                      <td className="p-1 md:p-6 text-center font-bold text-slate-500 text-[10px] md:text-sm">{player.goalsScored - player.goalsConceded}</td>
+                      <td className="p-3 md:p-6 text-center font-black text-sm md:text-lg text-brand-dark dark:text-white bg-slate-50 dark:bg-white/5">
                         {(player.win * 3) + player.draw}
                       </td>
                     </motion.tr>
