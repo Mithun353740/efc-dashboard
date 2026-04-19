@@ -27,21 +27,6 @@ export default function Leadership() {
           <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-8">
             The tactical masterminds and strategic visionaries guiding Quantum Vortex eFC to global esports dominance.
           </p>
-
-          <div className="space-y-4">
-            <div className="bg-[#6b7280] dark:bg-brand-green p-6 rounded-xl text-white dark:text-brand-dark">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-6 h-6 bg-white/20 dark:bg-brand-dark/20 rounded-full flex items-center justify-center text-[10px]">🏆</div>
-                <span className="text-[10px] font-black tracking-widest">ELITE GOVERNANCE</span>
-              </div>
-              <p className="text-[9px] font-bold opacity-70 tracking-widest">STANDARD OF EXCELLENCE</p>
-            </div>
-
-            <div className="bg-[#f1f5f9] dark:bg-white/5 p-6 rounded-xl border border-slate-200 dark:border-white/10">
-              <span className="text-[10px] font-black tracking-widest text-brand-dark dark:text-brand-green block mb-2">LATEST BRIEFING</span>
-              <p className="text-[10px] text-slate-400 font-bold tracking-tight">Strategy shift ahead of the winter qualifiers...</p>
-            </div>
-          </div>
         </div>
 
         <div className="lg:col-span-8 grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-12">

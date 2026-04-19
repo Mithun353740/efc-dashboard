@@ -19,35 +19,52 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
   const [isLoadingLeaders, setIsLoadingLeaders] = useState(true);
+  const [isLoadingMatches, setIsLoadingMatches] = useState(true);
+  const [isMinLoadTimePassed, setIsMinLoadTimePassed] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
+    // Minimum delay for branding aesthetics and to prevent cache flashes
+    const minLoadTimer = setTimeout(() => {
+      if (mounted) setIsMinLoadTimePassed(true);
+    }, 1200);
+
     const errorHandler = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (mounted && customEvent.detail?.error) {
         const errStr = String(customEvent.detail.error).toLowerCase();
-        if (errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('permission')) {
-          setDbError('QUOTA_EXCEEDED');
-          setIsLoadingPlayers(false);
-          setIsLoadingLeaders(false);
-        } else {
-          setDbError('DATABASE_ERROR');
-          setIsLoadingPlayers(false);
-          setIsLoadingLeaders(false);
+        
+        // Attempt to rescue from cache
+        const cachedP = localStorage.getItem('vortex_players_cache');
+        const cachedL = localStorage.getItem('vortex_leaders_cache');
+        const cachedM = localStorage.getItem('vortex_matches_cache');
+        
+        if (cachedP) setPlayers(JSON.parse(cachedP));
+        if (cachedL) setLeaders(JSON.parse(cachedL));
+        if (cachedM) setMatches(JSON.parse(cachedM));
+        
+        setIsLoadingPlayers(false);
+        setIsLoadingLeaders(false);
+        setIsLoadingMatches(false);
+
+        // Only show fatal error if NO cache exists
+        if (!cachedP && !cachedL) {
+          if (errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('permission')) {
+            setDbError('QUOTA_EXCEEDED');
+          } else {
+            setDbError('DATABASE_ERROR');
+          }
         }
       }
     };
     window.addEventListener('firestore-error', errorHandler);
 
-    // Run connection test and bootstrap in background without awaiting them
-    testFirestoreConnection().catch(console.warn);
-    bootstrapData().catch(console.warn);
-
     const unsubPlayers = subscribeToPlayers((data) => {
       if (mounted) {
         setPlayers(data);
+        localStorage.setItem('vortex_players_cache', JSON.stringify(data));
         setIsLoadingPlayers(false);
       }
     });
@@ -55,6 +72,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const unsubLeaders = subscribeToLeaders((data) => {
       if (mounted) {
         setLeaders(data);
+        localStorage.setItem('vortex_leaders_cache', JSON.stringify(data));
         setIsLoadingLeaders(false);
       }
     });
@@ -62,6 +80,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const unsubMatches = subscribeToMatches((data) => {
       if (mounted) {
         setMatches(data);
+        localStorage.setItem('vortex_matches_cache', JSON.stringify(data));
+        setIsLoadingMatches(false);
       }
     });
 
@@ -70,6 +90,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (mounted) {
         setIsLoadingPlayers(false);
         setIsLoadingLeaders(false);
+        setIsLoadingMatches(false);
       }
     }, 2000);
 
@@ -80,6 +101,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       unsubLeaders();
       unsubMatches();
       clearTimeout(timeout);
+      clearTimeout(minLoadTimer);
     };
   }, []);
 
@@ -99,7 +121,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     return l;
   });
 
-  const isLoading = isLoadingPlayers || isLoadingLeaders;
+  const isLoading = isLoadingPlayers || isLoadingLeaders || isLoadingMatches || !isMinLoadTimePassed;
 
   const value = {
     players: enrichedPlayers,

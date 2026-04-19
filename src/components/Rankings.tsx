@@ -16,12 +16,12 @@ export default function Rankings() {
         </div>
 
         <div className="bg-white dark:bg-white/5 rounded-3xl shadow-2xl shadow-slate-200/50 dark:shadow-none overflow-hidden border border-slate-100 dark:border-white/10">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse table-fixed lg:table-auto min-w-[500px]">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse table-fixed lg:table-auto w-full">
               <thead>
                 <tr className="bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark">
                   <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase w-8 lg:w-auto text-center lg:text-left">#</th>
-                  <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase w-24 sm:w-auto">PLAYER</th>
+                  <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase w-20 sm:w-auto">PLAYER</th>
                   <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">W</th>
                   <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">D</th>
                   <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center w-6 lg:w-auto">L</th>
@@ -29,7 +29,7 @@ export default function Rankings() {
                   <th className="hidden lg:table-cell p-6 text-[10px] font-black tracking-widest uppercase text-center">GC</th>
                   <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center w-8 lg:w-auto">GD</th>
                   <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center w-8 lg:w-auto">PTS</th>
-                  <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase w-16">FORM</th>
+                  <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase w-12 sm:w-16">FORM</th>
                 </tr>
               </thead>
               <tbody>

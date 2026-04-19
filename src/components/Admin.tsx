@@ -11,7 +11,7 @@ import { CLUB_LOGO, CLUB_NAME } from '../constants';
 import { History } from 'lucide-react';
 
 export default function Admin() {
-  const { players, leaders, matches } = useFirebase();
+  const { players, leaders, matches, dbError } = useFirebase();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
@@ -364,7 +364,7 @@ export default function Admin() {
               }
               setIsResyncing(false);
             }} 
-            disabled={isResyncing}
+            disabled={isResyncing || dbError === 'QUOTA_EXCEEDED'}
             className="px-6 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-full text-[10px] font-black tracking-widest transition-all disabled:opacity-50"
           >
             {isResyncing ? 'SYNCING...' : 'RESYNC STATS'}
@@ -389,8 +389,21 @@ export default function Admin() {
 
         {/* Main Content */}
         <div className="lg:col-span-9 space-y-8">
-          <AnimatePresence mode="wait">
-            {activeTab === 'players' ? (
+          {dbError === 'QUOTA_EXCEEDED' ? (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-12 backdrop-blur-xl text-center flex flex-col items-center justify-center min-h-[400px]">
+              <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center text-rose-500 mb-6">
+                <ShieldCheck size={40} />
+              </div>
+              <h2 className="text-3xl font-black text-rose-500 tracking-tighter mb-4 uppercase">CONTROL CENTER LOCKED</h2>
+              <p className="text-slate-400 font-bold tracking-tight max-w-md mb-8">Firebase Free Tier Quota Exceeded. The Control Center is temporarily locked to prevent out-of-sync local updates.</p>
+              <div className="bg-brand-dark border border-white/10 p-6 rounded-xl w-full max-w-md">
+                <p className="text-[10px] font-black tracking-widest text-slate-300 mb-2 uppercase">System Status</p>
+                <p className="text-[10px] font-bold text-slate-500">Live data fetching and dynamic updates are paused. The system will unlock automatically at midnight Pacific Time.</p>
+              </div>
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              {activeTab === 'players' ? (
               <motion.div key="players" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Add Player */}
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
@@ -831,7 +844,8 @@ export default function Admin() {
                 </div>
               </motion.div>
             ) : null}
-          </AnimatePresence>
+            </AnimatePresence>
+          )}
         </div>
       </div>
     </div>

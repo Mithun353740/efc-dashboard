@@ -20,8 +20,28 @@ import { FirebaseProvider, useFirebase } from './FirebaseContext';
 import { INITIAL_PLAYERS } from './lib/store';
 
 function Home() {
-  const { rankedPlayers, isLoading, dbError } = useFirebase();
-  
+  const { rankedPlayers, dbError } = useFirebase();
+
+  const heroPlayer = rankedPlayers.length > 0 ? rankedPlayers[0] : INITIAL_PLAYERS[0];
+
+  return (
+    <>
+      <Hero player={heroPlayer} />
+      <EliteRankings />
+      <Leadership />
+      <Legion />
+    </>
+  );
+}
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+  return isAdmin ? <>{children}</> : <Navigate to="/login" />;
+}
+
+function AppContent() {
+  const { isLoading, dbError } = useFirebase();
+
   if (isLoading) return (
     <div className="min-h-screen bg-brand-dark flex items-center justify-center">
       <div className="text-brand-green font-black animate-pulse tracking-widest">INITIALIZING VORTEX ENGINE...</div>
@@ -39,43 +59,29 @@ function Home() {
     </div>
   );
 
-  const heroPlayer = rankedPlayers.length > 0 ? rankedPlayers[0] : INITIAL_PLAYERS[0];
-
   return (
-    <>
-      <Hero player={heroPlayer} />
-      <EliteRankings />
-      <Leadership />
-      <Legion />
-    </>
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark transition-colors flex flex-col">
+      <Navbar />
+      <main className="flex-grow">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+          <Route path="/rankings" element={<Rankings />} />
+          <Route path="/stats" element={<PlayerStats />} />
+          <Route path="/tournament" element={<Tournament />} />
+        </Routes>
+      </main>
+      <Footer />
+    </div>
   );
-}
-
-
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
-  return isAdmin ? <>{children}</> : <Navigate to="/login" />;
 }
 
 export default function App() {
   return (
     <FirebaseProvider>
       <Router>
-        <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark transition-colors flex flex-col">
-          <Navbar />
-          <main className="flex-grow">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-              <Route path="/rankings" element={<Rankings />} />
-              <Route path="/stats" element={<PlayerStats />} />
-              <Route path="/tournament" element={<Tournament />} />
-            </Routes>
-          </main>
-          <Footer />
-        </div>
+        <AppContent />
       </Router>
     </FirebaseProvider>
   );

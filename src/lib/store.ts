@@ -62,7 +62,12 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  
+  if (errStrRaw.toLowerCase().includes('quota') || errStrRaw.toLowerCase().includes('exceeded')) {
+    console.warn('Firestore Quota Exceeded for path:', path);
+  } else {
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
+  }
   
   const event = new CustomEvent('firestore-error', { detail: errInfo });
   window.dispatchEvent(event);
