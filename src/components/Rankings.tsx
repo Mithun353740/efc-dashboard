@@ -1,9 +1,11 @@
 import { motion } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import { cn } from '../lib/utils';
+import { INITIAL_PLAYERS } from '../lib/store';
 
 export default function Rankings() {
   const { rankedPlayers } = useFirebase();
+  const activePlayers = rankedPlayers.length > 0 ? rankedPlayers : INITIAL_PLAYERS;
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark py-20 px-8 transition-colors">
@@ -31,7 +33,7 @@ export default function Rankings() {
                 </tr>
               </thead>
               <tbody>
-                {rankedPlayers.map((player, index) => (
+                {activePlayers.map((player, index) => (
                   <motion.tr
                     key={player.id}
                     initial={{ opacity: 0, x: -10 }}

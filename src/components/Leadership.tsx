@@ -1,8 +1,10 @@
 import { motion } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
+import { INITIAL_LEADERS } from '../lib/store';
 
 export default function Leadership() {
   const { leaders } = useFirebase();
+  const activeLeaders = leaders.length > 0 ? leaders : INITIAL_LEADERS;
 
   const roleOrder: Record<string, number> = {
     'President': 1,
@@ -11,7 +13,7 @@ export default function Leadership() {
     'Co-Founder': 4
   };
 
-  const sortedLeaders = [...leaders].sort((a, b) => {
+  const sortedLeaders = [...activeLeaders].sort((a, b) => {
     return (roleOrder[a.role] || 99) - (roleOrder[b.role] || 99);
   });
 

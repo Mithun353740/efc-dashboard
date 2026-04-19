@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ChevronRight, Trophy, Target, Zap, Filter, ChevronDown } from 'lucide-react';
+import { Search, ChevronRight, Trophy, Target, Zap, Filter, ChevronDown, Info, X } from 'lucide-react';
 import { useFirebase } from '../FirebaseContext';
 import { cn } from '../lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -16,6 +16,7 @@ export default function PlayerStats() {
   const playerIdParam = searchParams.get('id');
   const [filter, setFilter] = useState('All Time');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isOvrModalOpen, setIsOvrModalOpen] = useState(false);
 
   const [isMobileStatsView, setIsMobileStatsView] = useState(false);
 
@@ -216,7 +217,16 @@ export default function PlayerStats() {
                 )}
 
                 <div className="relative z-10 pt-10 lg:pt-0">
-                  <span className="text-brand-green font-black text-[10px] tracking-[0.4em] mb-2 lg:mb-4 block">PLAYER PROFILE</span>
+                  <div className="flex items-center gap-4 mb-2 lg:mb-4">
+                    <span className="text-brand-green font-black text-[10px] tracking-[0.4em]">PLAYER PROFILE</span>
+                    <button 
+                      onClick={() => setIsOvrModalOpen(true)}
+                      className="flex items-center gap-1.5 text-[9px] font-black tracking-widest text-[#0f172a] hover:text-white transition-colors bg-brand-green hover:bg-brand-green/80 px-3 py-1 rounded-full shadow-lg shadow-brand-green/20"
+                    >
+                      <Info size={10} />
+                      HOW OVR WORKS
+                    </button>
+                  </div>
                   
                   <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black tracking-tighter leading-none mb-6 break-words pr-4">{computedPlayer.name}</h1>
                   <div className="flex flex-wrap gap-3 lg:gap-6 items-center">
@@ -293,6 +303,60 @@ export default function PlayerStats() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* OVR Info Modal */}
+      <AnimatePresence>
+        {isOvrModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-brand-dark/80 backdrop-blur-sm"
+              onClick={() => setIsOvrModalOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-white dark:bg-[#0f172a] border border-slate-100 dark:border-white/10 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl"
+            >
+              <div className="p-6 md:p-8">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 className="text-2xl font-black text-brand-dark dark:text-white tracking-tighter">OVR SYSTEM</h3>
+                    <p className="text-[10px] font-bold text-brand-green tracking-widest mt-1">POWERED BY TRUE ELO</p>
+                  </div>
+                  <button onClick={() => setIsOvrModalOpen(false)} className="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
+                    <X size={16} className="text-slate-500 dark:text-white" />
+                  </button>
+                </div>
+
+                <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300 font-medium">
+                  <p>
+                    Your <strong className="text-brand-dark dark:text-white">Overall Rating (OVR)</strong> is now powered by a <strong className="text-brand-green">Hybrid True ELO Engine</strong>. This ensures new players feel rewarded instantly, while long-term veterans scale accurately.
+                  </p>
+                  
+                  <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-100 dark:border-white/10 space-y-3 text-xs leading-relaxed">
+                    <p>
+                      <strong>1. Core Performance (Base Stats)</strong><br/>
+                      Your rating heavily factors in your total Win Percentage, Experience, and Goal Difference (+15 max). <em>(Example: Playing 1 match and winning 5-0 immediately boosts your OVR so you don't feel penalized as a rookie!)</em>
+                    </p>
+                    <p>
+                      <strong>2. The ELO Influence (Match Quality)</strong><br/>
+                      Under the hood, a chess-style engine tracks every game. Beating a 95 OVR "Giant" quietly feeds massive multipliers into your background ELO, raising your overall ceiling. On the flip side, losing to a 60 OVR player creates a sharp penalty.
+                    </p>
+                  </div>
+
+                  <p className="text-[10px] text-slate-400 mt-4 leading-relaxed font-bold uppercase tracking-widest text-center">
+                    SHORT TERM FORM + LONG TERM ELO
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

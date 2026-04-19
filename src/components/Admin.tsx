@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, calculateOVR, recalculateAllStats } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats } from '../lib/store';
 import { Player, Leader, MatchRecord } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
@@ -182,7 +182,7 @@ export default function Admin() {
       name: newPlayer.name.toUpperCase(),
       number: newPlayer.number,
       position: 'ANY',
-      ovr: existingPlayer ? existingPlayer.ovr : calculateOVR(0, 0, 0, 0, 0),
+      ovr: existingPlayer ? existingPlayer.ovr : 60,
       win: existingPlayer ? existingPlayer.win : 0,
       loss: existingPlayer ? existingPlayer.loss : 0,
       draw: existingPlayer ? existingPlayer.draw : 0,

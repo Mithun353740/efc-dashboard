@@ -43,8 +43,9 @@ interface FirestoreErrorInfo {
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errStrRaw = error instanceof Error ? error.message : (typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error));
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errStrRaw,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -62,6 +63,10 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
+  
+  const event = new CustomEvent('firestore-error', { detail: errInfo });
+  window.dispatchEvent(event);
+
   if (operationType === OperationType.GET || operationType === OperationType.LIST) {
     // Don't throw for read operations to prevent app crash, just log
     return;
@@ -107,15 +112,66 @@ export const INITIAL_LEADERS: Leader[] = [
   },
 ];
 
-export function calculateOVR(win: number, loss: number, draw: number, goalsScored: number, goalsConceded: number): number {
-  const totalMatches = win + loss + draw;
+export function computeGlobalElo(players: Player[], matches: MatchRecord[]): Record<string, number> {
+  const elos: Record<string, number> = {};
+  const matchCount: Record<string, number> = {};
+  
+  players.forEach(p => {
+    elos[p.id] = 1200;
+    matchCount[p.id] = 0;
+  });
+
+  const sorted = [...matches].sort((a,b) => a.timestamp - b.timestamp);
+
+  sorted.forEach(m => {
+    if (!elos[m.p1Id]) { elos[m.p1Id] = 1200; matchCount[m.p1Id] = 0; }
+    if (!elos[m.p2Id]) { elos[m.p2Id] = 1200; matchCount[m.p2Id] = 0; }
+
+    const elo1 = elos[m.p1Id];
+    const elo2 = elos[m.p2Id];
+
+    const expected1 = 1 / (1 + Math.pow(10, (elo2 - elo1) / 400));
+    const expected2 = 1 / (1 + Math.pow(10, (elo1 - elo2) / 400));
+
+    let actual1 = 0.5, actual2 = 0.5;
+    const score1 = Number(m.p1Score);
+    const score2 = Number(m.p2Score);
+    
+    if (score1 > score2) { actual1 = 1; actual2 = 0; }
+    else if (score1 < score2) { actual1 = 0; actual2 = 1; }
+
+    // Use higher K factor for placements (first 5 games)
+    const K1 = matchCount[m.p1Id] < 5 ? 64 : 32;
+    const K2 = matchCount[m.p2Id] < 5 ? 64 : 32;
+
+    matchCount[m.p1Id]++;
+    matchCount[m.p2Id]++;
+
+    elos[m.p1Id] = elo1 + K1 * (actual1 - expected1);
+    elos[m.p2Id] = elo2 + K2 * (actual2 - expected2);
+  });
+
+  return elos;
+}
+
+export function calculateOvrHybrid(player: Player, elo: number): number {
+  const totalMatches = player.win + player.loss + player.draw;
   if (totalMatches === 0) return 60;
-  const winPct = win / totalMatches;
+  
+  const winPct = player.win / totalMatches;
+  // Factor experience softly
   const gamesFactor = Math.min(totalMatches, 20) / 20;
-  const goalDiff = goalsScored - goalsConceded;
+  const goalDiff = player.goalsScored - player.goalsConceded;
   const gdFactor = Math.max(-10, Math.min(goalDiff, 20));
-  let ovr = 60 + (winPct * 25) + (gamesFactor * 5) + (gdFactor * 0.45);
-  return Math.min(99, Math.max(40, Math.round(ovr)));
+  
+  // Base stat value (gives up to +18 OVR)
+  const statsBonus = (winPct * 15) + (gamesFactor * 5) + (gdFactor * 0.4);
+  
+  // Elo pulls its weight smoothly (gives +/- based on actual true chess rating)
+  const eloBonus = (elo - 1200) / 10;
+  
+  let ovr = 60 + statsBonus + eloBonus;
+  return Math.max(40, Math.min(99, Math.round(ovr)));
 }
 
 export const INITIAL_PLAYERS: Player[] = [
@@ -224,7 +280,7 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[]): P
     goalsScored,
     goalsConceded,
     form,
-    ovr: calculateOVR(win, loss, draw, goalsScored, goalsConceded)
+    ovr: calculateOvrHybrid(player, 1200) // Fallback OVR
   };
 }
 

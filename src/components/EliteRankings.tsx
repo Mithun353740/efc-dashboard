@@ -2,10 +2,12 @@ import { motion } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
+import { INITIAL_PLAYERS } from '../lib/store';
 
 export default function EliteRankings() {
   const { rankedPlayers } = useFirebase();
-  const topPlayers = rankedPlayers.slice(0, 5);
+  const activePlayers = rankedPlayers.length > 0 ? rankedPlayers : INITIAL_PLAYERS;
+  const topPlayers = activePlayers.slice(0, 5);
 
   return (
     <section className="py-20 px-8 max-w-7xl mx-auto">

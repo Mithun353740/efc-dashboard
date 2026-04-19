@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Player, Leader, MatchRecord } from './types';
-import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, bootstrapData, sortRankedPlayers, testFirestoreConnection } from './lib/store';
+import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, bootstrapData, sortRankedPlayers, testFirestoreConnection, computeGlobalElo, calculateOvrHybrid } from './lib/store';
 
 interface FirebaseContextType {
   players: Player[];
@@ -8,6 +8,7 @@ interface FirebaseContextType {
   leaders: Leader[];
   matches: MatchRecord[];
   isLoading: boolean;
+  dbError: string | null;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
@@ -18,9 +19,27 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
   const [isLoadingLeaders, setIsLoadingLeaders] = useState(true);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
+
+    const errorHandler = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (mounted && customEvent.detail?.error) {
+        const errStr = String(customEvent.detail.error).toLowerCase();
+        if (errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('permission')) {
+          setDbError('QUOTA_EXCEEDED');
+          setIsLoadingPlayers(false);
+          setIsLoadingLeaders(false);
+        } else {
+          setDbError('DATABASE_ERROR');
+          setIsLoadingPlayers(false);
+          setIsLoadingLeaders(false);
+        }
+      }
+    };
+    window.addEventListener('firestore-error', errorHandler);
 
     // Run connection test and bootstrap in background without awaiting them
     testFirestoreConnection().catch(console.warn);
@@ -56,6 +75,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
+      window.removeEventListener('firestore-error', errorHandler);
       unsubPlayers();
       unsubLeaders();
       unsubMatches();
@@ -63,10 +83,15 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const elos = React.useMemo(() => computeGlobalElo(players, matches), [players, matches]);
+  const enrichedPlayers = players.map(p => ({
+    ...p,
+    ovr: calculateOvrHybrid(p, elos[p.id])
+  }));
 
   const enrichedLeaders = leaders.map(l => {
     if (l.playerId) {
-      const p = players.find(player => player.id === l.playerId);
+      const p = enrichedPlayers.find(player => player.id === l.playerId);
       if (p) {
         return { ...l, name: p.name, image: p.image };
       }
@@ -77,11 +102,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const isLoading = isLoadingPlayers || isLoadingLeaders;
 
   const value = {
-    players,
-    rankedPlayers: sortRankedPlayers(players),
+    players: enrichedPlayers,
+    rankedPlayers: sortRankedPlayers(enrichedPlayers),
     leaders: enrichedLeaders,
     matches,
-    isLoading
+    isLoading,
+    dbError
   };
 
   return (
