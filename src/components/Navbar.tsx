@@ -59,7 +59,7 @@ export default function Navbar() {
             src={CLUB_LOGO}
             alt={CLUB_NAME} 
             className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
+            
             onError={(e) => {
               const target = e.currentTarget;
               target.style.display = 'none';
