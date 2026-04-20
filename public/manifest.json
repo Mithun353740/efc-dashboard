@@ -1,0 +1,17 @@
+{
+  "name": "Quantum Vortex FC App",
+  "short_name": "QVFC Portal",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "description": "Where Digital Strategy Meets Kinetic Chaos",
+  "icons": [
+    {
+      "src": "/logo.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
