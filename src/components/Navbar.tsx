@@ -56,18 +56,18 @@ export default function Navbar() {
       <Link to="/" className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-brand-dark dark:bg-brand-green/10">
           <img 
-            src={CLUB_LOGO} 
+            src={CLUB_LOGO}
             alt={CLUB_NAME} 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
             onError={(e) => {
-              // Fallback if image fails
-              e.currentTarget.style.display = 'none';
-              const parent = e.currentTarget.parentElement;
-              if (parent) {
+              const target = e.currentTarget;
+              target.style.display = 'none';
+              const parent = target.parentElement;
+              if (parent && !parent.querySelector('.fallback-v')) {
                 const fallback = document.createElement('div');
-                fallback.className = "w-full h-full flex items-center justify-center text-white dark:text-brand-green font-bold italic";
-                fallback.innerText = "V";
+                fallback.className = "fallback-v w-full h-full flex items-center justify-center text-white dark:text-brand-green font-bold italic text-lg";
+                fallback.innerText = "QV";
                 parent.appendChild(fallback);
               }
             }}

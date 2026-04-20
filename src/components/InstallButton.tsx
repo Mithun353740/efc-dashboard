@@ -36,14 +36,14 @@ export default function InstallButton() {
 
   const handleInstallClick = async () => {
     // If we're on iOS, show a custom instruction popup since Apple blocks the automatic prompt
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isIOS = (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && "ontouchend" in document)) && !(window as any).MSStream;
     if (isIOS && !isInstalled) {
       alert(" To install on iPhone/iPad:\n1. Tap the 'Share' button at the bottom of Safari (square with up arrow)\n2. Scroll down and tap 'Add to Home Screen'");
       return;
     }
 
     if (!deferredPrompt) {
-      alert("Installation is currently unavailable. This usually happens if you are opening this via an in-app browser (like inside Instagram or WhatsApp). Please tap the 3 dots at the top right and select 'Open in Chrome' or 'Open in Safari', then tap the install button again!");
+      alert("Custom installation blocked by Chrome.\n\nDon't worry! You can easily force the installation:\n\n1. Tap the 3 vertical dots ( ⋮ ) at the top right of your Chrome browser.\n2. Tap 'Add to Home screen' or 'Install app'.\n3. The app will install perfectly with your new club logo!");
       return;
     }
 

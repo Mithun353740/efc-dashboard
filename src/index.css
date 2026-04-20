@@ -5,7 +5,7 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --color-brand-green: #22c55e;
+  --color-brand-green: #00d4ff; /* Internally keeping the `brand-green` class name, but visibly rendering as Electric Blue/Cyan to match the Quantum Vortex logo perfectly */
   --color-brand-dark: #020617;
 }
 
