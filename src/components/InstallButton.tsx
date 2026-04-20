@@ -43,8 +43,7 @@ export default function InstallButton() {
     }
 
     if (!deferredPrompt) {
-      // If prompt isn't ready but we clicked it, might be desktop or missing conditions
-      alert("App installation is blocked by your browser right now.\n\nReason: Google Chrome requires the 'logo.jpg' file to exist physically in the server folder before it will allow this button to work!\n\nPlease ask the developer (me) to inject a temporary logo file, or upload the file directly to the /public folder.");
+      alert("Installation is currently unavailable. This usually happens if you are opening this via an in-app browser (like inside Instagram or WhatsApp). Please tap the 3 dots at the top right and select 'Open in Chrome' or 'Open in Safari', then tap the install button again!");
       return;
     }
 

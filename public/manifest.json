@@ -8,9 +8,9 @@
   "description": "Where Digital Strategy Meets Kinetic Chaos",
   "icons": [
     {
-      "src": "/logo.jpg",
+      "src": "/logo.svg",
       "sizes": "192x192 512x512",
-      "type": "image/jpeg",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]

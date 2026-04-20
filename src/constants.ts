@@ -1,3 +1,3 @@
-export const CLUB_LOGO = "/logo.jpg";
+export const CLUB_LOGO = "/logo.svg";
 export const CLUB_NAME = "Quantum Vortex FC";
 export const CLUB_TAGLINE = "Where Digital Strategy Meets Kinetic Chaos";
