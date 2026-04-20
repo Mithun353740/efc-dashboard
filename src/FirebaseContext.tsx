@@ -49,13 +49,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setIsLoadingLeaders(false);
         setIsLoadingMatches(false);
 
-        // Only show fatal error if NO cache exists
-        if (!cachedP && !cachedL) {
-          if (errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('permission')) {
-            setDbError('QUOTA_EXCEEDED');
-          } else {
-            setDbError('DATABASE_ERROR');
-          }
+        // Set dbError to trigger Read-Only UI and Admin Lock
+        if (errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('permission')) {
+          setDbError('QUOTA_EXCEEDED');
+        } else {
+          setDbError('DATABASE_ERROR');
         }
       }
     };

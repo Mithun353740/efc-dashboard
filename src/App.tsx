@@ -48,17 +48,6 @@ function AppContent() {
     </div>
   );
 
-  if (dbError) return (
-    <div className="pt-32 pb-20 px-4 md:px-8 text-center min-h-[70vh] flex flex-col items-center justify-center">
-      <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-rose-500 tracking-tighter mb-4 uppercase">SYSTEM OVERLOAD</h1>
-      <p className="text-slate-500 font-bold tracking-widest uppercase mb-8 max-w-lg">The engine has reached its maximum daily processing capacity. Data sync is temporarily locked.</p>
-      <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-3xl max-w-md w-full">
-        <p className="text-sm font-bold text-brand-dark dark:text-slate-300 mb-2">WHEN DOES THIS RESET?</p>
-        <p className="text-xs text-slate-500 font-medium">The Google Firebase free tier quota resets automatically at exactly <strong>12:00 AM (Midnight) Pacific Time</strong> (approx 1:00 PM BST). All stats and players are perfectly safe and will automatically reappear at that time.</p>
-      </div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark transition-colors flex flex-col">
       <Navbar />
