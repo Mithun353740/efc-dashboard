@@ -29,7 +29,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // Minimum delay for branding aesthetics and to prevent cache flashes
     const minLoadTimer = setTimeout(() => {
       if (mounted) setIsMinLoadTimePassed(true);
-    }, 1200);
+    }, 2500);
 
     const errorHandler = (e: Event) => {
       const customEvent = e as CustomEvent;
@@ -92,7 +92,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setIsLoadingLeaders(false);
         setIsLoadingMatches(false);
       }
-    }, 2000);
+    }, 3500);
 
     return () => {
       mounted = false;

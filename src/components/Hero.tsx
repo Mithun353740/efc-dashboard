@@ -3,10 +3,11 @@ import { Player } from '../types';
 import { Link } from 'react-router-dom';
 
 interface HeroProps {
-  player: Player;
+  player?: Player;
 }
 
 export default function Hero({ player }: HeroProps) {
+  if (!player) return null;
   const nameParts = player.name.split(' ');
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '';

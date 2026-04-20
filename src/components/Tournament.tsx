@@ -87,14 +87,14 @@ export default function Tournament() {
             <table className="w-full text-left border-collapse w-full">
               <thead>
                 <tr className="bg-slate-50 dark:bg-black/20 border-b border-slate-100 dark:border-white/10">
-                  <th className="p-3 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase w-10 md:w-16 text-center">POS</th>
-                  <th className="p-3 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase w-28 sm:w-auto">CLUB MEMBER</th>
-                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-6 sm:w-auto">P</th>
-                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-6 sm:w-auto">W</th>
-                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-6 sm:w-auto">D</th>
-                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-6 sm:w-auto">L</th>
-                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-6 sm:w-auto">GD</th>
-                  <th className="p-2 md:p-6 text-[8px] md:text-[10px] font-black text-slate-800 dark:text-white tracking-widest uppercase text-center bg-slate-100 dark:bg-white/5 w-10 sm:w-auto">PTS</th>
+                  <th className="p-3 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-10 md:w-auto">POS</th>
+                  <th className="p-3 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase">CLUB MEMBER</th>
+                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">P</th>
+                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">W</th>
+                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">D</th>
+                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">L</th>
+                  <th className="p-1 md:p-6 text-[8px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">GD</th>
+                  <th className="p-2 md:p-6 text-[8px] md:text-[10px] font-black text-slate-800 dark:text-white tracking-widest uppercase text-center bg-slate-100 dark:bg-white/5">PTS</th>
                 </tr>
               </thead>
               <tbody>

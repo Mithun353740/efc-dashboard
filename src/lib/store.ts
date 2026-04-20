@@ -90,32 +90,7 @@ export async function testFirestoreConnection() {
   }
 }
 
-export const INITIAL_LEADERS: Leader[] = [
-  {
-    id: '1',
-    name: 'ARTHUR THORNE',
-    role: 'CLUB PRESIDENT',
-    image: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=200&auto=format&fit=crop',
-    quote: 'Victory is calculated, chaos is controlled.',
-    initials: 'PRES',
-  },
-  {
-    id: '2',
-    name: 'DR. ELENA VOSS',
-    role: 'TACTICAL LEAD',
-    image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop',
-    quote: 'Optimizing performance through kinetic data.',
-    initials: 'TAC',
-  },
-  {
-    id: '3',
-    name: 'MARCUS VANE',
-    role: 'STRATEGIC DIRECTOR',
-    image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop',
-    quote: 'Building the foundation for future legends.',
-    initials: 'STRAT',
-  },
-];
+export const INITIAL_LEADERS: Leader[] = [];
 
 export function computeGlobalElo(players: Player[], matches: MatchRecord[]): Record<string, number> {
   const elos: Record<string, number> = {};
@@ -179,40 +154,7 @@ export function calculateOvrHybrid(player: Player, elo: number): number {
   return Math.max(40, Math.min(99, Math.round(ovr)));
 }
 
-export const INITIAL_PLAYERS: Player[] = [
-  {
-    id: '1',
-    name: 'VORTEX KINETIC',
-    number: '3',
-    position: 'FORWARD',
-    ovr: 95,
-    win: 24,
-    loss: 2,
-    draw: 1,
-    goalsScored: 45,
-    goalsConceded: 12,
-    image: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&auto=format&fit=crop',
-    form: ['W', 'W', 'W', 'D', 'W'],
-    device: 'PS5',
-    uid: 'VORTEX_001'
-  },
-  {
-    id: '2',
-    name: 'MARCUS STERLING',
-    number: '10',
-    position: 'MIDFIELDER',
-    ovr: 92,
-    win: 18,
-    loss: 2,
-    draw: 4,
-    goalsScored: 22,
-    goalsConceded: 10,
-    image: 'https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=400&auto=format&fit=crop',
-    form: ['W', 'D', 'W', 'W', 'L'],
-    device: 'PC',
-    uid: 'STERLING_X'
-  }
-];
+export const INITIAL_PLAYERS: Player[] = [];
 
 // Real-time listeners
 export function subscribeToPlayers(callback: (players: Player[]) => void) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ChevronRight, Trophy, Target, Zap, Filter, ChevronDown, Info, X } from 'lucide-react';
+import { Search, ChevronRight, Trophy, Target, Zap, Filter, ChevronDown, Info, X, Activity, Flame } from 'lucide-react';
 import { useFirebase } from '../FirebaseContext';
 import { cn } from '../lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -267,9 +267,11 @@ export default function PlayerStats() {
                   </div>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <StatCard icon={<Trophy className="text-brand-green" />} label="POINTS" value={computedPlayer.win * 3 + computedPlayer.draw} />
                   <StatCard icon={<Target className="text-brand-green" />} label="GOAL DIFF" value={computedPlayer.goalsScored - computedPlayer.goalsConceded} />
+                  <StatCard icon={<Flame className="text-brand-green" />} label="GOALS SCORED" value={computedPlayer.goalsScored} />
+                  <StatCard icon={<Activity className="text-brand-green" />} label="MATCHES PLAYED" value={computedPlayer.win + computedPlayer.loss + computedPlayer.draw} />
                   <StatCard icon={<Zap className="text-brand-green" />} label="WIN RATE" value={`${Math.round((computedPlayer.win / (computedPlayer.win + computedPlayer.loss + computedPlayer.draw || 1)) * 100)}%`} />
                 </div>
               </div>
