@@ -408,18 +408,32 @@ export async function bootstrapData() {
 // Ranking logic (can be used on the client-side array)
 export function sortRankedPlayers(players: Player[]): Player[] {
   return [...players].sort((a, b) => {
+    // 1. Players with 0 matches should ALWAYS be at the bottom
+    const totalMatchesA = a.win + a.loss + a.draw;
+    const totalMatchesB = b.win + b.loss + b.draw;
+    if (totalMatchesA === 0 && totalMatchesB > 0) return 1;
+    if (totalMatchesB === 0 && totalMatchesA > 0) return -1;
+
+    // 2. Points (Highest first)
     const pointsA = a.win * 3 + a.draw;
     const pointsB = b.win * 3 + b.draw;
     if (pointsB !== pointsA) return pointsB - pointsA;
-    if (b.win !== a.win) return b.win - a.win;
+    
+    // 3. Goal Difference (Highest first)
     const gdA = a.goalsScored - a.goalsConceded;
     const gdB = b.goalsScored - b.goalsConceded;
     if (gdB !== gdA) return gdB - gdA;
-    const totalA = a.win + a.loss + a.draw || 1;
-    const totalB = b.win + b.loss + b.draw || 1;
-    const wrA = a.win / totalA;
-    const wrB = b.win / totalB;
-    if (wrB !== wrA) return wrB - wrA;
+
+    // 4. Goals Scored (Highest first)
+    if (b.goalsScored !== a.goalsScored) return b.goalsScored - a.goalsScored;
+    
+    // 5. Total Wins (Highest first)
+    if (b.win !== a.win) return b.win - a.win;
+    
+    // 6. Matches Played (FEWER matches played ranks higher if perfectly tied on all above - "Games in Hand")
+    if (totalMatchesA !== totalMatchesB) return totalMatchesA - totalMatchesB;
+    
+    // 7. Alphabetical order fallback
     return a.name.localeCompare(b.name);
   });
 }

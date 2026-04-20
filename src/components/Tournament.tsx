@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import { Player } from '../types';
-import { computePlayerStats } from '../lib/store';
+import { computePlayerStats, sortRankedPlayers } from '../lib/store';
 import { cn } from '../lib/utils';
 import { Trophy, ChevronDown } from 'lucide-react';
 
@@ -18,18 +18,11 @@ export default function Tournament() {
     const tournamentMatches = matches.filter(m => m.tournament === selectedTournament);
     
     // Compute stats for all players using ONLY the tournament matches
-    return rankedPlayers
+    const unsortedTournamentPlayers = rankedPlayers
       .map(player => computePlayerStats(player, tournamentMatches))
-      .filter(p => p.win > 0 || p.loss > 0 || p.draw > 0) // Only show players who played in this tournament
-      .sort((a, b) => {
-        const ptsA = (a.win * 3) + a.draw;
-        const ptsB = (b.win * 3) + b.draw;
-        if (ptsB !== ptsA) return ptsB - ptsA;
-        const gdA = a.goalsScored - a.goalsConceded;
-        const gdB = b.goalsScored - b.goalsConceded;
-        if (gdB !== gdA) return gdB - gdA;
-        return a.name.localeCompare(b.name);
-      });
+      .filter(p => p.win > 0 || p.loss > 0 || p.draw > 0); // Only show players who played in this tournament
+      
+    return sortRankedPlayers(unsortedTournamentPlayers);
   }, [rankedPlayers, matches, selectedTournament]);
 
   return (

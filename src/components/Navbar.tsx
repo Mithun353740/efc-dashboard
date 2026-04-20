@@ -85,13 +85,26 @@ export default function Navbar() {
           { label: 'TOURNAMENT', path: '/tournament' },
           ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
         ].map((item) => (
-          <Link
-            key={item.label}
-            to={item.path}
-            className="text-[11px] font-black tracking-widest text-slate-500 hover:text-brand-dark dark:hover:text-brand-green transition-colors"
-          >
-            {item.label}
-          </Link>
+          item.externalUrl ? (
+            <a
+              key={item.label}
+              href={item.externalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-black tracking-widest text-brand-green hover:opacity-80 transition-colors flex items-center gap-1"
+            >
+              {item.label}
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            </a>
+          ) : (
+            <Link
+              key={item.label}
+              to={item.path}
+              className="text-[11px] font-black tracking-widest text-slate-500 hover:text-brand-dark dark:hover:text-brand-green transition-colors"
+            >
+              {item.label}
+            </Link>
+          )
         ))}
       </div>
 
@@ -143,14 +156,28 @@ export default function Navbar() {
                 { label: 'ANALYTICS', path: '/stats' },
                 { label: 'TOURNAMENT', path: '/tournament' },
                 ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
-              ].map((item) => (
-                <Link
-                  key={item.label}
-                  to={item.path}
-                  className="px-4 py-4 text-xs font-black tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 active:bg-slate-100 dark:active:bg-white/10 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
-                >
-                  {item.label}
-                </Link>
+              ].map((item: any) => (
+                item.externalUrl ? (
+                  <a
+                    key={item.label}
+                    href={item.externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="px-4 py-4 text-xs font-black tracking-widest text-brand-green hover:bg-slate-50 dark:hover:bg-white/5 active:bg-slate-100 dark:active:bg-white/10 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0 flex items-center justify-between"
+                  >
+                    {item.label}
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                  </a>
+                ) : (
+                  <Link
+                    key={item.label}
+                    to={item.path}
+                    className="px-4 py-4 text-xs font-black tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 active:bg-slate-100 dark:active:bg-white/10 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
+                  >
+                    {item.label}
+                  </Link>
+                )
               ))}
               {isAdmin && (
                 <button 
