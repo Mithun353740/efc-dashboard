@@ -44,7 +44,7 @@ export default function InstallButton() {
 
     if (!deferredPrompt) {
       // If prompt isn't ready but we clicked it, might be desktop or missing conditions
-      alert("App installation is not currently ready. You may need to open this in Chrome or Safari directly.");
+      alert("App installation is blocked by your browser right now.\n\nReason: Google Chrome requires the 'logo.jpg' file to exist physically in the server folder before it will allow this button to work!\n\nPlease ask the developer (me) to inject a temporary logo file, or upload the file directly to the /public folder.");
       return;
     }
 
@@ -62,7 +62,7 @@ export default function InstallButton() {
   return (
     <button 
       onClick={handleInstallClick}
-      className={`flex items-center gap-2 px-4 py-2 bg-brand-green/10 text-brand-green border border-brand-green/20 rounded-full hover:bg-brand-green text-[10px] font-black uppercase tracking-widest transition-all ${!isInstallable && !/iPad|iPhone|iPod/.test(navigator.userAgent) ? 'opacity-50 cursor-not-allowed hidden' : ''}`}
+      className={`flex items-center gap-2 px-4 py-2 bg-brand-green/10 text-brand-green border border-brand-green/20 rounded-full hover:bg-brand-green text-[10px] font-black uppercase tracking-widest transition-all`}
     >
       <Download size={14} />
       <span>Install App</span>
