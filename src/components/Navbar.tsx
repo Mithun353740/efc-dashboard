@@ -3,6 +3,7 @@ import { Bell, User, Moon, Sun, Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useLocation } from 'react-router-dom';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
+import InstallButton from './InstallButton';
 
 export default function Navbar() {
   const [isDark, setIsDark] = useState(true);
@@ -109,6 +110,9 @@ export default function Navbar() {
       </div>
 
       <div className="flex items-center gap-4">
+        <div className="hidden md:block">
+          <InstallButton />
+        </div>
         <button 
           onClick={toggleDark}
           className="p-2 text-slate-400 hover:text-brand-dark dark:hover:text-brand-green transition-colors"
@@ -179,6 +183,9 @@ export default function Navbar() {
                   </Link>
                 )
               ))}
+              <div className="mt-4 flex justify-center">
+                <InstallButton />
+              </div>
               {isAdmin && (
                 <button 
                   onClick={handleLogout}
