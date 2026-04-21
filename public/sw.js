@@ -1,4 +1,4 @@
-const CACHE_NAME = 'qvfc-cache-v2';
+const CACHE_NAME = 'qvfc-cache-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -8,7 +8,8 @@ self.addEventListener('install', (event) => {
         '/',
         '/index.html',
         '/manifest.json',
-        '/logo.jpg'
+        '/logo-192x192.png',
+        '/logo-512x512.png'
       ]);
     })
   );
@@ -29,6 +30,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Minimal fetch listener is required for PWA installability in Chrome
   if (event.request.method !== 'GET') return;
   if (event.request.url.includes('firestore.googleapis.com')) return;
 
