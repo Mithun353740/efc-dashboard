@@ -28,7 +28,7 @@ export default function Legion() {
               <div className="p-1.5 md:p-4">
                 <h3 className="text-[7px] md:text-xs font-black text-brand-dark dark:text-white tracking-tight truncate">{player.name}</h3>
                 <div className="mt-1 md:mt-2 flex items-center">
-                  <span className="bg-brand-green text-brand-dark px-1 md:px-2 py-0.5 md:py-1 rounded-sm text-[6px] md:text-[11px] font-black tracking-widest leading-none">
+                  <span className="bg-brand-gradient text-white border border-white/20 px-1 md:px-2 py-0.5 md:py-1 rounded-sm text-[6px] md:text-[11px] font-black tracking-widest leading-none">
                     {player.ovr} OVR
                   </span>
                 </div>

@@ -98,7 +98,7 @@ export default function PlayerStats() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search players..."
-              className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs font-bold outline-none focus:border-brand-green transition-all dark:text-white"
+              className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs font-bold outline-none focus:border-brand-purple transition-all dark:text-white"
             />
           </div>
         </div>
@@ -114,7 +114,7 @@ export default function PlayerStats() {
               }}
               className={cn(
                 "w-full flex items-center gap-4 p-3 rounded-2xl transition-all text-left group",
-                selectedPlayer?.id === player.id ? "bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark shadow-xl shadow-brand-dark/20" : "hover:bg-slate-50 dark:hover:bg-white/5"
+                selectedPlayer?.id === player.id ? "bg-brand-dark dark:bg-brand-purple text-white dark:text-brand-dark shadow-xl shadow-brand-dark/20" : "hover:bg-slate-50 dark:hover:bg-white/5"
               )}
             >
               <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-100 dark:border-white/10 transition-all">
@@ -162,11 +162,11 @@ export default function PlayerStats() {
                 <div className="absolute top-4 right-4 lg:top-8 lg:right-8 z-50">
                   <button 
                     onClick={() => setIsFilterOpen(!isFilterOpen)}
-                    className="bg-brand-dark border-brand-green border px-3 py-2 lg:px-4 lg:py-3 rounded-2xl flex items-center gap-2 hover:scale-[1.02] transition-all font-black text-[10px] lg:text-xs cursor-pointer group shadow-2xl shadow-brand-dark/50"
+                    className="bg-brand-dark border-brand-purple border px-3 py-2 lg:px-4 lg:py-3 rounded-2xl flex items-center gap-2 hover:scale-[1.02] transition-all font-black text-[10px] lg:text-xs cursor-pointer group shadow-2xl shadow-brand-dark/50"
                   >
-                    <Filter size={12} className="text-brand-green group-hover:rotate-12 transition-transform" />
+                    <Filter size={12} className="text-brand-purple group-hover:rotate-12 transition-transform" />
                     <span className="max-w-[80px] lg:max-w-none truncate">{filter.includes('/') ? `${filter} Season` : filter}</span>
-                    <ChevronDown size={14} className={cn("text-brand-green ml-1 transition-transform", isFilterOpen ? "rotate-180" : "")} />
+                    <ChevronDown size={14} className={cn("text-brand-purple ml-1 transition-transform", isFilterOpen ? "rotate-180" : "")} />
                   </button>
 
                   <AnimatePresence>
@@ -180,28 +180,28 @@ export default function PlayerStats() {
                         <div className="p-2 space-y-1 overflow-y-auto min-h-0 custom-scrollbar pr-1">
                           <button 
                             onClick={() => { setFilter('All Time'); setIsFilterOpen(false); }}
-                            className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === 'All Time' ? "bg-brand-green text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                            className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === 'All Time' ? "bg-brand-purple text-brand-dark" : "hover:bg-white/5 text-slate-300")}
                           >
                             All Time
                           </button>
                           
-                          <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-green mt-2 bg-brand-green/5 rounded-lg border border-brand-green/10">SEASONS</div>
+                          <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-purple mt-2 bg-brand-purple/5 rounded-lg border border-brand-purple/10">SEASONS</div>
                           {availableSeasons.map(s => (
                             <button 
                               key={s}
                               onClick={() => { setFilter(s); setIsFilterOpen(false); }}
-                              className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === s ? "bg-brand-green text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                              className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === s ? "bg-brand-purple text-brand-dark" : "hover:bg-white/5 text-slate-300")}
                             >
                               {s} Season
                             </button>
                           ))}
 
-                          <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-green mt-2 bg-brand-green/5 rounded-lg border border-brand-green/10">TOURNAMENTS</div>
+                          <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-purple mt-2 bg-brand-purple/5 rounded-lg border border-brand-purple/10">TOURNAMENTS</div>
                           {availableTournaments.map(t => (
                             <button 
                               key={t}
                               onClick={() => { setFilter(t); setIsFilterOpen(false); }}
-                              className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === t ? "bg-brand-green text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                              className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === t ? "bg-brand-purple text-brand-dark" : "hover:bg-white/5 text-slate-300")}
                             >
                               {t}
                             </button>
@@ -218,10 +218,10 @@ export default function PlayerStats() {
 
                 <div className="relative z-10 pt-10 lg:pt-0">
                   <div className="flex items-center gap-4 mb-2 lg:mb-4">
-                    <span className="text-brand-green font-black text-[10px] tracking-[0.4em]">PLAYER PROFILE</span>
+                    <span className="text-brand-purple font-black text-[10px] tracking-[0.4em]">PLAYER PROFILE</span>
                     <button 
                       onClick={() => setIsOvrModalOpen(true)}
-                      className="flex items-center gap-1.5 text-[9px] font-black tracking-widest text-[#0f172a] hover:text-white transition-colors bg-brand-green hover:bg-brand-green/80 px-3 py-1 rounded-full shadow-lg shadow-brand-green/20"
+                      className="flex items-center gap-1.5 text-[9px] font-black tracking-widest text-white transition-colors bg-brand-gradient hover:scale-105 px-3 py-1 rounded-full shadow-lg shadow-brand-purple/20"
                     >
                       <Info size={10} />
                       HOW OVR WORKS
@@ -238,8 +238,8 @@ export default function PlayerStats() {
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">DEVICE</p>
                       <p className="text-lg lg:text-xl font-black leading-none">{computedPlayer.device || 'N/A'}</p>
                     </div>
-                    <div className="bg-brand-green px-6 py-2 rounded-2xl lg:rounded-full text-brand-dark shrink-0">
-                      <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 leading-none mb-1">OVERALL</p>
+                    <div className="bg-brand-gradient px-6 py-2 rounded-2xl lg:rounded-full text-white shrink-0 shadow-lg shadow-brand-purple/20 border border-t-white/20 border-b-black/20">
+                      <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 leading-none mb-1">OVERALL</p>
                       <p className="text-lg lg:text-xl font-black leading-none">{computedPlayer.ovr}</p>
                     </div>
                   </div>
@@ -268,11 +268,11 @@ export default function PlayerStats() {
                 </div>
 
                 <div className="space-y-4">
-                  <StatCard icon={<Trophy className="text-brand-green" />} label="POINTS" value={computedPlayer.win * 3 + computedPlayer.draw} />
-                  <StatCard icon={<Target className="text-brand-green" />} label="GOAL DIFF" value={computedPlayer.goalsScored - computedPlayer.goalsConceded} />
-                  <StatCard icon={<Flame className="text-brand-green" />} label="GOALS SCORED" value={computedPlayer.goalsScored} />
-                  <StatCard icon={<Activity className="text-brand-green" />} label="MATCHES PLAYED" value={computedPlayer.win + computedPlayer.loss + computedPlayer.draw} />
-                  <StatCard icon={<Zap className="text-brand-green" />} label="WIN RATE" value={`${Math.round((computedPlayer.win / (computedPlayer.win + computedPlayer.loss + computedPlayer.draw || 1)) * 100)}%`} />
+                  <StatCard icon={<Trophy className="text-brand-purple" />} label="POINTS" value={computedPlayer.win * 3 + computedPlayer.draw} />
+                  <StatCard icon={<Target className="text-brand-purple" />} label="GOAL DIFF" value={computedPlayer.goalsScored - computedPlayer.goalsConceded} />
+                  <StatCard icon={<Flame className="text-brand-purple" />} label="GOALS SCORED" value={computedPlayer.goalsScored} />
+                  <StatCard icon={<Activity className="text-brand-purple" />} label="MATCHES PLAYED" value={computedPlayer.win + computedPlayer.loss + computedPlayer.draw} />
+                  <StatCard icon={<Zap className="text-brand-purple" />} label="WIN RATE" value={`${Math.round((computedPlayer.win / (computedPlayer.win + computedPlayer.loss + computedPlayer.draw || 1)) * 100)}%`} />
                 </div>
               </div>
 
@@ -283,7 +283,7 @@ export default function PlayerStats() {
                   {(computedPlayer.win > 0 || computedPlayer.loss > 0 || computedPlayer.draw > 0) && computedPlayer.form?.length ? computedPlayer.form.map((res, i) => (
                     <div key={i} className={cn(
                       "flex-1 py-4 rounded-2xl flex flex-col items-center justify-center border transition-all",
-                      res === 'W' ? "bg-brand-green/10 border-brand-green/20 text-brand-green" :
+                      res === 'W' ? "bg-brand-purple/10 border-brand-purple/20 text-brand-purple" :
                       res === 'L' ? "bg-red-500/10 border-red-500/20 text-red-500" :
                       "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400"
                     )}>
@@ -327,7 +327,7 @@ export default function PlayerStats() {
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <h3 className="text-2xl font-black text-brand-dark dark:text-white tracking-tighter">OVR SYSTEM</h3>
-                    <p className="text-[10px] font-bold text-brand-green tracking-widest mt-1">POWERED BY TRUE ELO</p>
+                    <p className="text-[10px] font-bold text-brand-purple tracking-widest mt-1">POWERED BY TRUE ELO</p>
                   </div>
                   <button onClick={() => setIsOvrModalOpen(false)} className="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
                     <X size={16} className="text-slate-500 dark:text-white" />
@@ -336,7 +336,7 @@ export default function PlayerStats() {
 
                 <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300 font-medium">
                   <p>
-                    Your <strong className="text-brand-dark dark:text-white">Overall Rating (OVR)</strong> is now powered by a <strong className="text-brand-green">Hybrid True ELO Engine</strong>. This ensures new players feel rewarded instantly, while long-term veterans scale accurately.
+                    Your <strong className="text-brand-dark dark:text-white">Overall Rating (OVR)</strong> is now powered by a <strong className="text-brand-purple">Hybrid True ELO Engine</strong>. This ensures new players feel rewarded instantly, while long-term veterans scale accurately.
                   </p>
                   
                   <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-100 dark:border-white/10 space-y-3 text-xs leading-relaxed">

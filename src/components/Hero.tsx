@@ -30,7 +30,7 @@ export default function Hero({ player }: HeroProps) {
           transition={{ duration: 0.6 }}
           className="max-w-2xl"
         >
-          <div className="inline-block bg-brand-green text-brand-dark px-3 py-1 mb-4 md:mb-6 rounded-md shadow-[0_0_20px_rgba(34,197,94,0.3)]">
+          <div className="inline-block bg-brand-gradient text-white px-3 py-1 mb-4 md:mb-6 rounded-md shadow-[0_0_20px_rgba(139,92,246,0.4)] border border-white/20">
             <span className="text-[10px] md:text-[12px] font-black tracking-[0.3em] uppercase">
               #1 RANK • TOP PERFORMER
             </span>
@@ -43,7 +43,7 @@ export default function Hero({ player }: HeroProps) {
           </h2>
           
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <Link to={`/stats?id=${player.id}`} className="bg-brand-green hover:bg-green-500 text-brand-dark font-black text-xs tracking-widest px-8 py-4 rounded-full transition-all hover:scale-105 flex items-center justify-center text-center">
+            <Link to={`/stats?id=${player.id}`} className="glossy-btn px-8 py-4 text-xs rounded-full flex items-center justify-center text-center uppercase">
               VIEW STATS
             </Link>
             <button className="border border-white/30 hover:border-white text-white font-black text-xs tracking-widest px-8 py-4 rounded-full transition-all hover:bg-white/10 text-center">

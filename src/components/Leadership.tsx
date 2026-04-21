@@ -49,7 +49,7 @@ export default function Leadership() {
                     {leader.initials}
                   </span>
                   <h3 className="text-sm md:text-lg font-black text-brand-dark dark:text-white relative z-10 leading-tight">{leader.name}</h3>
-                  <p className="text-[8px] md:text-[9px] font-bold text-brand-green tracking-[0.1em] md:tracking-widest mt-1 relative z-10">{leader.role}</p>
+                  <p className="text-[8px] md:text-[9px] font-bold text-brand-purple tracking-[0.1em] md:tracking-widest mt-1 relative z-10">{leader.role}</p>
                 </div>
 
                 <p className="text-[9px] md:text-[11px] italic text-slate-400 dark:text-slate-500 leading-relaxed mt-auto line-clamp-3">

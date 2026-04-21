@@ -59,7 +59,7 @@ export default function Login() {
         className="w-full max-w-md bg-white/5 border border-white/10 rounded-[2.5rem] p-12 backdrop-blur-xl"
       >
         <div className="flex flex-col items-center mb-12">
-          <div className="w-16 h-16 bg-brand-green rounded-2xl flex items-center justify-center text-brand-dark mb-6 shadow-xl shadow-brand-green/20">
+          <div className="w-16 h-16 bg-brand-purple rounded-2xl flex items-center justify-center text-brand-dark mb-6 shadow-xl shadow-brand-purple/20">
             <Shield size={32} />
           </div>
           <h1 className="text-3xl font-black text-white tracking-tighter">eFC ACCESS</h1>
@@ -73,7 +73,7 @@ export default function Login() {
               type="text"
               value={user}
               onChange={e => setUser(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white text-xs font-bold focus:border-brand-green outline-none transition-all"
+              className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white text-xs font-bold focus:border-brand-purple outline-none transition-all"
               placeholder="Admin_19"
             />
           </div>
@@ -85,7 +85,7 @@ export default function Login() {
                 type="password"
                 value={pass}
                 onChange={e => setPass(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white text-xs font-bold focus:border-brand-green outline-none transition-all"
+                className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white text-xs font-bold focus:border-brand-purple outline-none transition-all"
                 placeholder="••••••••"
               />
               <Lock className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20" size={16} />
@@ -94,7 +94,7 @@ export default function Login() {
 
           <button 
             disabled={isLoading}
-            className="w-full py-4 bg-brand-green text-brand-dark font-black text-xs tracking-widest rounded-xl hover:scale-[1.02] transition-all shadow-xl shadow-brand-green/10 disabled:opacity-50"
+            className="w-full py-4 glossy-btn rounded-xl disabled:opacity-50 uppercase"
           >
             {isLoading ? 'AUTHENTICATING...' : 'AUTHENTICATE'}
           </button>
@@ -112,7 +112,7 @@ export default function Login() {
             type="button"
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full py-4 bg-white/5 border border-white/10 text-white font-black text-xs tracking-widest rounded-xl hover:bg-white/10 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            className="w-full py-4 bg-brand-gradient text-white border-t border-t-white/10 border-b border-b-black/20 font-black text-xs tracking-widest rounded-xl hover:scale-105 shadow-lg shadow-brand-purple/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
             <Chrome size={18} />
             GOOGLE LOGIN

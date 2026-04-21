@@ -19,7 +19,7 @@ export default function Rankings() {
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark">
+                <tr className="bg-brand-dark dark:bg-brand-gradient text-white border-b border-white/20">
                   <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase w-6 lg:w-auto text-center lg:text-left">#</th>
                   <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase">PLAYER</th>
                   <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center">W</th>
@@ -41,13 +41,13 @@ export default function Rankings() {
                     transition={{ delay: index * 0.05 }}
                     className={cn(
                       "border-b border-slate-50 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors",
-                      index < 3 && "bg-brand-green/5 dark:bg-brand-green/10"
+                      index < 3 && "bg-brand-purple/5 dark:bg-brand-purple/10"
                     )}
                   >
                     <td className="p-2 lg:p-6 text-center lg:text-left">
                       <span className={cn(
                         "text-xs lg:text-lg font-black",
-                        index === 0 ? "text-brand-green" : index < 3 ? "text-brand-dark dark:text-white" : "text-slate-300 dark:text-slate-700"
+                        index === 0 ? "text-brand-purple" : index < 3 ? "text-brand-dark dark:text-white" : "text-slate-300 dark:text-slate-700"
                       )}>
                         {index + 1}
                       </span>
@@ -72,7 +72,7 @@ export default function Rankings() {
                       {player.goalsScored - player.goalsConceded > 0 ? '+' : ''}{player.goalsScored - player.goalsConceded}
                     </td>
                     <td className="p-1 lg:p-6 text-center">
-                      <span className="bg-brand-dark dark:bg-brand-green text-white dark:text-brand-dark text-[10px] lg:text-xs font-black px-1.5 lg:px-3 py-0.5 lg:py-1 rounded-full">
+                      <span className="bg-brand-dark dark:bg-brand-gradient dark:border dark:border-white/20 text-white text-[10px] lg:text-xs font-black px-1.5 lg:px-3 py-0.5 lg:py-1 rounded-full shadow-sm">
                         {player.win * 3 + player.draw}
                       </span>
                     </td>
@@ -81,7 +81,7 @@ export default function Rankings() {
                         {(player.win > 0 || player.loss > 0 || player.draw > 0) && player.form?.length ? player.form.map((res, i) => (
                           <div key={i} className={cn(
                             "w-2 h-2 rounded-full",
-                            res === 'W' ? 'bg-brand-green' : res === 'L' ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-700'
+                            res === 'W' ? 'bg-brand-gradient shadow-[0_0_10px_rgba(139,92,246,0.5)]' : res === 'L' ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-700'
                           )} />
                         )) : <span className="text-slate-300 dark:text-slate-700 text-[10px] font-bold">-</span>}
                       </div>

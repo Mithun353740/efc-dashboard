@@ -10,15 +10,15 @@ export default function Footer() {
     <footer className="bg-[#f1f5f9] dark:bg-[#0f172a] py-12 px-8 border-t border-slate-200 dark:border-white/5 transition-colors">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-12">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-brand-dark">
+          <div className="flex items-center gap-3 md:gap-5">
+            <div className="w-12 h-12 md:w-16 md:h-16 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-brand-dark shadow-[0_0_20px_rgba(139,92,246,0.3)]">
               <img src={CLUB_LOGO} alt={CLUB_NAME} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             <div>
-              <span className="font-black italic tracking-tighter text-xl text-brand-dark dark:text-white block leading-none">
+              <span className="font-black italic tracking-tighter text-xl md:text-2xl text-transparent bg-clip-text bg-brand-gradient block leading-none">
                 {CLUB_NAME}
               </span>
-              <span className="text-[9px] font-bold text-slate-400 tracking-widest mt-1 block">
+              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 tracking-widest mt-1 md:mt-2 block">
                 Where Digital Strategy Meets Kinetic Chaos.
               </span>
             </div>
@@ -26,7 +26,7 @@ export default function Footer() {
 
           <div className="flex gap-8">
             {['Privacy Policy', 'Terms of Service', 'Brand Kit', 'Partnerships'].map((item) => (
-              <a key={item} href="#" className="text-[10px] font-bold text-slate-400 hover:text-brand-dark dark:hover:text-brand-green transition-colors">
+              <a key={item} href="#" className="text-[10px] font-bold text-slate-400 hover:text-brand-dark dark:hover:text-brand-purple transition-colors">
                 {item}
               </a>
             ))}

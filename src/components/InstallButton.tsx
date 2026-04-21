@@ -61,7 +61,7 @@ export default function InstallButton() {
   return (
     <button 
       onClick={handleInstallClick}
-      className={`flex items-center gap-2 px-4 py-2 bg-brand-green/10 text-brand-green border border-brand-green/20 rounded-full hover:bg-brand-green text-[10px] font-black uppercase tracking-widest transition-all`}
+      className={`flex items-center gap-2 px-4 py-2 bg-brand-purple/10 text-brand-purple border border-brand-purple/20 rounded-full hover:bg-brand-gradient hover:text-white hover:border-transparent text-[10px] font-black uppercase tracking-widest transition-all`}
     >
       <Download size={14} />
       <span>Install App</span>

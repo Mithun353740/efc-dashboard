@@ -44,7 +44,7 @@ function AppContent() {
 
   if (isLoading) return (
     <div className="min-h-screen bg-brand-dark flex items-center justify-center">
-      <div className="text-brand-green font-black animate-pulse tracking-widest">INITIALIZING VORTEX ENGINE...</div>
+      <div className="text-brand-purple font-black animate-pulse tracking-widest">INITIALIZING VORTEX ENGINE...</div>
     </div>
   );
 

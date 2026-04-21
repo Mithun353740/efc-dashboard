@@ -337,13 +337,13 @@ export default function Admin() {
     <div className="min-h-screen bg-[#020617] text-white p-8">
       {/* Header */}
       <div className="max-w-6xl mx-auto flex justify-between items-center mb-12">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full overflow-hidden bg-brand-green/20 flex items-center justify-center">
+        <div className="flex items-center gap-4 md:gap-6">
+          <div className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden bg-brand-purple/20 flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.3)]">
             <img src={CLUB_LOGO} alt={CLUB_NAME} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           </div>
           <div>
-            <h1 className="text-2xl font-black italic tracking-tighter text-brand-dark dark:text-white">{CLUB_NAME}</h1>
-            <p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">CONTROL CENTER</p>
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-brand-gradient">{CLUB_NAME}</h1>
+            <p className="text-[10px] md:text-xs font-bold text-slate-500 tracking-widest uppercase">CONTROL CENTER</p>
           </div>
         </div>
         
@@ -460,7 +460,7 @@ export default function Admin() {
                                   <p className="text-[10px] font-black">{p.name}</p>
                                   <p className="text-[8px] font-bold text-slate-500">#{p.number}</p>
                                 </div>
-                                <div className="px-2 py-0.5 bg-brand-green/10 text-brand-green text-[7px] font-black rounded uppercase">
+                                <div className="px-2 py-0.5 bg-brand-purple/10 text-brand-purple text-[7px] font-black rounded uppercase">
                                   EDIT
                                 </div>
                               </button>
@@ -519,7 +519,7 @@ export default function Admin() {
                             type="text" 
                             value={newPlayer.image && !newPlayer.image.startsWith('data:') ? newPlayer.image : ''} 
                             onChange={e => setNewPlayer({...newPlayer, image: e.target.value})} 
-                            className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-green outline-none transition-all"
+                            className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all"
                             placeholder="OR PASTE DIRECT IMAGE URL"
                           />
                         </div>
@@ -533,11 +533,11 @@ export default function Admin() {
                     <button 
                       type="submit" 
                       disabled={isSubmitting}
-                      className="w-full py-4 bg-brand-green text-brand-dark font-black text-xs tracking-widest rounded-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:scale-100 uppercase"
+                      className="w-full py-4 glossy-btn rounded-xl disabled:opacity-50 disabled:scale-100 uppercase"
                     >
                       {isSubmitting ? 'SAVING...' : editingPlayerId ? 'UPDATE PLAYER' : 'CREATE PLAYER'}
                     </button>
-                    {playerMsg.text && <p className={cn("text-[10px] font-bold text-center mt-2", playerMsg.type === 'success' ? 'text-brand-green' : 'text-red-500')}>{playerMsg.text}</p>}
+                    {playerMsg.text && <p className={cn("text-[10px] font-bold text-center mt-2", playerMsg.type === 'success' ? 'text-brand-purple' : 'text-red-500')}>{playerMsg.text}</p>}
                   </form>
                 </div>
 
@@ -560,7 +560,7 @@ export default function Admin() {
                                 <p className="text-[9px] font-bold text-slate-500">#{p.number} • {p.position}</p>
                               </div>
                               {playerToDelete === p.id ? (
-                                <button type="button" onClick={() => handleDeletePlayer(p.id, true)} disabled={isSubmitting} className="text-[10px] font-black text-white bg-red-500/80 px-3 py-1.5 rounded uppercase tracking-wider disabled:opacity-50">
+                                <button type="button" onClick={() => handleDelete(p.id, true)} disabled={isSubmitting} className="text-[10px] font-black text-white bg-red-500/80 px-3 py-1.5 rounded uppercase tracking-wider disabled:opacity-50">
                                   {isSubmitting ? 'DELETING...' : 'TAP TO CONFIRM'}
                                 </button>
                               ) : (
@@ -596,23 +596,23 @@ export default function Admin() {
                           )}
                         </AnimatePresence>
                       </div>
-                      <input type="number" value={match.p1Score} onChange={e => setMatch({...match, p1Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-green outline-none transition-all" placeholder="0" />
+                      <input type="number" value={match.p1Score} onChange={e => setMatch({...match, p1Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />
                     </div>
 
-                    <div className="text-brand-green font-black text-2xl italic">VS</div>
+                    <div className="text-brand-purple font-black text-2xl italic">VS</div>
 
                     {/* Player 2 */}
                     <div className="flex-1 w-full space-y-4">
                       <div className="relative">
                         <div className="flex justify-between items-end mb-1">
                           <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">OPPONENT</label>
-                          <button type="button" onClick={() => setMatch({...match, isExternal: !match.isExternal, p2Id: ''})} className={cn("text-[8px] font-black px-2 py-0.5 rounded border transition-all", match.isExternal ? "bg-brand-green text-brand-dark border-brand-green" : "border-white/20 text-white/40")}>
+                          <button type="button" onClick={() => setMatch({...match, isExternal: !match.isExternal, p2Id: ''})} className={cn("text-[8px] font-black px-2 py-0.5 rounded border transition-all", match.isExternal ? "bg-brand-purple text-brand-dark border-brand-purple" : "border-white/20 text-white/40")}>
                             {match.isExternal ? 'EXTERNAL' : 'CLUB'}
                           </button>
                         </div>
                         {!match.isExternal ? (
                           <>
-                            <input value={p2Search} onChange={e => { setP2Search(e.target.value); setMatch({...match, p2Id: ''}); }} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-green outline-none transition-all" placeholder="Search club player..." />
+                            <input value={p2Search} onChange={e => { setP2Search(e.target.value); setMatch({...match, p2Id: ''}); }} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Search club player..." />
                             <AnimatePresence>
                               {p2Search && !match.p2Id && (
                                 <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute z-50 w-full mt-2 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
@@ -630,7 +630,7 @@ export default function Admin() {
                           <input disabled className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white/20" placeholder="External Opponent" />
                         )}
                       </div>
-                      <input type="number" value={match.p2Score} onChange={e => setMatch({...match, p2Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-green outline-none transition-all" placeholder="0" />
+                      <input type="number" value={match.p2Score} onChange={e => setMatch({...match, p2Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />
                     </div>
                   </div>
 
@@ -640,23 +640,23 @@ export default function Admin() {
                       <select 
                         value={match.tournament}
                         onChange={e => setMatch({...match, tournament: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-brand-green outline-none transition-all appearance-none cursor-pointer"
+                        className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-brand-purple outline-none transition-all appearance-none cursor-pointer"
                       >
                         <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
                         <option value="QVFC Elite League Cup Division 2" className="bg-brand-dark">QVFC Elite League Cup Division 2</option>
                         <option value="Vortex Champions Cup" className="bg-brand-dark">Vortex Champions Cup</option>
                         <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
                       </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-brand-green">
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-brand-purple">
                         <ChevronDown size={16} />
                       </div>
                     </div>
                   </div>
 
-                  <button className="w-full py-6 bg-brand-green text-brand-dark font-black text-sm tracking-[0.2em] rounded-2xl hover:scale-[1.01] transition-all shadow-xl shadow-brand-green/10 disabled:opacity-50 disabled:hover:scale-100" disabled={isSubmitting}>
+                  <button className="w-full py-6 glossy-btn rounded-2xl disabled:opacity-50 disabled:hover:scale-100" disabled={isSubmitting}>
                     {isSubmitting ? 'SUBMITTING...' : 'SUBMIT MATCH RESULTS'}
                   </button>
-                  {matchMsg.text && <p className={cn("text-[10px] font-bold text-center mt-2", matchMsg.type === 'success' ? 'text-brand-green' : 'text-red-500')}>{matchMsg.text}</p>}
+                  {matchMsg.text && <p className={cn("text-[10px] font-bold text-center mt-2", matchMsg.type === 'success' ? 'text-brand-purple' : 'text-red-500')}>{matchMsg.text}</p>}
                 </form>
               </motion.div>
             ) : activeTab === 'leadership' ? (
@@ -710,7 +710,7 @@ export default function Admin() {
                                       <p className="text-[10px] font-black">{p.name}</p>
                                       <p className="text-[8px] font-bold text-slate-500">#{p.number}</p>
                                     </div>
-                                    <div className="px-2 py-0.5 bg-brand-green/10 text-brand-green text-[7px] font-black rounded uppercase">
+                                    <div className="px-2 py-0.5 bg-brand-purple/10 text-brand-purple text-[7px] font-black rounded uppercase">
                                       LINK
                                     </div>
                                   </button>
@@ -744,10 +744,10 @@ export default function Admin() {
                     </div>
                     <Input label="QUOTE (OPTIONAL)" value={newLeader.quote} onChange={v => setNewLeader({...newLeader, quote: v})} placeholder="Inspirational quote..." />
                     
-                    <button type="submit" disabled={isSubmitting} className="w-full py-4 bg-brand-green text-brand-dark font-black text-xs tracking-widest rounded-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100">
+                    <button type="submit" disabled={isSubmitting} className="w-full py-4 glossy-btn rounded-xl disabled:opacity-50 disabled:hover:scale-100 uppercase">
                       {isSubmitting ? 'ADDING...' : 'ADD TO LEADERSHIP'}
                     </button>
-                    {leaderMsg.text && <p className="text-[10px] font-bold text-brand-green text-center mt-2">{leaderMsg.text}</p>}
+                    {leaderMsg.text && <p className="text-[10px] font-bold text-brand-purple text-center mt-2">{leaderMsg.text}</p>}
                   </form>
                 </div>
 
@@ -797,23 +797,23 @@ export default function Admin() {
                           <div className="flex-1 flex flex-col gap-1">
                             <span className="text-[10px] text-slate-500 font-bold tracking-widest">{new Date(m.timestamp).toLocaleString()} • {m.tournament || 'Friendly'}</span>
                             <div className="flex items-center gap-4 text-sm font-black uppercase whitespace-nowrap">
-                              <span className={m.p1Score > m.p2Score ? 'text-brand-green' : m.p1Score < m.p2Score ? 'text-red-500' : 'text-slate-300'}>{m.p1Name} <span className="text-white bg-white/10 px-2 py-0.5 rounded ml-2">{m.p1Score}</span></span>
+                              <span className={m.p1Score > m.p2Score ? 'text-brand-purple' : m.p1Score < m.p2Score ? 'text-red-500' : 'text-slate-300'}>{m.p1Name} <span className="text-white bg-white/10 px-2 py-0.5 rounded ml-2">{m.p1Score}</span></span>
                               <span className="text-slate-500 text-[10px]">VS</span>
-                              <span className={m.p2Score > m.p1Score ? 'text-brand-green' : m.p2Score < m.p1Score ? 'text-red-500' : 'text-slate-300'}><span className="text-white bg-white/10 px-2 py-0.5 rounded mr-2">{m.p2Score}</span> {m.p2Name}</span>
+                              <span className={m.p2Score > m.p1Score ? 'text-brand-purple' : m.p2Score < m.p1Score ? 'text-red-500' : 'text-slate-300'}><span className="text-white bg-white/10 px-2 py-0.5 rounded mr-2">{m.p2Score}</span> {m.p2Name}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             {editingMatch?.id === m.id ? (
                               <div className="flex flex-col md:flex-row items-center gap-2 bg-[#0f172a] p-2 rounded-xl">
                                 <div className="flex items-center gap-2">
-                                  <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-green outline-none" value={editMatchScore1} onChange={e => setEditMatchScore1(e.target.value)} placeholder="Score 1" />
+                                  <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-purple outline-none" value={editMatchScore1} onChange={e => setEditMatchScore1(e.target.value)} placeholder="Score 1" />
                                   <span className="text-slate-500 font-bold text-xs">-</span>
-                                  <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-green outline-none" value={editMatchScore2} onChange={e => setEditMatchScore2(e.target.value)} placeholder="Score 2" />
+                                  <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-purple outline-none" value={editMatchScore2} onChange={e => setEditMatchScore2(e.target.value)} placeholder="Score 2" />
                                 </div>
                                 <select 
                                   value={editMatchTournament}
                                   onChange={e => setEditMatchTournament(e.target.value)}
-                                  className="bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-brand-green outline-none mt-2 md:mt-0 w-full md:w-auto text-center"
+                                  className="bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-brand-purple outline-none mt-2 md:mt-0 w-full md:w-auto text-center"
                                 >
                                   <option value="Friendly" className="bg-brand-dark">Friendly</option>
                                   <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
@@ -822,7 +822,7 @@ export default function Admin() {
                                   <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
                                 </select>
                                 <div className="flex gap-2 mt-2 md:mt-0 w-full md:w-auto justify-end">
-                                  <button onClick={handleEditMatchSubmit} className="bg-brand-green text-brand-dark px-3 py-2 rounded text-[10px] font-black tracking-widest hover:scale-105 transition-all">SAVE</button>
+                                  <button onClick={handleEditMatchSubmit} className="glossy-btn px-3 py-2 rounded text-[10px] font-black tracking-widest transition-all uppercase">SAVE</button>
                                   <button onClick={() => setEditingMatch(null)} className="bg-white/10 text-white px-3 py-2 rounded text-[10px] font-black tracking-widest hover:bg-white/20 transition-all">CANCEL</button>
                                 </div>
                               </div>
@@ -854,7 +854,7 @@ export default function Admin() {
 
 function NavBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
-    <button onClick={onClick} className={cn("w-full flex items-center gap-4 p-4 rounded-xl font-black text-[10px] tracking-widest transition-all", active ? "bg-brand-green text-brand-dark" : "bg-white/5 text-slate-400 hover:bg-white/10")}>
+    <button onClick={onClick} className={cn("w-full flex items-center gap-4 p-4 rounded-xl font-black text-[10px] tracking-widest transition-all", active ? "bg-brand-gradient text-white shadow-lg shadow-brand-purple/20 border border-brand-purple/50" : "bg-white/5 text-slate-400 hover:bg-white/10")}>
       {icon}
       {label}
     </button>
@@ -865,7 +865,7 @@ function Input({ label, value, onChange, placeholder, type = 'text' }: { label: 
   return (
     <div className="space-y-1">
       <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-green outline-none transition-all" placeholder={placeholder} />
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder={placeholder} />
     </div>
   );
 }

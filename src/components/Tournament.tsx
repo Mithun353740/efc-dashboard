@@ -37,11 +37,11 @@ export default function Tournament() {
           <div className="relative z-50 w-full md:w-auto">
             <button 
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="w-full md:w-auto bg-brand-dark border-brand-green border px-6 py-4 rounded-xl flex items-center justify-between md:justify-center gap-4 hover:scale-[1.02] transition-all font-black text-xs cursor-pointer group shadow-xl shadow-brand-dark/20"
+              className="w-full md:w-auto bg-brand-dark border border-brand-purple/50 px-6 py-4 rounded-xl flex items-center justify-between md:justify-center gap-4 hover:scale-[1.02] transition-all font-black text-xs cursor-pointer group shadow-xl shadow-brand-purple/20"
             >
-              <Trophy size={16} className="text-brand-green group-hover:scale-110 transition-transform" />
-              <span className="text-white tracking-widest">{selectedTournament}</span>
-              <ChevronDown size={14} className={cn("text-brand-green transition-transform", isDropdownOpen ? "rotate-180" : "")} />
+              <Trophy size={16} className="text-brand-purple group-hover:scale-110 transition-transform" />
+              <span className="text-transparent bg-clip-text bg-brand-gradient tracking-widest">{selectedTournament}</span>
+              <ChevronDown size={14} className={cn("text-brand-purple transition-transform", isDropdownOpen ? "rotate-180" : "")} />
             </button>
 
             {isDropdownOpen && (
@@ -62,7 +62,7 @@ export default function Tournament() {
                         onClick={() => { setSelectedTournament(t); setIsDropdownOpen(false); }}
                         className={cn(
                           "w-full text-left px-4 py-4 rounded-xl text-xs font-black transition-all tracking-wider uppercase", 
-                          selectedTournament === t ? "bg-brand-green text-brand-dark" : "hover:bg-white/5 text-slate-300"
+                          selectedTournament === t ? "bg-brand-gradient text-white border border-white/10 shadow-lg" : "hover:bg-white/5 text-slate-300"
                         )}
                       >
                         {t}
@@ -113,7 +113,7 @@ export default function Tournament() {
                       </td>
                       <td className="p-3 md:p-6">
                         <div className="flex items-center gap-2 md:gap-4">
-                          <img src={player.image} alt={player.name} className="w-8 h-8 md:w-12 md:h-12 rounded-full object-cover border-2 border-transparent group-hover:border-brand-green transition-colors" />
+                          <img src={player.image} alt={player.name} className="w-8 h-8 md:w-12 md:h-12 rounded-full object-cover border-2 border-transparent group-hover:border-brand-purple transition-colors" />
                           <div className="min-w-0 flex-1">
                             <p className="font-black text-[10px] md:text-sm text-brand-dark dark:text-white uppercase tracking-tight truncate">{player.name}</p>
                             <p className="hidden md:block text-[10px] font-bold text-slate-400 tracking-widest">#{player.number}</p>
