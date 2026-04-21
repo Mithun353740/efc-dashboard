@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quantum Vortex eFC Manager</title>
+    
+    <!-- PWA Installation -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="QVFC Portal" />
+    <link rel="apple-touch-icon" href="/logo-192x192.png" />
+    <meta name="theme-color" content="#020617" />
+    
+    <!-- Open Graph Meta Tags for beautiful previews on Discord/WhatsApp/Socials -->
+    <meta property="og:title" content="Quantum Vortex FC | Official Portal" />
+    <meta property="og:description" content="Where Digital Strategy Meets Kinetic Chaos. View official club standings, analytics, and elite tournament match histories." />
+    <!-- Use a reliable Unsplash absolute URL for the preview image -->
+    <meta property="og:image" content="/logo-512x512.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:type" content="website" />
+    
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Quantum Vortex FC | Official Portal" />
+    <meta name="twitter:description" content="Where Digital Strategy Meets Kinetic Chaos. View official club standings, analytics, and elite tournament match histories." />
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=1200&h=630&auto=format&fit=crop" />
+    <script>
+      // Fix for "Uncaught TypeError: Cannot set property fetch of #<Window> which has only a getter"
+      // This occurs in some environments when libraries try to polyfill fetch.
+      (function() {
+        try {
+          var originalFetch = window.fetch;
+          if (originalFetch) {
+            Object.defineProperty(window, 'fetch', {
+              configurable: true,
+              enumerable: true,
+              get: function() { return originalFetch; },
+              set: function(v) { console.warn('Prevented attempt to overwrite window.fetch'); }
+            });
+          }
+        } catch (e) {
+          console.warn('Could not redefine window.fetch:', e);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-DMvBZN5k.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BQ_oSIrX.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+

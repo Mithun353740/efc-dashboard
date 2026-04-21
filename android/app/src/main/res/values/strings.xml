@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Quantum Vortex FC</string>
+    <string name="title_activity_main">Quantum Vortex FC</string>
+    <string name="package_name">com.quantumvortex.app</string>
+    <string name="custom_url_scheme">com.quantumvortex.app</string>
+</resources>
