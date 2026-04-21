@@ -1,4 +1,4 @@
-export const CLUB_LOGO = "https://raw.githubusercontent.com/Mithun353740/efc-dashboard/main/public/quantum_vortex_fc.jpg";
+export const CLUB_LOGO = "/logo.jpg";
 export const CLUB_NAME = "Quantum Vortex FC";
 export const CLUB_TAGLINE = "Where Digital Strategy Meets Kinetic Chaos";
 
