@@ -1,17 +1,12 @@
-const CACHE_NAME = 'qvfc-cache-v3';
+const CACHE_NAME = 'qvfc-cache-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
-        '/',
-        '/index.html',
-        '/manifest.json',
-        '/logo-192x192.png',
-        '/logo-512x512.png'
-      ]);
-    })
+      // Safely cache root without throwing if other assets fail
+      return cache.add('/');
+    }).catch(err => console.log('SW install error:', err))
   );
 });
 
@@ -36,14 +31,27 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     fetch(event.request).catch(async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const cachedResponse = await cache.match(event.request);
-      if (cachedResponse) return cachedResponse;
-      
-      if (event.request.mode === 'navigate') {
-        const indexResponse = await cache.match('/index.html');
-        return indexResponse;
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        const cachedResponse = await cache.match(event.request);
+        if (cachedResponse) return cachedResponse;
+        
+        if (event.request.mode === 'navigate') {
+          const rootResponse = await cache.match('/');
+          if (rootResponse) return rootResponse;
+        }
+      } catch (e) {
+        // Ignored
       }
+      
+      // Fallback response to guarantee Chrome PWA validating a valid Response object
+      return new Response('Offline', { 
+        status: 503, 
+        statusText: 'Service Unavailable',
+        headers: new Headers({
+          'Content-Type': 'text/plain'
+        })
+      });
     })
   );
 });
