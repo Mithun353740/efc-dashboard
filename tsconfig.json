@@ -15,7 +15,6 @@
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "types": ["vite-plugin-pwa/client"],
     "paths": {
       "@/*": [
         "./*"
@@ -25,4 +24,3 @@
     "noEmit": true
   }
 }
-
