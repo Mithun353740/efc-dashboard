@@ -16,6 +16,7 @@ import Rankings from './components/Rankings';
 import PlayerStats from './components/PlayerStats';
 import Login from './components/Login';
 import Tournament from './components/Tournament';
+import UpdateNotification from './components/UpdateNotification';
 import { FirebaseProvider, useFirebase } from './FirebaseContext';
 import { INITIAL_PLAYERS } from './lib/store';
 
@@ -62,6 +63,7 @@ function AppContent() {
         </Routes>
       </main>
       <Footer />
+      <UpdateNotification />
     </div>
   );
 }
