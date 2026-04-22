@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="vortex" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#020617" />
+  <circle cx="256" cy="256" r="200" fill="none" stroke="url(#vortex)" stroke-width="20" stroke-dasharray="80 30" opacity="0.9"/>
+  <circle cx="256" cy="256" r="140" fill="none" stroke="url(#vortex)" stroke-width="30" stroke-dasharray="120 40" opacity="0.7"/>
+  <circle cx="256" cy="256" r="70" fill="url(#vortex)" />
+  <text x="256" y="275" font-family="sans-serif" font-weight="900" font-size="65" text-anchor="middle" fill="#ffffff">QV</text>
+</svg>
