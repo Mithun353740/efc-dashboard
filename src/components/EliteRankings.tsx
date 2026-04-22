@@ -46,12 +46,12 @@ export default function EliteRankings() {
                   <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
                 </div>
 
-                <h3 className="text-xs md:text-xl font-black text-brand-dark dark:text-white tracking-tight leading-tight truncate">{player.name}</h3>
-                <div className="flex items-center gap-1 md:gap-2 mt-1 md:mt-2 flex-wrap">
-                  <span className="bg-brand-dark dark:bg-white/10 text-white px-1.5 md:px-2 py-0.5 md:py-1 flex items-center justify-center rounded-md text-[6px] md:text-[10px] font-black tracking-widest">
+                <h3 className="text-[11px] md:text-xl font-black text-brand-dark dark:text-white tracking-tight leading-tight truncate">{player.name}</h3>
+                <div className="flex items-center gap-1 md:gap-2 mt-1.5 md:mt-2 flex-wrap">
+                  <span className="bg-brand-dark dark:bg-white/10 text-white px-2 py-1 md:py-1 flex items-center justify-center rounded-md text-[9px] md:text-[10px] font-black tracking-widest">
                     #{index + 1} RANK
                   </span>
-                  <span className="bg-brand-gradient text-white border border-white/20 px-1.5 md:px-2 py-0.5 md:py-1 flex items-center justify-center rounded-md text-[6px] md:text-[10px] font-black tracking-widest shadow-lg shadow-brand-purple/20">
+                  <span className="bg-brand-gradient text-white border border-white/20 px-2 py-1 md:py-1 flex items-center justify-center rounded-md text-[9px] md:text-[10px] font-black tracking-widest shadow-lg shadow-brand-purple/20">
                     {player.ovr} OVR
                   </span>
                 </div>
