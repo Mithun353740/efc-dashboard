@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build",
+    "build": "vite build && echo %DATE%-%TIME% > public/version.txt",
     "start": "node server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
