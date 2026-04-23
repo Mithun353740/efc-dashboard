@@ -2345,6 +2345,7 @@ function renderSettings(container) {
   }
 
 
+
 // ---- PLAYER CREDENTIALS ----
 async function renderPlayerCredentialsView(container) {
   const players = state.dashboardPlayers || [];
@@ -2358,19 +2359,26 @@ async function renderPlayerCredentialsView(container) {
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         ${players.map(p => `
-          <div data-player-id="${p.id}" class="player-cred-card bg-slate-900 border border-slate-800 p-5 rounded-2xl cursor-pointer hover:border-indigo-500/50 transition-all group">
-            <div class="flex items-center gap-4">
-              <img src="${p.image}" class="w-12 h-12 rounded-xl object-cover border border-slate-800">
-              <div class="flex-1">
-                <p class="font-black text-slate-200 uppercase">${p.name}</p>
-                <div class="flex items-center gap-2 mt-1">
-                  <span class="text-[8px] font-black text-slate-600 uppercase tracking-widest">${p.email ? 'Email Set' : 'No Email'}</span>
-                  <span class="w-1 h-1 rounded-full bg-slate-800"></span>
-                  <span class="text-[8px] font-black text-slate-600 uppercase tracking-widest">${p.password ? 'Password Set' : 'No Password'}</span>
-                </div>
+          <div class="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] transition-all hover:bg-slate-900/50">
+            <div class="flex items-center gap-5 mb-6">
+              <img src="${p.image}" class="w-14 h-14 rounded-2xl object-cover border border-slate-800">
+              <div class="flex-1 min-w-0">
+                <p class="font-black text-slate-100 uppercase truncate text-lg">${p.name}</p>
+                <p class="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em]">${p.team || 'Unattached'}</p>
               </div>
-              <div class="text-slate-700 group-hover:text-indigo-400 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              <button data-player-id="${p.id}" class="edit-player-cred-btn p-3 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-xl transition-all shadow-lg active:scale-90">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+              </button>
+            </div>
+
+            <div class="space-y-3">
+              <div class="flex items-center justify-between p-3 bg-slate-950/50 rounded-xl border border-slate-800/50">
+                <span class="text-[8px] font-black text-slate-600 uppercase tracking-widest">Email</span>
+                <span class="text-xs font-bold text-slate-300">${p.email || '—'}</span>
+              </div>
+              <div class="flex items-center justify-between p-3 bg-slate-950/50 rounded-xl border border-slate-800/50">
+                <span class="text-[8px] font-black text-slate-600 uppercase tracking-widest">Password</span>
+                <span class="text-xs font-bold text-slate-300">${p.password || '—'}</span>
               </div>
             </div>
           </div>
@@ -2379,9 +2387,9 @@ async function renderPlayerCredentialsView(container) {
     </div>
   `;
 
-  container.querySelectorAll('.player-cred-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const p = players.find(player => player.id === card.dataset.playerId);
+  container.querySelectorAll('.edit-player-cred-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const p = players.find(player => player.id === btn.dataset.playerId);
       if (p) showPlayerCredEditor(p);
     });
   });
