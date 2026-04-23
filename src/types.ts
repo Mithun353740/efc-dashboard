@@ -36,3 +36,10 @@ export interface MatchRecord {
   p2Score: number;
   tournament?: string;
 }
+
+export interface Tournament {
+  id: string;
+  name: string;
+  season: string;
+  createdAt: number;
+}

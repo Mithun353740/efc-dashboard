@@ -1,12 +1,39 @@
+import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
-import { INITIAL_PLAYERS } from '../lib/store';
+import { INITIAL_PLAYERS, computePlayerStats, sortRankedPlayers } from '../lib/store';
 
 export default function EliteRankings() {
-  const { rankedPlayers } = useFirebase();
-  const activePlayers = rankedPlayers.length > 0 ? rankedPlayers : INITIAL_PLAYERS;
+  const { rankedPlayers, matches } = useFirebase();
+
+  // Get current season matches for "Top Performers This Season"
+  const currentSeasonPlayers = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+    const sY = isLateJan ? y - 1 : y;
+    const seasonId = `${sY}/${sY + 1}`;
+
+    const seasonMatches = matches.filter(m => {
+      const md = new Date(m.timestamp);
+      const my = md.getFullYear();
+      const mIsLateJan = (md.getMonth() === 0 && md.getDate() <= 17);
+      const msY = mIsLateJan ? my - 1 : my;
+      return `${msY}/${msY + 1}` === seasonId;
+    });
+
+    const playersWithSeasonStats = rankedPlayers.map(p => {
+      const stats = computePlayerStats(p, seasonMatches);
+      stats.ovr = p.ovr; // Keep global OVR
+      return stats;
+    }).filter(p => p.win > 0 || p.loss > 0 || p.draw > 0);
+
+    return sortRankedPlayers(playersWithSeasonStats);
+  }, [rankedPlayers, matches]);
+
+  const activePlayers = currentSeasonPlayers.length > 0 ? currentSeasonPlayers : rankedPlayers;
   const topPlayers = activePlayers.slice(0, 5);
 
   return (

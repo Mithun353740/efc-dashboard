@@ -1,4 +1,4 @@
-import { Player, Leader, MatchRecord } from '../types';
+import { Player, Leader, MatchRecord, Tournament } from '../types';
 import { db, auth } from '../firebase';
 import { 
   collection, 
@@ -231,6 +231,17 @@ export function subscribeToMatches(callback: (matches: MatchRecord[]) => void) {
   });
 }
 
+export function subscribeToTournaments(callback: (tournaments: Tournament[]) => void) {
+  const path = 'tournaments';
+  const q = query(collection(db, path), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    const tournaments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
+    callback(tournaments);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.GET, path);
+  });
+}
+
 // Write operations
 export function computePlayerStats(player: Player, allMatches: MatchRecord[]): Player {
   let win = 0, loss = 0, draw = 0, goalsScored = 0, goalsConceded = 0;
@@ -421,6 +432,15 @@ export async function deleteLeader(id: string) {
     await deleteDoc(doc(db, 'leaders', id));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export async function saveTournament(tournament: Tournament) {
+  const path = `tournaments/${tournament.id}`;
+  try {
+    await setDoc(doc(db, 'tournaments', tournament.id), tournament);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
 
