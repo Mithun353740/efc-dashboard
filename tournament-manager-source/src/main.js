@@ -1260,12 +1260,42 @@ function renderConfigSetup(root) {
   });
 }
 
+function getSeasonInfo(date) {
+  const d = new Date(date);
+  let start = new Date(2026, 3, 17); // April 17, 2026 (Anchor)
+  if (d >= start) {
+    while (true) {
+      let end = new Date(start);
+      end.setMonth(end.getMonth() + 9);
+      end.setDate(end.getDate() - 1);
+      if (d <= end) {
+        const sY = start.getFullYear();
+        const eY = end.getFullYear();
+        return { name: sY === eY ? `${sY} Season` : `${sY}/${eY}`, start, end };
+      }
+      start.setMonth(start.getMonth() + 9);
+      if (start.getFullYear() > 2100) break;
+    }
+  } else {
+    while (true) {
+      let nextStart = new Date(start);
+      start = new Date(start);
+      start.setMonth(start.getMonth() - 9);
+      let end = new Date(nextStart);
+      end.setDate(end.getDate() - 1);
+      if (d >= start && d <= end) {
+        const sY = start.getFullYear();
+        const eY = end.getFullYear();
+        return { name: sY === eY ? `${sY} Season` : `${sY}/${eY}`, start, end };
+      }
+      if (start.getFullYear() < 2020) break;
+    }
+  }
+  return { name: "Legacy", start: null, end: null };
+}
+
 function getCurrentSeason() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-  const sY = isLateJan ? y - 1 : y;
-  return `${sY}/${sY + 1}`;
+  return getSeasonInfo(new Date()).name;
 }
 
 async function initTournament(config) {
@@ -3623,9 +3653,20 @@ function renderTeamDetail(teamId) {
   if (!t) return;
   const standings = calculateStandings().find(s => s.id === t.id) || { p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0, home: {}, away: {}, cs: 0 };
   const form = calculateTeamForm(t.id);
-  const matches = state.tournament.fixtures.filter(m => 
-    m.status === 'completed' && (m.homeId === t.id || m.awayId === t.id)
-  ).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  
+  // Global Match History (Across all tournaments)
+  const allMatches = [];
+  state.tournaments.forEach(tourney => {
+    // Find this team in the other tournament (by name or playerId)
+    const otherTeam = tourney.teams.find(tm => tm.name === t.name || (t.playerId && tm.playerId === t.playerId));
+    if (otherTeam) {
+      tourney.fixtures.filter(m => m.status === 'completed' && (m.homeId === otherTeam.id || m.awayId === otherTeam.id)).forEach(m => {
+        allMatches.push({ ...m, tournamentName: tourney.name, teamInMatch: otherTeam });
+      });
+    }
+  });
+  
+  const matches = allMatches.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
   if (state.isMobile) {
     const content = `
@@ -3716,26 +3757,32 @@ function renderTeamDetail(teamId) {
         <section class="space-y-6">
            <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Match History</h4>
            <div class="space-y-3">
-             ${matches.map(m => {
-               const isHome = m.homeId === t.id;
-               const oppId = isHome ? m.awayId : m.homeId; const opp = state.tournament.teams.find(tm => tm.id === oppId) || { name: 'Unknown' };
-               const won = isHome ? (m.homeScore > m.awayScore) : (m.awayScore > m.homeScore);
-               const drew = m.homeScore === m.awayScore;
-               return `
-                 <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                      <div class="w-8 h-8 flex items-center justify-center rounded-lg border font-black text-[10px] ${won ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : (drew ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/70' : 'bg-red-500/10 border-red-500/20 text-red-500')}">
-                        ${won ? 'W' : (drew ? 'D' : 'L')}
-                      </div>
-                      <div class="font-black text-slate-300 uppercase text-xs truncate max-w-[120px]">${opp.name}</div>
-                    </div>
-                    <div class="font-black font-mono text-slate-100 flex items-center gap-2">
-                      <span>${m.homeScore}</span>
-                      <span class="text-slate-700">-</span>
-                      <span>${m.awayScore}</span>
-                    </div>
-                 </div>
-               `;
+              ${matches.map(m => {
+                const isHome = m.homeId === m.teamInMatch.id;
+                const oppId = isHome ? m.awayId : m.homeId; 
+                const tourney = state.tournaments.find(tour => tour.name === m.tournamentName) || state.tournament;
+                const opp = tourney.teams.find(tm => tm.id === oppId) || { name: 'Unknown' };
+                const won = isHome ? (m.homeScore > m.awayScore) : (m.awayScore > m.homeScore);
+                const drew = m.homeScore === m.awayScore;
+                return `
+                  <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex items-center justify-between">
+                     <div class="flex items-center gap-4">
+                       <div class="w-8 h-8 flex items-center justify-center rounded-lg border font-black text-[10px] ${won ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : (drew ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/70' : 'bg-red-500/10 border-red-500/20 text-red-500')}">
+                         ${won ? 'W' : (drew ? 'D' : 'L')}
+                       </div>
+                       <div>
+                         <div class="font-black text-slate-300 uppercase text-xs truncate max-w-[120px]">${opp.name}</div>
+                         <div class="text-[7px] font-black text-slate-600 uppercase tracking-widest mt-0.5">${m.tournamentName}</div>
+                       </div>
+                     </div>
+                     <div class="font-black font-mono text-slate-100 flex items-center gap-2">
+                       <span>${m.homeScore}</span>
+                       <span class="text-slate-700">-</span>
+                       <span>${m.awayScore}</span>
+                     </div>
+                  </div>
+                `;
+              }).join('')}
              }).join('')}
              ${matches.length === 0 ? '<p class="text-slate-700 italic text-center py-6 text-xs uppercase tracking-widest">No data recorded</p>' : ''}
            </div>
@@ -3822,28 +3869,32 @@ function renderTeamDetail(teamId) {
         <section class="space-y-6">
            <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Historical Archive</h4>
            <div class="space-y-3">
-             ${matches.map(m => {
-               const isHome = m.homeId === t.id;
-               const opp = state.tournament.teams.find(tm => tm.id === (isHome ? m.awayId : m.homeId));
-               const won = isHome ? (m.homeScore > m.awayScore) : (m.awayScore > m.homeScore);
-               const drew = m.homeScore === m.awayScore;
-               const status = won ? 'W' : (drew ? 'D' : 'L');
-               const color = won ? 'text-emerald-400' : (drew ? 'text-yellow-500/70' : 'text-red-400');
-               return `
-                 <div class="bg-slate-950/40 p-6 rounded-2xl border border-slate-800/50 flex items-center justify-between">
-                    <div class="flex items-center gap-6">
-                      <div class="text-[10px] font-mono text-slate-700">${m.date || 'TBD'}</div>
-                      <div class="font-black text-slate-200">${opp.name}</div>
-                    </div>
-                    <div class="flex items-center gap-8">
-                       <div class="font-black font-mono text-xl text-slate-100">${m.homeScore} - ${m.awayScore}</div>
-                       <div class="w-10 h-10 flex items-center justify-center rounded-xl border font-black text-sm ${won ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : (drew ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/70' : 'bg-red-500/10 border-red-500/20 text-red-400')}">
-                         ${status}
+              ${matches.map(m => {
+                const isHome = m.homeId === m.teamInMatch.id;
+                const tourney = state.tournaments.find(tour => tour.name === m.tournamentName) || state.tournament;
+                const opp = tourney.teams.find(tm => tm.id === (isHome ? m.awayId : m.homeId)) || { name: 'Unknown' };
+                const won = isHome ? (m.homeScore > m.awayScore) : (m.awayScore > m.homeScore);
+                const drew = m.homeScore === m.awayScore;
+                const status = won ? 'W' : (drew ? 'D' : 'L');
+                const color = won ? 'text-emerald-400' : (drew ? 'text-yellow-500/70' : 'text-red-400');
+                return `
+                  <div class="bg-slate-950/40 p-6 rounded-2xl border border-slate-800/50 flex items-center justify-between">
+                     <div class="flex items-center gap-6">
+                       <div class="text-[10px] font-mono text-slate-700">${m.date || 'TBD'}</div>
+                       <div>
+                         <div class="font-black text-slate-200">${opp.name}</div>
+                         <div class="text-[8px] font-black text-slate-600 uppercase tracking-widest mt-1">${m.tournamentName}</div>
                        </div>
-                    </div>
-                 </div>
-               `;
-             }).join('')}
+                     </div>
+                     <div class="flex items-center gap-8">
+                        <div class="font-black font-mono text-xl text-slate-100">${m.homeScore} - ${m.awayScore}</div>
+                        <div class="w-10 h-10 flex items-center justify-center rounded-xl border font-black text-sm ${won ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : (drew ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/70' : 'bg-red-500/10 border-red-500/20 text-red-500')}">
+                          ${status}
+                        </div>
+                     </div>
+                  </div>
+                `;
+              }).join('')}
              ${matches.length === 0 ? '<p class="text-slate-600 italic text-center py-10">No matches recorded for this deployment.</p>' : ''}
            </div>
         </section>
@@ -4901,9 +4952,9 @@ function renderHistoryView(container) {
           return `
             <div class="bg-slate-900 border ${isCurrent ? 'border-indigo-500/50 shadow-[0_0_40px_rgba(59,130,246,0.1)]' : 'border-slate-800'} rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center justify-between gap-8 transition-all hover:bg-slate-900/80">
                <div class="flex items-center gap-8 flex-1">
-                  <div class="w-20 h-20 bg-slate-950 rounded-3xl flex flex-col items-center justify-center border border-slate-800">
-                     <span class="text-[9px] font-black text-slate-600 uppercase tracking-widest">Season</span>
-                     <span class="text-3xl font-black text-slate-100 font-mono">${s.season || 1}</span>
+                   <div class="w-20 h-20 bg-slate-950 rounded-3xl flex flex-col items-center justify-center border border-slate-800 p-2 text-center">
+                     <span class="text-[7px] font-black text-slate-600 uppercase tracking-widest mb-1">Season</span>
+                     <span class="text-[10px] font-black text-slate-100 font-mono leading-tight">${s.season || getSeasonInfo(new Date(s.createdAt)).name}</span>
                   </div>
                   <div>
                      <h3 class="text-xl font-black text-slate-100 uppercase tracking-tight mb-2">${s.name}</h3>
