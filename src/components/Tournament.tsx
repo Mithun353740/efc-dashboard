@@ -49,7 +49,7 @@ export default function Tournament() {
     const unsortedTournamentPlayers = rankedPlayers
       .map(player => {
         const stats = computePlayerStats(player, tournamentMatches);
-        // Force the universal All-Time OVR into the tournament stats
+        // FORCE GIT SYNC: Lock the universal All-Time OVR into the tournament stats
         stats.ovr = player.ovr;
         return stats;
       })

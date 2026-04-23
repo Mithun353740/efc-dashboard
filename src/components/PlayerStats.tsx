@@ -81,7 +81,7 @@ export default function PlayerStats() {
 
     const computedStats = computePlayerStats(selectedPlayer, filteredMatches);
     
-    // Force OVR to remain the universal "All Time" OVR regardless of filtering
+    // FORCE GIT SYNC: Ensure universal OVR is maintained across all filters
     // to prevent player's OVR from dropping in sub-tournaments
     computedStats.ovr = selectedPlayer.ovr;
 
