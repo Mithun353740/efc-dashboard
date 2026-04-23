@@ -6,6 +6,9 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Disable ETag to completely prevent 304 Not Modified browser caching for HTML routes
+  app.set('etag', false);
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -16,8 +19,21 @@ async function startServer() {
   } else {
     // Serve static files from 'dist' in production
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          // NEVER cache the index.html file so dynamic React/Vite builds always fetch the newest JS chunks
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+      }
+    }));
     app.get('*', (req, res) => {
+      // Catch-all SPA routing: also never cache index.html
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
