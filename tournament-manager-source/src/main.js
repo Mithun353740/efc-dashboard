@@ -773,6 +773,8 @@ function renderMobileTournamentCard(t) {
   const total = t.fixtures.length;
   const progress = total > 0 ? (played / total) * 100 : 0;
   const typeIcon = ICONS[t.type === 'groups' ? 'group' : (t.type === 'knockout' ? 'knockout' : 'league')];
+  const nextDate = getNextMatchdayDate(t);
+  const dateStr = nextDate ? nextDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : null;
   
   return `
     <div data-id="${t.id}" class="open-tournament rounded-2xl p-5 flex items-center gap-4 active:scale-[0.98] transition-all" style="background:#0f0f1a;border:1px solid #1e1e32">
@@ -780,7 +782,10 @@ function renderMobileTournamentCard(t) {
          ${t.logo ? `<img src="${t.logo}" class="w-full h-full object-cover">` : typeIcon}
        </div>
        <div class="flex-1 min-w-0">
-         <h3 class="font-black tracking-tight uppercase truncate" style="color:#f1f5f9">${t.name}</h3>
+         <div class="flex items-center justify-between">
+           <h3 class="font-black tracking-tight uppercase truncate" style="color:#f1f5f9">${t.name}</h3>
+           ${dateStr ? `<span class="text-[8px] font-black px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-widest ml-2">${dateStr}</span>` : ''}
+         </div>
          <div class="flex items-center gap-2 mt-1">
            <span class="text-[9px] font-black uppercase tracking-widest" style="color:#60a5fa">${t.type.replace('_',' ')}</span>
            <span style="color:#1e293b;font-size:9px">•</span>
@@ -793,6 +798,25 @@ function renderMobileTournamentCard(t) {
        <span style="color:#1e293b">›</span>
     </div>
   `;
+}
+
+function getNextMatchdayDate(t) {
+  if (!t.scheduling || !t.scheduling.matchDays || t.scheduling.matchDays.length === 0) return null;
+  const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+  const targetDays = t.scheduling.matchDays.map(d => dayMap[d]);
+  
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  
+  for (let i = 0; i < 14; i++) {
+    let d = new Date(now);
+    d.setDate(now.getDate() + i);
+    if (targetDays.includes(d.getDay())) {
+      // If it's today, it only "resets" at 11:59pm, so we keep it as next date
+      return d;
+    }
+  }
+  return null;
 }
 
 function renderTournamentCard(t) {
@@ -844,10 +868,18 @@ function renderTournamentCard(t) {
           <div>
             <h3 class="text-xl font-black tracking-tight mb-1 line-clamp-1 transition-all" style="color:#f1f5f9">${t.name}</h3>
             <p class="text-[10px] font-black uppercase tracking-widest" style="color:#475569">${formatLabels[t.type]||t.type} &bull; ${t.teams.length} Teams &bull; S${t.season || 1}</p>
+            ${(() => {
+              const nd = getNextMatchdayDate(t);
+              if (!nd) return '';
+              return `<p class="mt-2 text-[9px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                <span class="w-1 h-1 rounded-full bg-indigo-500 animate-pulse"></span>
+                Next Matchday: ${nd.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
+              </p>`;
+            })()}
           </div>
         </div>
       </div>
-
+      
       <div class="space-y-4 relative z-10">
         <div class="flex items-center justify-between">
            <div>
@@ -1104,6 +1136,36 @@ function renderConfigSetup(root) {
             </div>
           ` : ''}
 
+          <div class="space-y-6 bg-slate-950/50 p-6 rounded-[2rem] border border-slate-800/50 shadow-inner">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="p-2 bg-indigo-600/10 rounded-xl text-indigo-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>
+              </div>
+              <span class="text-[10px] font-black text-slate-100 uppercase tracking-[0.2em]">Matchday Scheduling</span>
+            </div>
+
+            <div class="space-y-2">
+              <label class="text-[9px] font-black text-slate-600 uppercase tracking-widest pl-2">Days per Matchday</label>
+              <select name="daysPerMatchday" id="daysPerMatchday" class="w-full px-6 py-4 bg-slate-950 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-100 font-black shadow-inner appearance-none">
+                ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n===1?'selected':''}>${n} Day${n>1?'s':''}</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="space-y-3">
+              <label class="text-[9px] font-black text-slate-600 uppercase tracking-widest pl-2">Operational Days</label>
+              <div class="grid grid-cols-4 sm:grid-cols-7 gap-2" id="matchdays-selector">
+                ${['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'].map(day => `
+                  <div class="relative">
+                    <input type="checkbox" name="matchDays" value="${day}" id="day-${day}" class="peer hidden" ${day==='Fri'||day==='Sat'?'checked':''}>
+                    <label for="day-${day}" class="flex items-center justify-center py-3 rounded-xl border border-slate-800 bg-slate-950 text-[10px] font-black text-slate-600 uppercase tracking-tighter cursor-pointer transition-all peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-transparent peer-checked:shadow-[0_4px_12px_rgba(79,70,229,0.3)]">
+                      ${day}
+                    </label>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
           <div id="est-matches" class="bg-slate-950 p-5 rounded-2xl md:rounded-[2rem] border border-slate-800 flex items-center justify-between">
             <div class="flex items-center gap-3">
               <div class="p-2.5 bg-indigo-600/10 rounded-xl text-indigo-400">
@@ -1189,7 +1251,11 @@ function renderConfigSetup(root) {
       groupSize: parseInt(data.get('groupSize') || 0),
       promoSpots: parseInt(data.get('promoSpots') || 0),
       relegationSpots: parseInt(data.get('relegationSpots') || 0),
-      continentalSpots: parseInt(data.get('continentalSpots') || 0)
+      continentalSpots: parseInt(data.get('continentalSpots') || 0),
+      scheduling: {
+        daysPerMatchday: parseInt(data.get('daysPerMatchday')),
+        matchDays: Array.from(e.target.querySelectorAll('input[name="matchDays"]:checked')).map(cb => cb.value)
+      }
     });
   });
 }
@@ -1913,7 +1979,7 @@ function renderApp(root) {
             ${renderNavLink('history', 'League History', ICONS.certificate)}
             ${state.isAdmin ? `
             <div style="height:1px;background:#1e1e32;margin:0.5rem 0"></div>
-            ${renderNavLink('settings', 'Account Settings', '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>')}
+            ${renderNavLink('settings', 'Account Settings', \`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>\`)}
             ` : ''}
           </nav>
 
@@ -2142,6 +2208,42 @@ function renderSettings(container) {
         </div>
       </div>
 
+      <!-- Scheduling Settings (Admin Only) -->
+      ${state.isAdmin ? `
+      <div class="rounded-2xl overflow-hidden" style="border:1px solid #1e1e32">
+        <div class="px-5 py-4 flex items-center gap-3" style="background:#0f0f1a;border-bottom:1px solid #1e1e32">
+          <span style="color:#60a5fa"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg></span>
+          <span class="text-xs font-black uppercase tracking-widest" style="color:#94a3b8">Matchday Scheduling</span>
+        </div>
+        <div class="p-5 space-y-6" style="background:#0a0a12">
+          <form id="update-scheduling-form" class="space-y-6">
+            <div>
+              <label class="block text-[9px] font-black uppercase tracking-widest mb-3" style="color:#475569">Days per Matchday</label>
+              <select name="daysPerMatchday" class="w-full bg:#050508 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 font-bold outline-none" style="background:#050508">
+                ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${t.scheduling?.daysPerMatchday === n ? 'selected' : ''}>${n} Day${n>1?'s':''}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-[9px] font-black uppercase tracking-widest mb-3" style="color:#475569">Operational Days</label>
+              <div class="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                ${['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'].map(day => {
+                  const checked = t.scheduling?.matchDays?.includes(day);
+                  return `
+                  <div class="relative">
+                    <input type="checkbox" name="matchDays" value="${day}" id="set-day-${day}" class="peer hidden" ${checked ? 'checked' : ''}>
+                    <label for="set-day-${day}" class="flex items-center justify-center py-2.5 rounded-xl border border-slate-800 bg-slate-950 text-[9px] font-black text-slate-600 uppercase cursor-pointer transition-all peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-transparent">
+                      ${day}
+                    </label>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>
+            <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl text-[10px] uppercase tracking-widest transition-all">Save Schedule</button>
+          </form>
+        </div>
+      </div>
+      ` : ''}
+
       ${state.isAdmin ? `
       <!-- Danger Zone -->
       <div class="rounded-2xl overflow-hidden mt-12" style="border:1px solid rgba(239,68,68,0.2)">
@@ -2161,6 +2263,21 @@ function renderSettings(container) {
       ` : ''}
     </div>
   `;
+
+  // Listeners for Settings
+  if (state.isAdmin) {
+    document.getElementById('update-scheduling-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const data = new FormData(e.target);
+      t.scheduling = {
+        daysPerMatchday: parseInt(data.get('daysPerMatchday')),
+        matchDays: Array.from(e.target.querySelectorAll('input[name="matchDays"]:checked')).map(cb => cb.value)
+      };
+      saveState();
+      showToast('Schedule updated');
+      render();
+    });
+  }
 
   // --- Change Username handler ---
   document.getElementById('change-username-form').addEventListener('submit', async (e) => {
