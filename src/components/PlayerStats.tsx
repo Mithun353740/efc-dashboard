@@ -14,7 +14,8 @@ export default function PlayerStats() {
   const [search, setSearch] = useState('');
   const [searchParams] = useSearchParams();
   const playerIdParam = searchParams.get('id');
-  const [filter, setFilter] = useState('All Time');
+  const [selectedSeason, setSelectedSeason] = useState('All Time');
+  const [selectedTournament, setSelectedTournament] = useState('All Tournaments');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isOvrModalOpen, setIsOvrModalOpen] = useState(false);
 
@@ -60,24 +61,26 @@ export default function PlayerStats() {
 
   const computedPlayer = useMemo(() => {
     if (!selectedPlayer) return null;
-    if (filter === 'All Time') return selectedPlayer;
+    if (selectedSeason === 'All Time' && selectedTournament === 'All Tournaments') return selectedPlayer;
 
     let filteredMatches = matches;
     
-    if (filter.includes('/')) {
-      filteredMatches = matches.filter(m => {
+    if (selectedSeason !== 'All Time') {
+      filteredMatches = filteredMatches.filter(m => {
         const d = new Date(m.timestamp);
         const y = d.getFullYear();
         const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
         const sY = isLateJan ? y - 1 : y;
-        return `${sY}/${sY + 1}` === filter;
+        return `${sY}/${sY + 1}` === selectedSeason;
       });
-    } else {
-      filteredMatches = matches.filter(m => (m.tournament || 'Friendly') === filter);
+    }
+
+    if (selectedTournament !== 'All Tournaments') {
+      filteredMatches = filteredMatches.filter(m => (m.tournament || 'Friendly') === selectedTournament);
     }
 
     return computePlayerStats(selectedPlayer, filteredMatches);
-  }, [selectedPlayer, filter, matches]);
+  }, [selectedPlayer, selectedSeason, selectedTournament, matches]);
 
   const chartData = computedPlayer ? [
     { name: 'WINS', value: computedPlayer.win, color: '#22c55e' },
@@ -165,7 +168,13 @@ export default function PlayerStats() {
                     className="bg-brand-dark border-brand-purple border px-3 py-2 lg:px-4 lg:py-3 rounded-2xl flex items-center gap-2 hover:scale-[1.02] transition-all font-black text-[10px] lg:text-xs cursor-pointer group shadow-2xl shadow-brand-dark/50"
                   >
                     <Filter size={12} className="text-brand-purple group-hover:rotate-12 transition-transform" />
-                    <span className="max-w-[80px] lg:max-w-none truncate">{filter.includes('/') ? `${filter} Season` : filter}</span>
+                    <span className="max-w-[120px] lg:max-w-none truncate">
+                      {selectedSeason === 'All Time' 
+                        ? 'All Time' 
+                        : selectedTournament === 'All Tournaments' 
+                          ? `${selectedSeason} Season` 
+                          : selectedTournament}
+                    </span>
                     <ChevronDown size={14} className={cn("text-brand-purple ml-1 transition-transform", isFilterOpen ? "rotate-180" : "")} />
                   </button>
 
@@ -175,37 +184,58 @@ export default function PlayerStats() {
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 top-full mt-2 w-64 lg:w-72 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[60vh] flex flex-col z-50"
+                        className="absolute right-0 top-full mt-2 w-64 lg:w-72 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[70vh] flex flex-col z-50"
                       >
                         <div className="p-2 space-y-1 overflow-y-auto min-h-0 custom-scrollbar pr-1">
                           <button 
-                            onClick={() => { setFilter('All Time'); setIsFilterOpen(false); }}
-                            className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === 'All Time' ? "bg-brand-purple text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                            onClick={() => { setSelectedSeason('All Time'); setSelectedTournament('All Tournaments'); setIsFilterOpen(false); }}
+                            className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", selectedSeason === 'All Time' ? "bg-brand-purple text-brand-dark" : "hover:bg-white/5 text-slate-300")}
                           >
                             All Time
                           </button>
                           
-                          <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-purple mt-2 bg-brand-purple/5 rounded-lg border border-brand-purple/10">SEASONS</div>
+                          <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-purple mt-2 bg-brand-purple/5 rounded-lg border border-brand-purple/10">1. SELECT SEASON</div>
                           {availableSeasons.map(s => (
                             <button 
                               key={s}
-                              onClick={() => { setFilter(s); setIsFilterOpen(false); }}
-                              className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === s ? "bg-brand-purple text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                              onClick={() => { 
+                                setSelectedSeason(s); 
+                                setSelectedTournament('All Tournaments');
+                              }}
+                              className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase flex justify-between items-center", selectedSeason === s ? "bg-brand-purple/20 text-brand-purple border border-brand-purple/30" : "hover:bg-white/5 text-slate-300")}
                             >
                               {s} Season
+                              {selectedSeason === s && <div className="w-1.5 h-1.5 rounded-full bg-brand-purple" />}
                             </button>
                           ))}
 
-                          <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-purple mt-2 bg-brand-purple/5 rounded-lg border border-brand-purple/10">TOURNAMENTS</div>
-                          {availableTournaments.map(t => (
-                            <button 
-                              key={t}
-                              onClick={() => { setFilter(t); setIsFilterOpen(false); }}
-                              className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", filter === t ? "bg-brand-purple text-brand-dark" : "hover:bg-white/5 text-slate-300")}
-                            >
-                              {t}
-                            </button>
-                          ))}
+                          <AnimatePresence>
+                            {selectedSeason !== 'All Time' && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-purple mt-2 bg-brand-purple/5 rounded-lg border border-brand-purple/10">2. SELECT TOURNAMENT</div>
+                                <button 
+                                  onClick={() => { setSelectedTournament('All Tournaments'); setIsFilterOpen(false); }}
+                                  className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", selectedTournament === 'All Tournaments' ? "bg-brand-purple text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                                >
+                                  All Tournaments
+                                </button>
+                                {availableTournaments.map(t => (
+                                  <button 
+                                    key={t}
+                                    onClick={() => { setSelectedTournament(t); setIsFilterOpen(false); }}
+                                    className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", selectedTournament === t ? "bg-brand-purple text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                                  >
+                                    {t}
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       </motion.div>
                     )}

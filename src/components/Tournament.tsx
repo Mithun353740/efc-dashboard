@@ -11,19 +11,47 @@ const TOURNAMENTS = ["QVFC Elite League Cup", "QVFC Elite League Cup Division 2"
 export default function Tournament() {
   const { rankedPlayers, matches } = useFirebase();
   const [selectedTournament, setSelectedTournament] = useState(TOURNAMENTS[0]);
+  const [selectedSeason, setSelectedSeason] = useState('All Time');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const availableSeasons = useMemo(() => {
+    const seasons = new Set<string>();
+    matches.forEach(m => {
+      const d = new Date(m.timestamp);
+      const y = d.getFullYear();
+      const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+      const sY = isLateJan ? y - 1 : y;
+      seasons.add(`${sY}/${sY + 1}`);
+    });
+    const d = new Date();
+    const y = d.getFullYear();
+    const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+    const sY = isLateJan ? y - 1 : y;
+    seasons.add(`${sY}/${sY + 1}`);
+    return Array.from(seasons).sort().reverse();
+  }, [matches]);
 
   // Compute standings for the selected tournament
   const standings = useMemo(() => {
-    const tournamentMatches = matches.filter(m => m.tournament === selectedTournament);
+    let tournamentMatches = matches.filter(m => m.tournament === selectedTournament);
     
+    if (selectedSeason !== 'All Time') {
+      tournamentMatches = tournamentMatches.filter(m => {
+        const d = new Date(m.timestamp);
+        const y = d.getFullYear();
+        const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+        const sY = isLateJan ? y - 1 : y;
+        return `${sY}/${sY + 1}` === selectedSeason;
+      });
+    }
+
     // Compute stats for all players using ONLY the tournament matches
     const unsortedTournamentPlayers = rankedPlayers
       .map(player => computePlayerStats(player, tournamentMatches))
       .filter(p => p.win > 0 || p.loss > 0 || p.draw > 0); // Only show players who played in this tournament
       
     return sortRankedPlayers(unsortedTournamentPlayers);
-  }, [rankedPlayers, matches, selectedTournament]);
+  }, [rankedPlayers, matches, selectedTournament, selectedSeason]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] flex flex-col items-center p-8 transition-colors">
@@ -40,8 +68,12 @@ export default function Tournament() {
               className="w-full md:w-auto bg-brand-dark border border-brand-purple/50 px-6 py-4 rounded-xl flex items-center justify-between md:justify-center gap-4 hover:scale-[1.02] transition-all font-black text-xs cursor-pointer group shadow-xl shadow-brand-purple/20"
             >
               <Trophy size={16} className="text-brand-purple group-hover:scale-110 transition-transform" />
-              <span className="text-transparent bg-clip-text bg-brand-gradient tracking-widest">{selectedTournament}</span>
-              <ChevronDown size={14} className={cn("text-brand-purple transition-transform", isDropdownOpen ? "rotate-180" : "")} />
+              <span className="text-transparent bg-clip-text bg-brand-gradient tracking-widest">
+                {selectedSeason === 'All Time' 
+                  ? selectedTournament 
+                  : `${selectedSeason} - ${selectedTournament}`}
+              </span>
+              <ChevronDown size={14} className={cn("text-brand-purple ml-1 transition-transform", isDropdownOpen ? "rotate-180" : "")} />
             </button>
 
             {isDropdownOpen && (
@@ -53,19 +85,40 @@ export default function Tournament() {
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute right-0 top-full mt-3 w-full md:w-72 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col z-50"
+                  className="absolute right-0 top-full mt-3 w-full md:w-80 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col z-50 max-h-[70vh]"
                 >
-                  <div className="p-2 space-y-1">
+                  <div className="p-2 space-y-1 overflow-y-auto custom-scrollbar">
+                    <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-purple mt-2 bg-brand-purple/5 rounded-lg border border-brand-purple/10">1. SELECT SEASON</div>
+                    <button 
+                      onClick={() => { setSelectedSeason('All Time'); }}
+                      className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase flex justify-between items-center", selectedSeason === 'All Time' ? "bg-brand-purple/20 text-brand-purple border border-brand-purple/30" : "hover:bg-white/5 text-slate-300")}
+                    >
+                      All Time
+                      {selectedSeason === 'All Time' && <div className="w-1.5 h-1.5 rounded-full bg-brand-purple" />}
+                    </button>
+                    {availableSeasons.map(s => (
+                      <button 
+                        key={s}
+                        onClick={() => { setSelectedSeason(s); }}
+                        className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase flex justify-between items-center", selectedSeason === s ? "bg-brand-purple/20 text-brand-purple border border-brand-purple/30" : "hover:bg-white/5 text-slate-300")}
+                      >
+                        {s} Season
+                        {selectedSeason === s && <div className="w-1.5 h-1.5 rounded-full bg-brand-purple" />}
+                      </button>
+                    ))}
+
+                    <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-purple mt-4 bg-brand-purple/5 rounded-lg border border-brand-purple/10">2. SELECT TOURNAMENT</div>
                     {TOURNAMENTS.map(t => (
                       <button 
                         key={t}
                         onClick={() => { setSelectedTournament(t); setIsDropdownOpen(false); }}
                         className={cn(
-                          "w-full text-left px-4 py-4 rounded-xl text-xs font-black transition-all tracking-wider uppercase", 
+                          "w-full text-left px-4 py-4 rounded-xl text-xs font-black transition-all tracking-wider uppercase flex justify-between items-center", 
                           selectedTournament === t ? "bg-brand-gradient text-white border border-white/10 shadow-lg" : "hover:bg-white/5 text-slate-300"
                         )}
                       >
                         {t}
+                        {selectedTournament === t && <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_10px_white]" />}
                       </button>
                     ))}
                   </div>
