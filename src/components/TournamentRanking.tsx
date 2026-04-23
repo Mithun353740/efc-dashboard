@@ -9,27 +9,60 @@ export default function TournamentRanking() {
   const { rankedPlayers, matches, tournaments } = useFirebase();
   
   // 1. Determine Current Season & Available Seasons
-  const getCurrentSeason = () => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-    const sY = isLateJan ? y - 1 : y;
-    return `${sY}/${sY + 1}`;
+  const getSeasonInfo = (date: Date) => {
+    let start = new Date(2026, 3, 17); // April 17, 2026 (Anchor)
+    if (date >= start) {
+      while (true) {
+        let end = new Date(start);
+        end.setMonth(end.getMonth() + 9);
+        end.setDate(end.getDate() - 1);
+        if (date <= end) {
+          const sY = start.getFullYear();
+          const eY = end.getFullYear();
+          return {
+            name: sY === eY ? `${sY} Season` : `${sY}/${eY}`,
+            start, end
+          };
+        }
+        start.setMonth(start.getMonth() + 9);
+        if (start.getFullYear() > 2100) break;
+      }
+    } else {
+      while (true) {
+        let nextStart = new Date(start);
+        start = new Date(start);
+        start.setMonth(start.getMonth() - 9);
+        let end = new Date(nextStart);
+        end.setDate(end.getDate() - 1);
+        if (date >= start && date <= end) {
+          const sY = start.getFullYear();
+          const eY = end.getFullYear();
+          return {
+            name: sY === eY ? `${sY} Season` : `${sY}/${eY}`,
+            start, end
+          };
+        }
+        if (start.getFullYear() < 2020) break;
+      }
+    }
+    return { name: "Legacy", start: null, end: null };
   };
 
-  const currentSeason = useMemo(() => getCurrentSeason(), []);
+  const currentSeason = useMemo(() => getSeasonInfo(new Date()).name, []);
   
   const availableSeasons = useMemo(() => {
     const seasons = new Set<string>();
     // Pull from tournaments collection
-    tournaments.forEach(t => { if (t.season) seasons.add(t.season); });
+    tournaments.forEach(t => { 
+      if (t.season) {
+        seasons.add(t.season); 
+      } else if (t.createdAt) {
+        seasons.add(getSeasonInfo(new Date(t.createdAt)).name);
+      }
+    });
     // Pull from match history as fallback/legacy
     matches.forEach(m => {
-      const d = new Date(m.timestamp);
-      const y = d.getFullYear();
-      const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-      const sY = isLateJan ? y - 1 : y;
-      seasons.add(`${sY}/${sY + 1}`);
+      seasons.add(getSeasonInfo(new Date(m.timestamp)).name);
     });
     // Ensure current is there
     seasons.add(currentSeason);
@@ -55,11 +88,7 @@ export default function TournamentRanking() {
     // Fallback: matches with this tournament name in this season
     matches.forEach(m => {
       if (m.tournament && m.tournament !== 'Friendly') {
-        const d = new Date(m.timestamp);
-        const y = d.getFullYear();
-        const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-        const sY = isLateJan ? y - 1 : y;
-        if (`${sY}/${sY + 1}` === selectedSeason) {
+        if (getSeasonInfo(new Date(m.timestamp)).name === selectedSeason) {
           names.add(m.tournament);
         }
       }
@@ -83,11 +112,7 @@ export default function TournamentRanking() {
     
     // Filter matches by season as well (to handle same tournament name across seasons)
     tournamentMatches = tournamentMatches.filter(m => {
-      const d = new Date(m.timestamp);
-      const y = d.getFullYear();
-      const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-      const sY = isLateJan ? y - 1 : y;
-      return `${sY}/${sY + 1}` === selectedSeason;
+      return getSeasonInfo(new Date(m.timestamp)).name === selectedSeason;
     });
 
     const unsortedTournamentPlayers = rankedPlayers
@@ -112,7 +137,7 @@ export default function TournamentRanking() {
             <h1 className="text-3xl md:text-5xl font-black text-brand-dark dark:text-white tracking-tighter uppercase mb-2">CLUB TOURNAMENTS</h1>
             <div className="flex items-center gap-3">
               <span className="px-2 py-0.5 bg-brand-purple/10 text-brand-purple rounded text-[9px] font-black uppercase tracking-widest border border-brand-purple/20">Official Standings</span>
-              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{selectedSeason} Season</span>
+              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{selectedSeason} Season (Apr 17 - Jan 17)</span>
             </div>
           </motion.div>
 
@@ -169,7 +194,10 @@ export default function TournamentRanking() {
                             >
                               <div className="flex items-center gap-3">
                                 <Calendar size={14} className={selectedSeason === s ? "text-brand-purple" : "text-slate-600"} />
-                                <span>{s} Season</span>
+                                <div className="text-left">
+                                  <p>{s} Season</p>
+                                  <p className="text-[8px] text-slate-500 font-bold lowercase tracking-normal">Apr 17 - Jan 17</p>
+                                </div>
                               </div>
                               {selectedSeason === s && <div className="w-1.5 h-1.5 rounded-full bg-brand-purple shadow-[0_0_8px_rgba(124,58,237,0.8)]" />}
                             </button>

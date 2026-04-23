@@ -8,20 +8,45 @@ import { INITIAL_PLAYERS, computePlayerStats, sortRankedPlayers } from '../lib/s
 export default function EliteRankings() {
   const { rankedPlayers, matches } = useFirebase();
 
+  const getSeasonInfo = (date: Date) => {
+    let start = new Date(2026, 3, 17); // April 17, 2026 (Anchor)
+    if (date >= start) {
+      while (true) {
+        let end = new Date(start);
+        end.setMonth(end.getMonth() + 9);
+        end.setDate(end.getDate() - 1);
+        if (date <= end) {
+          const sY = start.getFullYear();
+          const eY = end.getFullYear();
+          return { name: sY === eY ? `${sY} Season` : `${sY}/${eY}`, start, end };
+        }
+        start.setMonth(start.getMonth() + 9);
+        if (start.getFullYear() > 2100) break;
+      }
+    } else {
+      while (true) {
+        let nextStart = new Date(start);
+        start = new Date(start);
+        start.setMonth(start.getMonth() - 9);
+        let end = new Date(nextStart);
+        end.setDate(end.getDate() - 1);
+        if (date >= start && date <= end) {
+          const sY = start.getFullYear();
+          const eY = end.getFullYear();
+          return { name: sY === eY ? `${sY} Season` : `${sY}/${eY}`, start, end };
+        }
+        if (start.getFullYear() < 2020) break;
+      }
+    }
+    return { name: "Legacy", start: null, end: null };
+  };
+
   // Get current season matches for "Top Performers This Season"
   const currentSeasonPlayers = useMemo(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-    const sY = isLateJan ? y - 1 : y;
-    const seasonId = `${sY}/${sY + 1}`;
+    const seasonId = getSeasonInfo(new Date()).name;
 
     const seasonMatches = matches.filter(m => {
-      const md = new Date(m.timestamp);
-      const my = md.getFullYear();
-      const mIsLateJan = (md.getMonth() === 0 && md.getDate() <= 17);
-      const msY = mIsLateJan ? my - 1 : my;
-      return `${msY}/${msY + 1}` === seasonId;
+      return getSeasonInfo(new Date(m.timestamp)).name === seasonId;
     });
 
     const playersWithSeasonStats = rankedPlayers.map(p => {
