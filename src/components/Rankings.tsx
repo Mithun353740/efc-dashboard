@@ -1,21 +1,117 @@
-import { motion } from 'motion/react';
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import { cn } from '../lib/utils';
-import { INITIAL_PLAYERS } from '../lib/store';
+import { INITIAL_PLAYERS, computePlayerStats, sortRankedPlayers } from '../lib/store';
+import { Trophy, ChevronDown, Filter } from 'lucide-react';
 
 export default function Rankings() {
-  const { rankedPlayers } = useFirebase();
-  const activePlayers = rankedPlayers.length > 0 ? rankedPlayers : INITIAL_PLAYERS;
+  const { rankedPlayers, matches } = useFirebase();
+  const [selectedSeason, setSelectedSeason] = useState('All Time');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  const availableSeasons = useMemo(() => {
+    const seasons = new Set<string>();
+    matches.forEach(m => {
+      const d = new Date(m.timestamp);
+      const y = d.getFullYear();
+      const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+      const sY = isLateJan ? y - 1 : y;
+      seasons.add(`${sY}/${sY + 1}`);
+    });
+    // Ensure current season
+    const d = new Date();
+    const y = d.getFullYear();
+    const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+    const sY = isLateJan ? y - 1 : y;
+    seasons.add(`${sY}/${sY + 1}`);
+    return Array.from(seasons).sort().reverse();
+  }, [matches]);
+
+  const activePlayers = useMemo(() => {
+    if (rankedPlayers.length === 0) return INITIAL_PLAYERS;
+    
+    if (selectedSeason === 'All Time') return rankedPlayers;
+
+    // Filter matches by season
+    const seasonMatches = matches.filter(m => {
+      const d = new Date(m.timestamp);
+      const y = d.getFullYear();
+      const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+      const sY = isLateJan ? y - 1 : y;
+      return `${sY}/${sY + 1}` === selectedSeason;
+    });
+
+    // Compute new stats
+    const seasonPlayers = rankedPlayers.map(player => {
+      const stats = computePlayerStats(player, seasonMatches);
+      stats.ovr = player.ovr; // Keep global OVR
+      return stats;
+    }).filter(p => p.win > 0 || p.loss > 0 || p.draw > 0);
+
+    return sortRankedPlayers(seasonPlayers);
+  }, [rankedPlayers, matches, selectedSeason]);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark py-20 px-8 transition-colors">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark py-20 px-4 md:px-8 transition-colors">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-12">
-          <h1 className="text-4xl md:text-6xl font-black text-brand-dark dark:text-white tracking-tighter leading-none">OFFICIAL<br />eFOOTBALL RANKINGS</h1>
-          <p className="text-xs font-bold text-slate-400 tracking-[0.3em] mt-4 uppercase">SEASON 2026 GLOBAL PERFORMANCE DATA</p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6 relative z-50">
+          <div>
+            <h1 className="text-4xl md:text-6xl font-black text-brand-dark dark:text-white tracking-tighter leading-none">OFFICIAL<br />eFOOTBALL RANKINGS</h1>
+            <p className="text-xs font-bold text-slate-400 tracking-[0.3em] mt-4 uppercase">GLOBAL PERFORMANCE DATA</p>
+          </div>
+
+          <div className="relative w-full md:w-auto">
+            <button 
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className="w-full md:w-auto bg-brand-dark border-brand-purple border px-4 py-3 rounded-2xl flex items-center justify-between gap-3 hover:scale-[1.02] transition-all font-black text-xs cursor-pointer group shadow-2xl shadow-brand-dark/50 text-white"
+            >
+              <Filter size={14} className="text-brand-purple group-hover:rotate-12 transition-transform" />
+              <span>
+                {selectedSeason === 'All Time' ? 'ALL TIME RANKINGS' : `${selectedSeason} LEADERBOARD`}
+              </span>
+              <ChevronDown size={14} className={cn("text-brand-purple transition-transform", isFilterOpen ? "rotate-180" : "")} />
+            </button>
+
+            <AnimatePresence>
+              {isFilterOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 md:right-0 top-full mt-2 w-full md:w-64 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col z-50"
+                >
+                  <div className="p-2 space-y-1">
+                    <button 
+                      onClick={() => { setSelectedSeason('All Time'); setIsFilterOpen(false); }}
+                      className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase", selectedSeason === 'All Time' ? "bg-brand-purple text-brand-dark" : "hover:bg-white/5 text-slate-300")}
+                    >
+                      All Time Rankings
+                    </button>
+                    
+                    <div className="px-4 py-2 text-[9px] font-black tracking-[0.2em] text-brand-purple mt-2 bg-brand-purple/5 rounded-lg border border-brand-purple/10">SELECT SEASON</div>
+                    {availableSeasons.map(s => (
+                      <button 
+                        key={s}
+                        onClick={() => { setSelectedSeason(s); setIsFilterOpen(false); }}
+                        className={cn("w-full text-left px-4 py-3 rounded-xl text-xs font-black transition-all tracking-wider uppercase flex justify-between items-center", selectedSeason === s ? "bg-brand-purple/20 text-brand-purple border border-brand-purple/30" : "hover:bg-white/5 text-slate-300")}
+                      >
+                        {s} Season
+                        {selectedSeason === s && <div className="w-1.5 h-1.5 rounded-full bg-brand-purple" />}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {isFilterOpen && (
+            <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsFilterOpen(false)} />
+          )}
         </div>
 
-        <div className="bg-white dark:bg-white/5 rounded-3xl shadow-2xl shadow-slate-200/50 dark:shadow-none overflow-hidden border border-slate-100 dark:border-white/10">
+        <div className="bg-white dark:bg-white/5 rounded-3xl shadow-2xl shadow-slate-200/50 dark:shadow-none overflow-hidden border border-slate-100 dark:border-white/10 relative z-10">
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse">
               <thead>
