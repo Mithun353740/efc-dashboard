@@ -9,6 +9,39 @@ import {
   bergerRoundRobin, seededKnockout,
   generateGroupStage, semiAutoFill, validateFixtures
 } from './fixtureGen.js';
+function showPlayerSelectionModal(callback) {
+  const modal = document.createElement('div');
+  modal.className = 'fixed inset-0 bg-slate-950/90 backdrop-blur-3xl z-[200] flex items-center justify-center p-8 animate-in fade-in zoom-in duration-300';
+  modal.innerHTML = `
+    <div class="bg-slate-900 w-full max-w-2xl rounded-[3rem] border border-slate-800 shadow-3xl flex flex-col p-10 space-y-8">
+      <div class="flex items-center justify-between">
+        <h3 class="text-2xl font-black text-slate-100 uppercase tracking-tighter">Link Club Player</h3>
+        <button id="close-selection" class="p-4 bg-slate-950 rounded-2xl text-slate-500">${ICONS.reset}</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-auto max-h-[60vh] pr-4 custom-scrollbar">
+        ${state.dashboardPlayers.length === 0 ? '<p class="col-span-2 text-center text-slate-500 py-10">No club players synced. Ensure dashboard is open.</p>' : state.dashboardPlayers.map(p => `
+          <button class="player-select-btn p-6 bg-slate-950 border border-slate-800 rounded-2xl flex items-center gap-4 hover:border-indigo-500/50 transition-all text-left group" data-player-id="${p.id}">
+            <img src="${p.image}" class="w-12 h-12 rounded-xl object-cover border border-slate-800" />
+            <div>
+              <p class="font-black text-slate-200 text-sm group-hover:text-indigo-400">${p.name}</p>
+              <p class="text-[9px] font-black text-slate-600 uppercase">#${p.number} • OVR ${p.ovr}</p>
+            </div>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelectorAll('.player-select-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      callback(btn.dataset.playerId);
+      modal.remove();
+    });
+  });
+  modal.addEventListener('click', (e) => { if(e.target === modal) modal.remove(); });
+  const closeBtn = document.getElementById('close-selection');
+  if (closeBtn) closeBtn.addEventListener('click', () => modal.remove());
+}
 
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -473,7 +506,7 @@ function renderTournamentList(root) {
             <img src="/logo.png" alt="KickOff Logo" style="width:44px;height:44px;border-radius:12px;object-fit:cover;box-shadow:0 0 20px rgba(59,130,246,0.5),0 0 40px rgba(124,58,237,0.2)">
             <div>
               <h1 class="text-xl font-black tracking-tighter" style="background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">KickOff</h1>
-              <p class="text-[9px] font-black uppercase tracking-widest" style="color:#475569">Tournament Manager</p>
+              <p class="text-[9px] font-black uppercase tracking-widest" style="color:#475569">${state.isAdmin ? 'Control Center' : 'Official Hub'}</p>
             </div>
           </div>
           <button id="theme-toggle" class="p-3 rounded-xl border transition-all" style="background:#0f0f1a;border-color:#1e1e32;color:#94a3b8">
@@ -525,12 +558,14 @@ function renderTournamentList(root) {
              <div class="flex items-center gap-6">
                <img src="/logo.png" alt="KickOff" style="width:80px;height:80px;border-radius:20px;object-fit:cover;box-shadow:0 0 30px rgba(59,130,246,0.5),0 0 80px rgba(124,58,237,0.2),0 20px 40px rgba(0,0,0,0.4)">
                <div class="space-y-3">
+                 ${state.isAdmin ? `
                  <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-black uppercase tracking-widest" style="background:#0f0f1a;border-color:#1e1e32;color:#60a5fa">
                    <span style="width:6px;height:6px;border-radius:50%;background:#3b82f6;box-shadow:0 0 8px rgba(59,130,246,0.8)"></span>
                    Command Center Active
                  </div>
-                 <h1 class="text-5xl font-black tracking-tighter" style="background:linear-gradient(135deg,#f1f5f9 30%,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Your Tournaments</h1>
-                 <p class="font-bold tracking-[0.3em] uppercase text-xs" style="color:#475569">Manage multiple disciplines</p>
+                 ` : ''}
+                 <h1 class="text-5xl font-black tracking-tighter" style="background:linear-gradient(135deg,#f1f5f9 30%,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${state.isAdmin ? 'Your Tournaments' : 'Official Tournaments'}</h1>
+                 <p class="font-bold tracking-[0.3em] uppercase text-xs" style="color:#475569">${state.isAdmin ? 'Manage multiple disciplines' : 'Live Competition Center'}</p>
                </div>
              </div>
              <div class="flex items-center gap-4">
@@ -550,7 +585,7 @@ function renderTournamentList(root) {
               </div>
               <div class="space-y-3">
                 <h3 class="text-2xl font-black" style="color:#475569">No active tournaments</h3>
-                <p class="text-sm font-medium" style="color:#334155">Create your first tournament to get started.</p>
+                <p class="text-sm font-medium" style="color:#334155">${state.isAdmin ? 'Create your first tournament to get started.' : 'Waiting for the next season to begin...'}</p>
               </div>
               ${state.isAdmin ? `
               <button id="new-tournament-btn-empty" class="px-10 py-4 rounded-2xl font-black text-sm transition-all" style="background:linear-gradient(135deg,#3b82f6,#7c3aed);color:white;box-shadow:0 8px 32px rgba(59,130,246,0.3)">Create Tournament</button>
@@ -1224,17 +1259,48 @@ function renderTeamSetup(container) {
           <div class="group bg-slate-900 p-6 rounded-[2rem] border border-slate-800 hover:border-indigo-500/30 transition-all flex items-center gap-4 shadow-xl">
             <div class="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-xs font-black text-slate-700 relative overflow-hidden">
                <input type="color" data-color-id="${t.id}" value="${colors[idx % colors.length]}" class="absolute inset-0 w-full h-full border-none p-0 cursor-pointer opacity-0">
+               <div id="team-img-container-${t.id}" class="absolute inset-0 ${t.image ? '' : 'hidden'}">
+                 <img src="${t.image || ''}" class="w-full h-full object-cover">
+               </div>
                <div style="background-color: ${colors[idx % colors.length]}" class="w-6 h-6 rounded-full shadow-inner team-color-dot" data-dot-id="${t.id}"></div>
             </div>
             <div class="flex-1">
                <label class="text-[8px] font-black text-slate-600 uppercase tracking-widest block mb-1">Squad Name</label>
-               <input type="text" data-team-id="${t.id}" value="${t.name}" class="team-name-input w-full bg-transparent border-none focus:ring-0 text-lg font-black text-slate-100 placeholder:text-slate-800" placeholder="Red Devils FC">
+               <input type="text" data-team-id="${t.id}" value="${t.name}" list="club-players" class="team-name-input w-full bg-transparent border-none focus:ring-0 text-lg font-black text-slate-100 placeholder:text-slate-800" placeholder="Type name for suggestions...">
             </div>
           </div>
         `).join('')}
       </div>
+
+      <datalist id="club-players">
+        ${state.dashboardPlayers.map(p => `<option value="${p.name}">${p.ovr} OVR • #${p.number}</option>`).join('')}
+      </datalist>
     </div>
   `;
+
+  // Dynamic Image Auto-Fill Listener
+  document.querySelectorAll('.team-name-input').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const name = e.target.value.trim();
+      const player = state.dashboardPlayers.find(p => p.name.toLowerCase() === name.toLowerCase());
+      const teamId = parseInt(e.target.dataset.teamId);
+      const team = state.tournament.teams.find(tm => tm.id === teamId);
+      const imgContainer = document.getElementById(`team-img-container-${teamId}`);
+      
+      if (player) {
+        team.playerId = player.id;
+        team.image = player.image;
+        if (imgContainer) {
+          imgContainer.querySelector('img').src = player.image;
+          imgContainer.classList.remove('hidden');
+        }
+      } else {
+        team.playerId = null;
+        team.image = null;
+        if (imgContainer) imgContainer.classList.add('hidden');
+      }
+    });
+  });
 
   document.querySelectorAll('input[type="color"]').forEach(input => {
     input.addEventListener('input', (e) => {
@@ -2970,7 +3036,24 @@ function toggleMatchStatus(mId) {
   }
   m.status = m.status === 'completed' ? 'upcoming' : 'completed';
   if (m.stage === 'knockout' && m.status === 'completed') advanceWinner(m);
-  saveState(true); // Backup on result entry
+  
+  // Dashboard Integration: Report Match
+  if (m.status === 'completed' && window.parent !== window) {
+    const tHome = state.tournament.teams.find(t => t.id === m.homeId);
+    const tAway = state.tournament.teams.find(t => t.id === m.awayId);
+    window.parent.postMessage({
+      type: 'MATCH_COMPLETED',
+      match: {
+        p1Id: tHome?.playerId || null,
+        p1Score: m.homeScore,
+        p2Id: tAway?.playerId || null,
+        p2Score: m.awayScore,
+        tournament: state.tournament.name
+      }
+    }, '*');
+  }
+
+  saveState(true);
   if (m.status === 'completed') checkTournamentCompletion();
   render();
 }
@@ -3397,6 +3480,35 @@ function renderTeamDetail(teamId) {
         </section>
 
         <section class="space-y-6">
+           <div class="flex items-center justify-between">
+             <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Squad Roster</h4>
+             ${state.isAdmin ? `<button id="link-player-btn-mobile" class="text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-500/20">Link Club Player</button>` : ''}
+           </div>
+           <div id="roster-container-mobile" class="space-y-3">
+             ${t.playerId ? (() => {
+               const lp = state.dashboardPlayers.find(p => p.id === t.playerId);
+               return lp ? `
+                 <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex items-center justify-between group">
+                    <div class="flex items-center gap-4">
+                      <div class="w-12 h-12 rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                        <img src="${lp.image}" class="w-full h-full object-cover" />
+                      </div>
+                      <div>
+                        <p class="text-xs font-black text-slate-200 uppercase">${lp.name}</p>
+                        <p class="text-[8px] font-black text-slate-500 uppercase tracking-widest">#${lp.number} • ${lp.device}</p>
+                      </div>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-lg font-black text-indigo-400 font-mono">${lp.ovr}</p>
+                      <p class="text-[7px] font-black text-slate-600 uppercase tracking-tighter">Rating</p>
+                    </div>
+                 </div>
+               ` : '<p class="text-slate-700 italic text-center py-6 text-xs">Linked player not found in sync</p>';
+             })() : '<p class="text-slate-700 italic text-center py-6 text-xs uppercase tracking-widest">No club player linked</p>'}
+           </div>
+        </section>
+
+        <section class="space-y-6">
            <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Match History</h4>
            <div class="space-y-3">
              ${matches.map(m => {
@@ -3556,14 +3668,23 @@ function renderTeamDetail(teamId) {
       }
     });
 
-    root.querySelector('.add-player-btn')?.addEventListener('click', () => {
-      const name = prompt("Enter new player name:");
-      if (name && name.trim()) {
-        t.players.push(name.trim());
+    root.querySelector('.add-player-btn')?.remove(); // Remove legacy player add btn
+
+    root.querySelector('#link-player-btn')?.addEventListener('click', () => {
+      showPlayerSelectionModal((pId) => {
+        t.playerId = pId;
         saveState();
-        if(!state.isMobile) modal.remove();
+        if (!state.isMobile) modal.remove();
         renderTeamDetail(teamId);
-      }
+      });
+    });
+
+    root.querySelector('#link-player-btn-mobile')?.addEventListener('click', () => {
+      showPlayerSelectionModal((pId) => {
+        t.playerId = pId;
+        saveState();
+        renderTeamDetail(teamId);
+      });
     });
 
     const mobileTeamBackBtn = root.querySelector('#mobile-team-back-btn');
