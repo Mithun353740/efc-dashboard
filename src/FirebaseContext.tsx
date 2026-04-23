@@ -87,7 +87,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Fallback: don't hang forever if collections are completely empty and snapshot takes time
+    // FALLBACK: don't hang forever if collections are completely empty and snapshot takes time
     const timeout = setTimeout(() => {
       if (mounted) {
         setIsLoadingPlayers(false);
@@ -96,16 +96,47 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     }, 3500);
 
+    // TOURNAMENT INTEGRATION: Handle messages from the embedded Tournament System
+    const handleTournamentMessage = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== 'object') return;
+
+      const { type, match } = event.data;
+
+      // 1. Respond to player data requests
+      if (type === 'REQUEST_PLAYERS' && event.source) {
+        (event.source as Window).postMessage({ 
+          type: 'PLAYERS_LIST', 
+          players: players 
+        }, { targetOrigin: '*' });
+      }
+
+      // 2. Handle automated match recording
+      if (type === 'MATCH_COMPLETED' && match) {
+        const { p1Id, p1Score, p2Id, p2Score, tournament } = match;
+        const player1 = players.find(p => p.id === p1Id);
+        const player2 = players.find(p => p.id === p2Id);
+
+        if (player1) {
+          console.log('[Dashboard] Auto-recording tournament match:', match);
+          addMatch(player1, p1Score, p2Score, player2, matches, tournament)
+            .catch(err => console.error('[Dashboard] Match recording failed:', err));
+        }
+      }
+    };
+
+    window.addEventListener('message', handleTournamentMessage);
+
     return () => {
       mounted = false;
       window.removeEventListener('firestore-error', errorHandler);
+      window.removeEventListener('message', handleTournamentMessage);
       unsubPlayers();
       unsubLeaders();
       unsubMatches();
       clearTimeout(timeout);
       clearTimeout(minLoadTimer);
     };
-  }, []);
+  }, [players, matches]);
 
   const elos = React.useMemo(() => computeGlobalElo(players, matches), [players, matches]);
   const enrichedPlayers = players.map(p => ({
