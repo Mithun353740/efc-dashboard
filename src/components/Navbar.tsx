@@ -8,6 +8,8 @@ import InstallButton from './InstallButton';
 export default function Navbar() {
   const [isDark, setIsDark] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isPlayer, setIsPlayer] = useState(false);
+  const [playerName, setPlayerName] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -23,13 +25,18 @@ export default function Navbar() {
     setIsDark(isDarkNow);
     if (isDarkNow) document.documentElement.classList.add('dark');
     
-    const checkAdmin = () => {
+    const checkAuth = () => {
       setIsAdmin(localStorage.getItem('adminLoggedIn') === 'true');
+      const playerLoggedIn = localStorage.getItem('playerLoggedIn') === 'true';
+      setIsPlayer(playerLoggedIn);
+      if (playerLoggedIn) {
+        setPlayerName(localStorage.getItem('playerName') || 'Player');
+      }
     };
     
-    checkAdmin();
-    window.addEventListener('storage', checkAdmin);
-    return () => window.removeEventListener('storage', checkAdmin);
+    checkAuth();
+    window.addEventListener('storage', checkAuth);
+    return () => window.removeEventListener('storage', checkAuth);
   }, []);
 
   if (location.pathname === '/login' || location.pathname === '/admin') return null;
@@ -47,7 +54,12 @@ export default function Navbar() {
 
   const handleLogout = () => {
     localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('playerLoggedIn');
+    localStorage.removeItem('playerId');
+    localStorage.removeItem('playerName');
+    localStorage.removeItem('userType');
     setIsAdmin(false);
+    setIsPlayer(false);
     window.location.href = '/';
   };
 
@@ -120,13 +132,21 @@ export default function Navbar() {
           {isDark ? <Sun size={20} /> : <Moon size={20} />}
         </button>
         
-        {isAdmin ? (
-          <button 
-            onClick={handleLogout}
-            className="hidden md:flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 rounded-full text-[10px] font-black tracking-widest hover:bg-red-500/20 transition-all"
-          >
-            LOGOUT
-          </button>
+        {(isAdmin || isPlayer) ? (
+          <div className="flex items-center gap-4">
+            {isPlayer && (
+              <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-tighter">{playerName}</span>
+              </div>
+            )}
+            <button 
+              onClick={handleLogout}
+              className="hidden md:flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 rounded-full text-[10px] font-black tracking-widest hover:bg-red-500/20 transition-all"
+            >
+              LOGOUT
+            </button>
+          </div>
         ) : (
           <Link 
             to="/login"
@@ -186,13 +206,22 @@ export default function Navbar() {
               <div className="mt-4 flex justify-center">
                 <InstallButton />
               </div>
-              {isAdmin && (
+              {(isAdmin || isPlayer) && (
                 <button 
                   onClick={handleLogout}
                   className="mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 text-red-500 rounded-xl text-[10px] font-black tracking-widest hover:bg-red-500/20 transition-all"
                 >
-                  LOGOUT
+                  <User size={14} />
+                  LOGOUT {isPlayer ? playerName : ''}
                 </button>
+              )}
+              {(!isAdmin && !isPlayer) && (
+                <Link 
+                  to="/login"
+                  className="mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-brand-purple text-brand-dark rounded-xl text-[10px] font-black tracking-widest hover:scale-105 transition-all"
+                >
+                  LOGIN
+                </Link>
               )}
             </div>
           </motion.div>
