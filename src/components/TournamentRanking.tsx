@@ -8,7 +8,7 @@ import { Trophy, ChevronDown } from 'lucide-react';
 
 const TOURNAMENTS = ["QVFC Elite League Cup", "QVFC Elite League Cup Division 2", "Vortex Champions Cup", "Vortex Domestic Cup"];
 
-export default function Tournament() {
+export default function TournamentRanking() {
   const { rankedPlayers, matches } = useFirebase();
   const [selectedTournament, setSelectedTournament] = useState(TOURNAMENTS[0]);
   const [selectedSeason, setSelectedSeason] = useState('All Time');
