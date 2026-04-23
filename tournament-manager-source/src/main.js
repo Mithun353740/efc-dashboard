@@ -3254,27 +3254,41 @@ function renderMatchCard(m, isBiggestWin = false) {
 
 
 
-function updateScore(mId, type, val) {
-  const m = state.tournament.fixtures.find(fx => fx.id === mId);
+function updateScore(mId, type, val, tournamentName = null) {
+  let tournament = state.tournament;
+  if (tournamentName) {
+    tournament = state.tournaments.find(t => t.name === tournamentName) || state.tournament;
+  }
+  
+  const m = tournament.fixtures.find(fx => fx.id === mId);
   if (m) { 
     m[`${type}Score`] = val === '' ? null : parseInt(val); 
-    saveState(true); // Backup on result entry
+    saveState(true); 
   }
 }
 
-function toggleMatchStatus(mId) {
-  const m = state.tournament.fixtures.find(fx => fx.id === mId);
+function toggleMatchStatus(mId, tournamentName = null) {
+  let tournament = state.tournament;
+  if (tournamentName) {
+    tournament = state.tournaments.find(t => t.name === tournamentName) || state.tournament;
+  }
+
+  const m = tournament.fixtures.find(fx => fx.id === mId);
   if (!m || m.homeScore === null || m.awayScore === null) {
       alert("Results must be entered before marking as complete.");
       return;
   }
   m.status = m.status === 'completed' ? 'upcoming' : 'completed';
-  if (m.stage === 'knockout' && m.status === 'completed') advanceWinner(m);
+  
+  if (m.stage === 'knockout' && m.status === 'completed') {
+    // Note: advanceWinner needs to be updated too if we want to support global knockout updates
+    advanceWinner(m);
+  }
   
   // Dashboard Integration: Report Match
   if (m.status === 'completed' && window.parent !== window) {
-    const tHome = state.tournament.teams.find(t => t.id === m.homeId);
-    const tAway = state.tournament.teams.find(t => t.id === m.awayId);
+    const tHome = tournament.teams.find(t => t.id === m.homeId);
+    const tAway = tournament.teams.find(t => t.id === m.awayId);
     window.parent.postMessage({
       type: 'MATCH_COMPLETED',
       match: {
@@ -3282,7 +3296,7 @@ function toggleMatchStatus(mId) {
         p1Score: m.homeScore,
         p2Id: tAway?.playerId || null,
         p2Score: m.awayScore,
-        tournament: state.tournament.name
+        tournament: tournament.name
       }
     }, '*');
   }
@@ -3649,6 +3663,19 @@ function showEditModal(title, defaultValue, onSave) {
 }
 
 function renderTeamDetail(teamId) {
+
+    const setupGlobalMatchListeners = (parent) => {
+      parent.querySelectorAll('.global-score-input').forEach(i => i.addEventListener('change', e => {
+        const row = e.target.closest('[data-match-id]');
+        updateScore(row.dataset.matchId, e.target.dataset.type, e.target.value, row.dataset.tournament);
+      }));
+      parent.querySelectorAll('.global-status-toggle').forEach(b => b.addEventListener('click', e => {
+        const row = e.target.closest('[data-match-id]');
+        toggleMatchStatus(row.dataset.matchId, row.dataset.tournament);
+        renderTeamDetail(teamId); // Refresh modal
+      }));
+    };
+
   const t = state.tournament.teams.find(tm => tm.id === parseInt(teamId));
   if (!t) return;
   const standings = calculateStandings().find(s => s.id === t.id) || { p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0, home: {}, away: {}, cs: 0 };
@@ -3757,33 +3784,43 @@ function renderTeamDetail(teamId) {
         <section class="space-y-6">
            <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Match History</h4>
            <div class="space-y-3">
-              ${matches.map(m => {
-                const isHome = m.homeId === m.teamInMatch.id;
-                const oppId = isHome ? m.awayId : m.homeId; 
-                const tourney = state.tournaments.find(tour => tour.name === m.tournamentName) || state.tournament;
-                const opp = tourney.teams.find(tm => tm.id === oppId) || { name: 'Unknown' };
-                const won = isHome ? (m.homeScore > m.awayScore) : (m.awayScore > m.homeScore);
-                const drew = m.homeScore === m.awayScore;
-                return `
-                  <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex items-center justify-between">
-                     <div class="flex items-center gap-4">
-                       <div class="w-8 h-8 flex items-center justify-center rounded-lg border font-black text-[10px] ${won ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : (drew ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/70' : 'bg-red-500/10 border-red-500/20 text-red-500')}">
-                         ${won ? 'W' : (drew ? 'D' : 'L')}
-                       </div>
-                       <div>
-                         <div class="font-black text-slate-300 uppercase text-xs truncate max-w-[120px]">${opp.name}</div>
-                         <div class="text-[7px] font-black text-slate-600 uppercase tracking-widest mt-0.5">${m.tournamentName}</div>
-                       </div>
-                     </div>
-                     <div class="font-black font-mono text-slate-100 flex items-center gap-2">
-                       <span>${m.homeScore}</span>
-                       <span class="text-slate-700">-</span>
-                       <span>${m.awayScore}</span>
-                     </div>
-                  </div>
-                `;
-              }).join('')}
-             }).join('')}
+               ${matches.map(m => {
+                 const isHome = m.homeId === m.teamInMatch.id;
+                 const oppId = isHome ? m.awayId : m.homeId; 
+                 const tourney = state.tournaments.find(tour => tour.name === m.tournamentName) || state.tournament;
+                 const opp = tourney.teams.find(tm => tm.id === oppId) || { name: 'Unknown' };
+                 const won = isHome ? (m.homeScore > m.awayScore) : (m.awayScore > m.homeScore);
+                 const drew = m.homeScore === m.awayScore;
+                 const done = m.status === 'completed';
+
+                 return `
+                   <div data-match-id="${m.id}" data-tournament="${m.tournamentName}" class="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex items-center justify-between">
+                      <div class="flex items-center gap-4">
+                        <div class="flex flex-col items-center gap-1">
+                           <div class="w-8 h-8 flex items-center justify-center rounded-lg border font-black text-[10px] ${won ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : (drew ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/70' : 'bg-red-500/10 border-red-500/20 text-red-500')}">
+                             ${won ? 'W' : (drew ? 'D' : 'L')}
+                           </div>
+                           ${state.isAdmin ? `<button class="global-status-toggle p-1 text-slate-600 hover:text-indigo-400 transition-colors text-xs">${done ? '✅' : '⏳'}</button>` : ''}
+                        </div>
+                        <div>
+                          <div class="font-black text-slate-300 uppercase text-xs truncate max-w-[120px]">${opp.name}</div>
+                          <div class="text-[7px] font-black text-slate-600 uppercase tracking-widest mt-0.5">${m.tournamentName}</div>
+                        </div>
+                      </div>
+                      <div class="font-black font-mono text-slate-100 flex items-center gap-2">
+                        ${state.isAdmin ? `
+                          <input type="number" data-type="${isHome ? 'home' : 'away'}" value="${isHome ? (m.homeScore ?? '') : (m.awayScore ?? '')}" class="global-score-input w-10 h-10 bg-slate-950 border border-slate-800 rounded-xl text-center text-xs text-indigo-400 outline-none">
+                          <span class="text-slate-700">-</span>
+                          <input type="number" data-type="${isHome ? 'away' : 'home'}" value="${isHome ? (m.awayScore ?? '') : (m.homeScore ?? '')}" class="global-score-input w-10 h-10 bg-slate-950 border border-slate-800 rounded-xl text-center text-xs text-slate-500 outline-none">
+                        ` : `
+                          <span>${m.homeScore}</span>
+                          <span class="text-slate-700">-</span>
+                          <span>${m.awayScore}</span>
+                        `}
+                      </div>
+                   </div>
+                 `;
+               }).join('')}
              ${matches.length === 0 ? '<p class="text-slate-700 italic text-center py-6 text-xs uppercase tracking-widest">No data recorded</p>' : ''}
            </div>
         </section>
@@ -3791,6 +3828,7 @@ function renderTeamDetail(teamId) {
     `;
     toggleBottomSheet(content, true);
     setTimeout(() => initTeamFormChart(t.id, 'formChartMobile'), 100);
+    setupGlobalMatchListeners(document.getElementById('bottom-sheet-container'));
     return;
   }
 
@@ -3869,32 +3907,46 @@ function renderTeamDetail(teamId) {
         <section class="space-y-6">
            <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Historical Archive</h4>
            <div class="space-y-3">
-              ${matches.map(m => {
-                const isHome = m.homeId === m.teamInMatch.id;
-                const tourney = state.tournaments.find(tour => tour.name === m.tournamentName) || state.tournament;
-                const opp = tourney.teams.find(tm => tm.id === (isHome ? m.awayId : m.homeId)) || { name: 'Unknown' };
-                const won = isHome ? (m.homeScore > m.awayScore) : (m.awayScore > m.homeScore);
-                const drew = m.homeScore === m.awayScore;
-                const status = won ? 'W' : (drew ? 'D' : 'L');
-                const color = won ? 'text-emerald-400' : (drew ? 'text-yellow-500/70' : 'text-red-400');
-                return `
-                  <div class="bg-slate-950/40 p-6 rounded-2xl border border-slate-800/50 flex items-center justify-between">
-                     <div class="flex items-center gap-6">
-                       <div class="text-[10px] font-mono text-slate-700">${m.date || 'TBD'}</div>
-                       <div>
-                         <div class="font-black text-slate-200">${opp.name}</div>
-                         <div class="text-[8px] font-black text-slate-600 uppercase tracking-widest mt-1">${m.tournamentName}</div>
-                       </div>
-                     </div>
-                     <div class="flex items-center gap-8">
-                        <div class="font-black font-mono text-xl text-slate-100">${m.homeScore} - ${m.awayScore}</div>
-                        <div class="w-10 h-10 flex items-center justify-center rounded-xl border font-black text-sm ${won ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : (drew ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/70' : 'bg-red-500/10 border-red-500/20 text-red-500')}">
-                          ${status}
+               ${matches.map(m => {
+                 const isHome = m.homeId === m.teamInMatch.id;
+                 const tourney = state.tournaments.find(tour => tour.name === m.tournamentName) || state.tournament;
+                 const opp = tourney.teams.find(tm => tm.id === (isHome ? m.awayId : m.homeId)) || { name: 'Unknown' };
+                 const won = isHome ? (m.homeScore > m.awayScore) : (m.awayScore > m.homeScore);
+                 const drew = m.homeScore === m.awayScore;
+                 const status = won ? 'W' : (drew ? 'D' : 'L');
+                 const done = m.status === 'completed';
+
+                 return `
+                   <div data-match-id="${m.id}" data-tournament="${m.tournamentName}" class="bg-slate-950/40 p-6 rounded-2xl border border-slate-800/50 flex items-center justify-between">
+                      <div class="flex items-center gap-6">
+                        <div class="text-[10px] font-mono text-slate-700">${m.date || 'TBD'}</div>
+                        <div>
+                          <div class="font-black text-slate-200">${opp.name}</div>
+                          <div class="text-[8px] font-black text-slate-600 uppercase tracking-widest mt-1">${m.tournamentName}</div>
                         </div>
-                     </div>
-                  </div>
-                `;
-              }).join('')}
+                      </div>
+                      <div class="flex items-center gap-8">
+                         <div class="font-black font-mono text-xl text-slate-100 flex items-center gap-3">
+                           ${state.isAdmin ? `
+                             <input type="number" data-type="${isHome ? 'home' : 'away'}" value="${isHome ? (m.homeScore ?? '') : (m.awayScore ?? '')}" class="global-score-input w-14 h-12 bg-slate-950 border border-slate-800 rounded-xl text-center font-black text-indigo-400 outline-none">
+                             <span class="text-slate-700">-</span>
+                             <input type="number" data-type="${isHome ? 'away' : 'home'}" value="${isHome ? (m.awayScore ?? '') : (m.homeScore ?? '')}" class="global-score-input w-14 h-12 bg-slate-950 border border-slate-800 rounded-xl text-center font-black text-slate-500 outline-none">
+                           ` : `
+                             <span>${m.homeScore}</span>
+                             <span class="text-slate-700">-</span>
+                             <span>${m.awayScore}</span>
+                           `}
+                         </div>
+                         <div class="flex flex-col items-center gap-1">
+                            <div class="w-10 h-10 flex items-center justify-center rounded-xl border font-black text-sm ${won ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : (drew ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/70' : 'bg-red-500/10 border-red-500/20 text-red-500')}">
+                              ${status}
+                            </div>
+                            ${state.isAdmin ? `<button class="global-status-toggle text-[10px] hover:text-indigo-400 transition-colors uppercase font-black tracking-widest mt-1">${done ? 'Undo' : 'Complete'}</button>` : ''}
+                         </div>
+                      </div>
+                   </div>
+                 `;
+               }).join('')}
              ${matches.length === 0 ? '<p class="text-slate-600 italic text-center py-10">No matches recorded for this deployment.</p>' : ''}
            </div>
         </section>
@@ -3906,6 +3958,7 @@ function renderTeamDetail(teamId) {
   modal.addEventListener('click', (e) => { if(e.target === modal) modal.remove(); });
   document.getElementById('close-modal').addEventListener('click', () => modal.remove());
   setTimeout(() => initTeamFormChart(t.id, state.isMobile ? 'formChartMobile' : 'formChartDesktop'), 100);
+  setupGlobalMatchListeners(document.getElementById('team-detail-modal'));
 
 
   // Roster binding (Mobile + Desktop)
