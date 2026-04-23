@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, User, Moon, Sun, Menu, X } from 'lucide-react';
+import { Bell, User, Moon, Sun, Menu, X, ChevronDown, Settings, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useLocation } from 'react-router-dom';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
 import InstallButton from './InstallButton';
+import PlayerSettingsModal from './PlayerSettingsModal';
 
 export default function Navbar() {
   const [isDark, setIsDark] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPlayer, setIsPlayer] = useState(false);
   const [playerName, setPlayerName] = useState('');
+  const [playerImage, setPlayerImage] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const location = useLocation();
 
   // Close mobile menu on route change
@@ -31,6 +35,7 @@ export default function Navbar() {
       setIsPlayer(playerLoggedIn);
       if (playerLoggedIn) {
         setPlayerName(localStorage.getItem('playerName') || 'Player');
+        setPlayerImage(localStorage.getItem('playerImage') || '');
       }
     };
     
@@ -133,19 +138,62 @@ export default function Navbar() {
         </button>
         
         {(isAdmin || isPlayer) ? (
-          <div className="flex items-center gap-4">
-            {isPlayer && (
-              <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-tighter">{playerName}</span>
+          <div className="relative flex items-center gap-4">
+            {isPlayer ? (
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="flex items-center gap-2 group transition-all"
+                >
+                  <div className="w-9 h-9 rounded-full border-2 border-brand-purple/30 group-hover:border-brand-purple overflow-hidden shadow-lg shadow-brand-purple/10 transition-all">
+                    <img src={playerImage} alt={playerName} className="w-full h-full object-cover" />
+                  </div>
+                  <ChevronDown size={14} className={`text-slate-400 group-hover:text-brand-purple transition-all ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {isDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute top-full right-0 mt-3 w-56 bg-white dark:bg-brand-dark border border-slate-100 dark:border-white/10 rounded-2xl shadow-2xl p-2 z-[200] backdrop-blur-xl"
+                    >
+                      <div className="px-4 py-3 border-b border-slate-100 dark:border-white/10 mb-2">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Player Profile</p>
+                        <p className="text-sm font-black text-slate-900 dark:text-white truncate mt-0.5 uppercase italic">{playerName}</p>
+                      </div>
+                      
+                      <button 
+                        onClick={() => {
+                          setIsSettingsOpen(true);
+                          setIsDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 transition-all uppercase"
+                      >
+                        <Settings size={14} />
+                        Account Settings
+                      </button>
+
+                      <button 
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all uppercase"
+                      >
+                        <LogOut size={14} />
+                        Logout
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
+            ) : (
+              <button 
+                onClick={handleLogout}
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 rounded-full text-[10px] font-black tracking-widest hover:bg-red-500/20 transition-all"
+              >
+                LOGOUT
+              </button>
             )}
-            <button 
-              onClick={handleLogout}
-              className="hidden md:flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 rounded-full text-[10px] font-black tracking-widest hover:bg-red-500/20 transition-all"
-            >
-              LOGOUT
-            </button>
           </div>
         ) : (
           <Link 
@@ -227,6 +275,10 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
+      <PlayerSettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+      />
     </nav>
   );
 }

@@ -14,7 +14,7 @@ export default function Login() {
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (user === 'Admin_19' && pass === 'Admin_19#') {
+    if (user === 'QVFC' && pass === 'QVFC_19') {
       setIsLoading(true);
       try {
         await loginAnonymously();
@@ -53,6 +53,7 @@ export default function Login() {
         localStorage.setItem('playerLoggedIn', 'true');
         localStorage.setItem('playerId', playerDoc.id);
         localStorage.setItem('playerName', playerData.name);
+        localStorage.setItem('playerImage', playerData.image || '');
         localStorage.setItem('userType', 'player');
         navigate('/stats'); // Redirect to their stats or home
       } else {
