@@ -2975,7 +2975,6 @@ function renderFixtures(container) {
     updateScore(e.target.closest('[data-match-id]').dataset.matchId, e.target.dataset.type, e.target.value); 
   }));
   container.querySelectorAll('.status-toggle').forEach(b => b.addEventListener('click', e => toggleMatchStatus(e.currentTarget.closest('[data-match-id]').dataset.matchId)));
-  container.querySelectorAll('.status-toggle').forEach(b => b.addEventListener('click', e => toggleMatchStatus(e.currentTarget.closest('[data-match-id]').dataset.matchId)));
 }
 
 function renderMatchCard(m, isBiggestWin = false) {
