@@ -6,11 +6,29 @@ import { computePlayerStats, sortRankedPlayers } from '../lib/store';
 import { cn } from '../lib/utils';
 import { Trophy, ChevronDown } from 'lucide-react';
 
-const TOURNAMENTS = ["QVFC Elite League Cup", "QVFC Elite League Cup Division 2", "Vortex Champions Cup", "Vortex Domestic Cup"];
-
 export default function TournamentRanking() {
   const { rankedPlayers, matches } = useFirebase();
+  
+  // Dynamically get tournaments from match history
+  const TOURNAMENTS = useMemo(() => {
+    const names = new Set<string>();
+    matches.forEach(m => {
+      if (m.tournament && m.tournament !== 'Friendly') names.add(m.tournament);
+    });
+    // Add defaults if empty
+    if (names.size === 0) return ["No Tournaments Found"];
+    return Array.from(names).sort();
+  }, [matches]);
+
   const [selectedTournament, setSelectedTournament] = useState(TOURNAMENTS[0]);
+  
+  // Ensure selected tournament is valid if list changes
+  React.useEffect(() => {
+    if (!TOURNAMENTS.includes(selectedTournament)) {
+      setSelectedTournament(TOURNAMENTS[0]);
+    }
+  }, [TOURNAMENTS]);
+
   const [selectedSeason, setSelectedSeason] = useState('All Time');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
