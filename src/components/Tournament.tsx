@@ -47,7 +47,12 @@ export default function Tournament() {
 
     // Compute stats for all players using ONLY the tournament matches
     const unsortedTournamentPlayers = rankedPlayers
-      .map(player => computePlayerStats(player, tournamentMatches))
+      .map(player => {
+        const stats = computePlayerStats(player, tournamentMatches);
+        // Force the universal All-Time OVR into the tournament stats
+        stats.ovr = player.ovr;
+        return stats;
+      })
       .filter(p => p.win > 0 || p.loss > 0 || p.draw > 0); // Only show players who played in this tournament
       
     return sortRankedPlayers(unsortedTournamentPlayers);

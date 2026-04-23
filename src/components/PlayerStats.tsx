@@ -79,7 +79,13 @@ export default function PlayerStats() {
       filteredMatches = filteredMatches.filter(m => (m.tournament || 'Friendly') === selectedTournament);
     }
 
-    return computePlayerStats(selectedPlayer, filteredMatches);
+    const computedStats = computePlayerStats(selectedPlayer, filteredMatches);
+    
+    // Force OVR to remain the universal "All Time" OVR regardless of filtering
+    // to prevent player's OVR from dropping in sub-tournaments
+    computedStats.ovr = selectedPlayer.ovr;
+
+    return computedStats;
   }, [selectedPlayer, selectedSeason, selectedTournament, matches]);
 
   const chartData = computedPlayer ? [
