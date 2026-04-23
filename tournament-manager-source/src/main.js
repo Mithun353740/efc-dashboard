@@ -1695,13 +1695,13 @@ function openFixtureWizard() {
 function renderMobileTopBar() {
   return `
     <header class="backdrop-blur-xl border-b p-3 sticky top-0 z-50 flex items-center justify-between no-print" style="background:rgba(10,10,18,0.92);border-color:#1e1e32">
-      <div class="flex items-center gap-2.5 overflow-hidden" id="mobile-switcher-btn">
+      <div class="flex items-center gap-2.5 overflow-hidden" ${state.isAdmin ? 'id="mobile-switcher-btn"' : ''}>
         <img src="/logo.png" alt="Logo" style="width:34px;height:34px;border-radius:8px;object-fit:cover;box-shadow:0 0 12px rgba(59,130,246,0.4),0 0 24px rgba(124,58,237,0.15);flex-shrink:0">
         <div class="overflow-hidden">
           <div class="text-[8px] font-black uppercase tracking-widest" style="color:#475569">Tournament</div>
           <h2 class="text-sm font-black truncate tracking-tighter uppercase" style="color:#f1f5f9">${state.tournament.name}</h2>
         </div>
-        <span class="ml-1" style="color:#334155">${ICONS.menu}</span>
+        ${state.isAdmin ? `<span class="ml-1" style="color:#334155">${ICONS.menu}</span>` : ''}
       </div>
       <div class="flex items-center gap-2">
         <button id="theme-toggle-mobile" class="p-2 rounded-xl border transition-all active:scale-95" style="background:#0f0f1a;border-color:#1e1e32;color:#60a5fa">
@@ -1768,6 +1768,11 @@ function toggleBottomSheet(payload, isCustom = false) {
              <span class="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">${ICONS.bracket}</span>
              <span class="text-xs font-black uppercase tracking-tight">Knockout Stage</span>
           </button>
+          <button data-view-mobile="history" class="flex flex-col items-start gap-4 p-5 bg-slate-950 rounded-3xl border border-slate-800 text-slate-300 active:bg-slate-800">
+             <span class="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">${ICONS.certificate}</span>
+             <span class="text-xs font-black uppercase tracking-tight">League History</span>
+          </button>
+          ${state.isAdmin ? `
           <button data-view-mobile="summary" class="flex flex-col items-start gap-4 p-5 bg-slate-950 rounded-3xl border border-slate-800 text-slate-300 active:bg-slate-800">
              <span class="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">${ICONS.trophy}</span>
              <span class="text-xs font-black uppercase tracking-tight">Tournament Report</span>
@@ -1776,21 +1781,20 @@ function toggleBottomSheet(payload, isCustom = false) {
              <span class="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">${ICONS.medal}</span>
              <span class="text-xs font-black uppercase tracking-tight">Special Awards</span>
           </button>
-          <button data-view-mobile="history" class="flex flex-col items-start gap-4 p-5 bg-slate-950 rounded-3xl border border-slate-800 text-slate-300 active:bg-slate-800">
-             <span class="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">${ICONS.certificate}</span>
-             <span class="text-xs font-black uppercase tracking-tight">League History</span>
-          </button>
           <button data-view-mobile="settings" class="flex flex-col items-start gap-4 p-5 bg-slate-950 rounded-3xl border border-slate-800 text-slate-300 active:bg-slate-800 col-span-2">
              <span class="p-3 rounded-xl" style="background:rgba(59,130,246,0.1);color:#60a5fa">
                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
              </span>
              <span class="text-xs font-black uppercase tracking-tight">Account Settings &amp; Credentials</span>
           </button>
+          ` : ''}
         </div>
+        ${state.isAdmin ? `
         <div class="h-px bg-slate-800/50 my-3"></div>
         <button id="logout-btn" class="w-full flex items-center justify-center gap-4 p-5 rounded-2xl border font-black uppercase text-[10px] tracking-[0.2em] transition-all" style="background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.2);color:#f87171">
            ${ICONS.trash} Sign Out
         </button>
+        ` : ''}
       </div>
     `;
   } else if (type === 'switcher') {
@@ -1888,27 +1892,32 @@ function renderApp(root) {
             <img src="/logo.png" alt="KickOff" style="width:40px;height:40px;border-radius:10px;object-fit:cover;box-shadow:0 0 16px rgba(59,130,246,0.4),0 0 32px rgba(124,58,237,0.15)">
             <div>
               <div class="text-base font-black tracking-tighter" style="background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">KickOff</div>
-              <div class="text-[8px] font-black uppercase tracking-widest" style="color:#334155">Tournament Manager</div>
+              <div class="text-[8px] font-black uppercase tracking-widest" style="color:#334155">Tournaments</div>
             </div>
           </div>
 
           <nav class="flex-1 px-4 space-y-1">
+            ${state.isAdmin ? `
             <button id="back-to-home" class="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all font-bold text-sm mb-4" style="color:#475569" onmouseover="this.style.background='#0f0f1a';this.style.color='#94a3b8'" onmouseout="this.style.background='transparent';this.style.color='#475569'">
               <span class="w-4 h-4">${ICONS.arrowLeft}</span>
               <span>All Tournaments</span>
             </button>
             <div class="mb-4" style="height:1px;background:#1e1e32"></div>
+            ` : ''}
             ${renderNavLink('dashboard', 'Dashboard', ICONS.dashboard)}
             ${renderNavLink('fixtures', 'Fixtures', ICONS.fixtures)}
             ${renderNavLink('standings', 'Standings', ICONS.standings)}
             ${renderNavLink('scorers', 'Top Scorers', ICONS.boot)}
             ${renderNavLink('teams', 'Teams', ICONS.teams)}
-            ${(state.tournament.type === 'knockout' || state.tournament.type === 'groups') ? renderNavLink('bracket', 'Bracket', ICONS.bracket) : ''}
+            ${(state.isAdmin && (state.tournament.type === 'knockout' || state.tournament.type === 'groups')) ? renderNavLink('bracket', 'Bracket', ICONS.bracket) : ''}
             ${renderNavLink('history', 'League History', ICONS.certificate)}
+            ${state.isAdmin ? `
             <div style="height:1px;background:#1e1e32;margin:0.5rem 0"></div>
-            ${renderNavLink('settings', 'Account Settings', `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`)}
+            ${renderNavLink('settings', 'Account Settings', '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>')}
+            ` : ''}
           </nav>
 
+          ${state.isAdmin ? `
           <div class="p-4 mx-4 mb-6 rounded-xl" style="background:#0f0f1a;border:1px solid #1e1e32">
             <p class="text-[8px] font-black uppercase tracking-widest mb-2" style="color:#334155">Status</p>
             <div class="flex items-center gap-2">
@@ -1933,6 +1942,7 @@ function renderApp(root) {
               </button>
             </div>
           </div>
+          ` : ''}
         </aside>
         <main id="main-content" class="flex-1 p-6 md:p-10 overflow-auto">
           <header class="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2131,6 +2141,24 @@ function renderSettings(container) {
           </form>
         </div>
       </div>
+
+      ${state.isAdmin ? `
+      <!-- Danger Zone -->
+      <div class="rounded-2xl overflow-hidden mt-12" style="border:1px solid rgba(239,68,68,0.2)">
+        <div class="px-5 py-4 flex items-center gap-3" style="background:rgba(239,68,68,0.05);border-bottom:1px solid rgba(239,68,68,0.2)">
+          <span style="color:#f87171">${ICONS.trash}</span>
+          <span class="text-xs font-black uppercase tracking-widest" style="color:#f87171">Danger Zone</span>
+        </div>
+        <div class="p-5" style="background:#0a0a12">
+          <p class="text-xs font-bold mb-4 text-slate-400">Permanently delete this tournament and all its data. This action cannot be undone.</p>
+          <button id="delete-tournament-btn-settings" style="background:rgba(239,68,68,0.1);color:#f87171;border:1px solid rgba(239,68,68,0.3);padding:0.7rem 1.5rem;border-radius:0.75rem;font-weight:900;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.15em;cursor:pointer;width:100%;transition:all 0.2s"
+            onmouseover="this.style.background='#ef4444';this.style.color='white'"
+            onmouseout="this.style.background='rgba(239,68,68,0.1)';this.style.color='#f87171'">
+            Delete Tournament
+          </button>
+        </div>
+      </div>
+      ` : ''}
     </div>
   `;
 
@@ -2223,6 +2251,13 @@ function renderSettings(container) {
       msg.textContent = 'Error: ' + (err.message || 'Update failed.'); msg.style.color = '#f87171'; msg.style.display = 'block';
     }
   });
+
+  const deleteBtn = document.getElementById('delete-tournament-btn-settings');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', () => {
+      showDeleteConfirmation(state.tournament.id);
+    });
+  }
 }
 
 function renderStandingsView(container) {
@@ -2583,8 +2618,8 @@ function renderDashboard(container) {
         ${topScorer ? `
           <div class="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-6 shadow-xl flex items-center justify-between" data-view="scorers">
             <div class="flex items-center gap-4">
-              <div class="w-12 h-12 bg-slate-950 rounded-xl flex items-center justify-center text-sm font-black text-indigo-400 border border-slate-800 shadow-inner">
-                 ${topScorer.name.substring(0,2).toUpperCase()}
+              <div class="w-12 h-12 bg-slate-950 rounded-xl flex items-center justify-center text-sm font-black text-indigo-400 border border-slate-800 shadow-inner overflow-hidden">
+                 ${topScorer.image ? `<img src="${topScorer.image}" class="w-full h-full object-cover">` : topScorer.name.substring(0,2).toUpperCase()}
               </div>
               <div>
                 <h4 class="font-black text-slate-100 uppercase tracking-tight text-xs">Top Scorer</h4>
@@ -2627,13 +2662,15 @@ function renderDashboard(container) {
               <div class="absolute -top-4 -right-4 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl"></div>
               <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tournament Record: Biggest Win</h3>
               <div class="flex items-center justify-between gap-4">
-                <div class="flex-1 text-right">
+                <div class="flex-1 flex items-center justify-end gap-2">
                   <p class="text-xs font-black text-slate-200 truncate uppercase">${h.name}</p>
+                  ${h.image ? `<img src="${h.image}" class="w-6 h-6 rounded-full object-cover border border-slate-700/50">` : ''}
                 </div>
-                <div class="px-5 py-2 bg-indigo-600 rounded-xl font-black font-mono text-white shadow-lg shadow-indigo-900/40">
+                <div class="px-5 py-2 bg-indigo-600 rounded-xl font-black font-mono text-white shadow-lg shadow-indigo-900/40 whitespace-nowrap">
                   ${bw.homeScore} - ${bw.awayScore}
                 </div>
-                <div class="flex-1 text-left">
+                <div class="flex-1 flex items-center gap-2">
+                  ${a.image ? `<img src="${a.image}" class="w-6 h-6 rounded-full object-cover border border-slate-700/50">` : ''}
                   <p class="text-xs font-black text-slate-200 truncate uppercase">${a.name}</p>
                 </div>
               </div>
@@ -2705,8 +2742,8 @@ function renderDashboard(container) {
                 <span class="text-2xl">🥇</span>
               </div>
               <div class="flex items-center gap-6">
-                <div class="w-20 h-20 bg-slate-950 border border-slate-800 rounded-[2rem] flex items-center justify-center text-2xl font-black text-indigo-400 shadow-inner">
-                  ${topScorer.name.substring(0,2).toUpperCase()}
+                <div class="w-20 h-20 bg-slate-950 border border-slate-800 rounded-[2rem] flex items-center justify-center text-2xl font-black text-indigo-400 shadow-inner overflow-hidden">
+                  ${topScorer.image ? `<img src="${topScorer.image}" class="w-full h-full object-cover">` : topScorer.name.substring(0,2).toUpperCase()}
                 </div>
                 <div class="space-y-1">
                   <h4 class="text-2xl font-black text-slate-100 tracking-tighter uppercase">${topScorer.name}</h4>
@@ -2741,9 +2778,15 @@ function renderDashboard(container) {
                   <div class="p-6 bg-slate-950 border border-slate-800 rounded-2xl space-y-4">
                     <p class="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Biggest Margin of Victory</p>
                     <div class="flex items-center justify-between">
-                      <span class="text-xs font-bold text-slate-300">${h.name}</span>
+                      <div class="flex items-center gap-2">
+                        ${h.image ? `<img src="${h.image}" class="w-6 h-6 rounded-full object-cover border border-slate-700/50">` : ''}
+                        <span class="text-xs font-bold text-slate-300 truncate w-24">${h.name}</span>
+                      </div>
                       <span class="font-black font-mono text-indigo-400 mx-3">${bw.homeScore} - ${bw.awayScore}</span>
-                      <span class="text-xs font-bold text-slate-300">${a.name}</span>
+                      <div class="flex items-center justify-end gap-2 text-right">
+                        <span class="text-xs font-bold text-slate-300 truncate w-24">${a.name}</span>
+                        ${a.image ? `<img src="${a.image}" class="w-6 h-6 rounded-full object-cover border border-slate-700/50">` : ''}
+                      </div>
                     </div>
                   </div>
                 `;
@@ -2900,7 +2943,19 @@ function renderCompactMatch(m) {
   const h = state.tournament.teams.find(t => t.id === m.homeId) || { name: '?' };
   const a = state.tournament.teams.find(t => t.id === m.awayId) || { name: '?' };
   const score = m.status === 'upcoming' ? 'VS' : `${m.homeScore}–${m.awayScore}`;
-  return `<div class="p-4 rounded-xl flex items-center justify-between transition-all" style="background:#0a0a12;border:1px solid #1e1e32"><div class="flex-1 flex items-center justify-end gap-2 team-detail-btn" data-team-id="${h.id}"><span class="font-bold text-sm truncate" style="color:#94a3b8">${h.name}</span></div><div class="mx-4 px-4 py-1.5 rounded-lg font-black font-mono text-sm" style="background:#0f0f1a;color:#60a5fa;border:1px solid #1e1e32">${score}</div><div class="flex-1 flex items-center gap-2 team-detail-btn" data-team-id="${a.id}"><span class="font-bold text-sm truncate" style="color:#94a3b8">${a.name}</span></div></div>`;
+  const hImg = h.image ? `<img src="${h.image}" class="w-5 h-5 rounded-full object-cover border border-slate-700/50">` : '';
+  const aImg = a.image ? `<img src="${a.image}" class="w-5 h-5 rounded-full object-cover border border-slate-700/50">` : '';
+  return `<div class="p-4 rounded-xl flex items-center justify-between transition-all" style="background:#0a0a12;border:1px solid #1e1e32">
+    <div class="flex-1 flex items-center justify-end gap-2 team-detail-btn cursor-pointer hover:opacity-80" data-team-id="${h.id}">
+      <span class="font-bold text-sm truncate" style="color:#94a3b8">${h.name}</span>
+      ${hImg}
+    </div>
+    <div class="mx-4 px-4 py-1.5 rounded-lg font-black font-mono text-sm" style="background:#0f0f1a;color:#60a5fa;border:1px solid #1e1e32">${score}</div>
+    <div class="flex-1 flex items-center gap-2 team-detail-btn cursor-pointer hover:opacity-80" data-team-id="${a.id}">
+      ${aImg}
+      <span class="font-bold text-sm truncate" style="color:#94a3b8">${a.name}</span>
+    </div>
+  </div>`;
 }
 
 function renderFixtures(container) {
@@ -3123,6 +3178,7 @@ function calculateTopScorers() {
       name: t.name,
       teamId: t.id,
       teamName: t.name,
+      image: t.image || null,
       goals: 0,
       assists: 0,
       matchesPlayed: new Set(),

@@ -14,6 +14,30 @@ import {
   getDocFromServer
 } from 'firebase/firestore';
 
+export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>) => void) {
+  const q = query(collection(db, 'settings'));
+  return onSnapshot(q, (snapshot) => {
+    let locks = { tournaments: false };
+    snapshot.forEach((docSnap) => {
+      if (docSnap.id === 'locks') {
+        locks = docSnap.data() as Record<string, boolean>;
+      }
+    });
+    callback(locks);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, 'settings/locks');
+  });
+}
+
+export async function toggleSystemLock(systemId: string, locked: boolean) {
+  try {
+    const lockDoc = doc(db, 'settings', 'locks');
+    await setDoc(lockDoc, { [systemId]: locked }, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `settings/locks`);
+  }
+}
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock } from '../lib/store';
 import TournamentManager from './TournamentManager';
 import { Player, Leader, MatchRecord } from '../types';
 import { cn } from '../lib/utils';
@@ -12,9 +12,9 @@ import { CLUB_LOGO, CLUB_NAME } from '../constants';
 import { History } from 'lucide-react';
 
 export default function Admin() {
-  const { players, leaders, matches, dbError } = useFirebase();
+  const { players, leaders, matches, systemLocks, dbError } = useFirebase();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments'>('players');
+  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   
   React.useEffect(() => {
@@ -387,6 +387,7 @@ export default function Admin() {
           <NavBtn active={activeTab === 'leadership'} onClick={() => setActiveTab('leadership')} icon={<ShieldCheck size={18} />} label="LEADERSHIP" />
           <NavBtn active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History size={18} />} label="MATCH HISTORY" />
           <NavBtn active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} icon={<Trophy size={18} />} label="TOURNAMENTS" />
+          <NavBtn active={activeTab === 'locks'} onClick={() => setActiveTab('locks')} icon={<ShieldCheck size={18} />} label="SYSTEM LOCKS" />
         </div>
 
         {/* Main Content */}
@@ -854,6 +855,38 @@ export default function Admin() {
                 className="h-[calc(100vh-200px)] bg-brand-darker rounded-[2rem] overflow-hidden border border-white/5"
               >
                 <TournamentManager isControlCenter={true} />
+              </motion.div>
+            ) : activeTab === 'locks' ? (
+              <motion.div key="locks" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+                  <h3 className="text-xl font-black tracking-tight mb-2">SYSTEM LOCKS</h3>
+                  <p className="text-xs font-bold text-slate-400 mb-8 uppercase tracking-widest">Temporarily lock public access to specific systems for maintenance</p>
+                  <div className="bg-[#0f172a] rounded-xl border border-white/10 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center border", systemLocks?.tournaments ? "bg-red-500/10 border-red-500/20 text-red-500" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-500")}>
+                        <Trophy size={20} />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-lg tracking-tight">Tournaments System</h4>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Status: {systemLocks?.tournaments ? 'LOCKED (MAINTENANCE)' : 'ACTIVE (PUBLIC)'}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={async () => {
+                        const isCurrentlyLocked = systemLocks?.tournaments;
+                        try {
+                          await toggleSystemLock('tournaments', !isCurrentlyLocked);
+                        } catch (err) {
+                          console.error(err);
+                          alert('Failed to update system lock.');
+                        }
+                      }}
+                      className={cn("px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all", systemLocks?.tournaments ? "bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/25" : "bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/25")}
+                    >
+                      {systemLocks?.tournaments ? 'UNLOCK SYSTEM' : 'LOCK SYSTEM'}
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             ) : null}
             </AnimatePresence>

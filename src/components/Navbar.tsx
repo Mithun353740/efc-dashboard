@@ -83,7 +83,7 @@ export default function Navbar() {
           { label: 'HOME', path: '/' },
           { label: 'RANKINGS', path: '/rankings' },
           { label: 'ANALYTICS', path: '/stats' },
-          { label: 'TOURNAMENT', path: '/tournament' },
+          { label: 'TOURNAMENTS', path: '/tournament' },
           ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
         ].map((item: any) => (
           item.externalUrl ? (
@@ -158,7 +158,7 @@ export default function Navbar() {
                 { label: 'HOME', path: '/' },
                 { label: 'RANKINGS', path: '/rankings' },
                 { label: 'ANALYTICS', path: '/stats' },
-                { label: 'TOURNAMENT', path: '/tournament' },
+                { label: 'TOURNAMENTS', path: '/tournament' },
                 ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
               ].map((item: any) => (
                 item.externalUrl ? (

@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Player, Leader, MatchRecord } from './types';
-import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, bootstrapData, sortRankedPlayers, testFirestoreConnection, computeGlobalElo, calculateOvrHybrid } from './lib/store';
+import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, subscribeToSystemLocks, bootstrapData, sortRankedPlayers, testFirestoreConnection, computeGlobalElo, calculateOvrHybrid } from './lib/store';
 
 interface FirebaseContextType {
   players: Player[];
   rankedPlayers: Player[];
   leaders: Leader[];
   matches: MatchRecord[];
+  systemLocks: Record<string, boolean>;
   isLoading: boolean;
   dbError: string | null;
 }
@@ -17,6 +18,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [matches, setMatches] = useState<MatchRecord[]>([]);
+  const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>({});
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
   const [isLoadingLeaders, setIsLoadingLeaders] = useState(true);
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
@@ -87,6 +89,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    const unsubLocks = subscribeToSystemLocks((locks) => {
+      if (mounted) {
+        setSystemLocks(locks);
+      }
+    });
+
     // FALLBACK: don't hang forever if collections are completely empty and snapshot takes time
     const timeout = setTimeout(() => {
       if (mounted) {
@@ -133,6 +141,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       unsubPlayers();
       unsubLeaders();
       unsubMatches();
+      unsubLocks();
       clearTimeout(timeout);
       clearTimeout(minLoadTimer);
     };
@@ -167,6 +176,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     rankedPlayers: sortRankedPlayers(enrichedPlayers),
     leaders: enrichedLeaders,
     matches,
+    systemLocks,
     isLoading,
     dbError
   };

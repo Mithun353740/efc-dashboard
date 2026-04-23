@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, BarChart3 } from 'lucide-react';
+import { Trophy, BarChart3, ShieldAlert } from 'lucide-react';
 import TournamentManager from './TournamentManager';
 import TournamentRanking from './TournamentRanking';
 import { cn } from '../lib/utils';
+import { useFirebase } from '../FirebaseContext';
 
 type View = 'manager' | 'ranking';
 
 export default function TournamentWrapper() {
+  const { systemLocks } = useFirebase();
   const [activeView, setActiveView] = useState<View>('manager');
+  const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+  const isLocked = systemLocks?.tournaments && !isAdmin;
 
   return (
     <div className="min-h-screen bg-brand-dark flex flex-col">
@@ -24,7 +28,7 @@ export default function TournamentWrapper() {
           )}
         >
           <Trophy size={14} />
-          Tournament System
+          Tournaments
         </button>
         <button
           onClick={() => setActiveView('ranking')}
@@ -42,7 +46,31 @@ export default function TournamentWrapper() {
 
       <main className="flex-grow">
         <AnimatePresence mode="wait">
-          {activeView === 'manager' ? (
+          {isLocked ? (
+            <motion.div
+              key="locked"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="h-full flex flex-col items-center justify-center p-8 text-center"
+            >
+              <div className="w-24 h-24 bg-red-500/10 rounded-[2rem] flex items-center justify-center text-red-500 mb-8 border border-red-500/20 shadow-2xl shadow-red-500/10">
+                <ShieldAlert size={48} />
+              </div>
+              <h2 className="text-4xl font-black tracking-tighter mb-4 uppercase">System Locked</h2>
+              <p className="text-slate-400 font-bold max-w-md mx-auto leading-relaxed uppercase tracking-tight text-sm">
+                The Tournaments System is currently undergoing maintenance. 
+                Please check back later once the system is unlocked by an administrator.
+              </p>
+              <div className="mt-12 p-6 bg-white/5 border border-white/10 rounded-2xl max-w-sm w-full backdrop-blur-xl">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Current Status</p>
+                <div className="flex items-center justify-center gap-2 text-red-500">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-xs font-black uppercase tracking-widest">Maintenance Mode Active</span>
+                </div>
+              </div>
+            </motion.div>
+          ) : activeView === 'manager' ? (
             <motion.div
               key="manager"
               initial={{ opacity: 0, x: -20 }}
