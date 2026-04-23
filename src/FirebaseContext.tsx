@@ -106,19 +106,19 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (type === 'REQUEST_PLAYERS' && event.source) {
         (event.source as Window).postMessage({ 
           type: 'PLAYERS_LIST', 
-          players: players 
+          players: playersRef.current 
         }, { targetOrigin: '*' });
       }
 
       // 2. Handle automated match recording
       if (type === 'MATCH_COMPLETED' && match) {
         const { p1Id, p1Score, p2Id, p2Score, tournament } = match;
-        const player1 = players.find(p => p.id === p1Id);
-        const player2 = players.find(p => p.id === p2Id);
+        const player1 = playersRef.current.find(p => p.id === p1Id);
+        const player2 = playersRef.current.find(p => p.id === p2Id);
 
         if (player1) {
           console.log('[Dashboard] Auto-recording tournament match:', match);
-          addMatch(player1, p1Score, p2Score, player2, matches, tournament)
+          addMatch(player1, p1Score, p2Score, player2, matchesRef.current, tournament)
             .catch(err => console.error('[Dashboard] Match recording failed:', err));
         }
       }
@@ -136,7 +136,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timeout);
       clearTimeout(minLoadTimer);
     };
-  }, [players, matches]);
+  }, []); // REMOVED dependencies to stop the infinite loop
+
+  // Sync refs for the message handler to use
+  const playersRef = React.useRef(players);
+  const matchesRef = React.useRef(matches);
+  React.useEffect(() => { playersRef.current = players; }, [players]);
+  React.useEffect(() => { matchesRef.current = matches; }, [matches]);
 
   const elos = React.useMemo(() => computeGlobalElo(players, matches), [players, matches]);
   const enrichedPlayers = players.map(p => ({

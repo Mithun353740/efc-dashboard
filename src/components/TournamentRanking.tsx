@@ -23,11 +23,12 @@ export default function TournamentRanking() {
   const [selectedTournament, setSelectedTournament] = useState(TOURNAMENTS[0]);
   
   // Ensure selected tournament is valid if list changes
+  const tournamentNamesString = JSON.stringify(TOURNAMENTS);
   React.useEffect(() => {
-    if (!TOURNAMENTS.includes(selectedTournament)) {
+    if (TOURNAMENTS.length > 0 && !TOURNAMENTS.includes(selectedTournament)) {
       setSelectedTournament(TOURNAMENTS[0]);
     }
-  }, [TOURNAMENTS]);
+  }, [tournamentNamesString, selectedTournament]);
 
   const [selectedSeason, setSelectedSeason] = useState('All Time');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
