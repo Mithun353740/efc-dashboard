@@ -83,9 +83,25 @@ export async function testFirestoreConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
     console.log('Firestore connection test successful');
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
+  } catch (error: any) {
+    if (error?.message?.includes('the client is offline')) {
       console.error("Firestore is offline. Please check your Firebase configuration.");
+    } else if (error?.code === 'permission-denied' || error?.code === 'resource-exhausted' || String(error).toLowerCase().includes('quota')) {
+      console.warn("Quota exceeded or permission denied detected during connection test.");
+      const errInfo: FirestoreErrorInfo = {
+        error: error.message || 'Quota exceeded',
+        operationType: OperationType.GET,
+        path: 'test/connection',
+        authInfo: {
+          userId: auth.currentUser?.uid || 'anonymous',
+          email: auth.currentUser?.email || '',
+          emailVerified: auth.currentUser?.emailVerified || false,
+          isAnonymous: auth.currentUser?.isAnonymous || true,
+          providerInfo: auth.currentUser?.providerData.map(p => ({ providerId: p.providerId, displayName: p.displayName || '', email: p.email || '' })) || []
+        }
+      };
+      const event = new CustomEvent('firestore-error', { detail: errInfo });
+      window.dispatchEvent(event);
     }
   }
 }

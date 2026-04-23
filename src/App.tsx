@@ -16,6 +16,7 @@ import Rankings from './components/Rankings';
 import PlayerStats from './components/PlayerStats';
 import Login from './components/Login';
 import Tournament from './components/Tournament';
+import AutoUpdater from './components/AutoUpdater';
 import { FirebaseProvider, useFirebase } from './FirebaseContext';
 import { INITIAL_PLAYERS } from './lib/store';
 
@@ -69,6 +70,7 @@ function AppContent() {
 export default function App() {
   return (
     <FirebaseProvider>
+      <AutoUpdater />
       <Router>
         <AppContent />
       </Router>

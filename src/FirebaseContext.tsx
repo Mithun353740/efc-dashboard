@@ -31,6 +31,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (mounted) setIsMinLoadTimePassed(true);
     }, 2500);
 
+    // Actively probe the server once to see if quota is blown, 
+    // because IndexedDB offline persistence might silently hide quota errors from onSnapshot
+    testFirestoreConnection();
+
     const errorHandler = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (mounted && customEvent.detail?.error) {

@@ -6,8 +6,20 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Generate a distinct server hash once on boot
+  // Every time the code is updated and the server restarts, this hash will change
+  const SERVER_BOOT_HASH = Date.now().toString(36) + Math.random().toString(36).substring(2);
+
   // Disable ETag to completely prevent 304 Not Modified browser caching for HTML routes
   app.set('etag', false);
+
+  // Expose an auto-update ping endpoint to forcibly sync client caches
+  app.get('/api/version-ping', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.json({ current_version: SERVER_BOOT_HASH });
+  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
