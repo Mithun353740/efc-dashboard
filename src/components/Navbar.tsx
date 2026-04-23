@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, User, Moon, Sun, Menu, X, ChevronDown, Settings, LogOut } from 'lucide-react';
+import { Bell, User, Moon, Sun, Menu, X, ChevronDown, Settings, LogOut, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
 import InstallButton from './InstallButton';
 import PlayerSettingsModal from './PlayerSettingsModal';
@@ -16,6 +16,7 @@ export default function Navbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -174,6 +175,19 @@ export default function Navbar() {
                         <Settings size={14} />
                         Account Settings
                       </button>
+
+                      {isAdmin && (
+                        <button 
+                          onClick={() => {
+                            navigate('/admin');
+                            setIsDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black tracking-widest text-brand-purple hover:bg-brand-purple/5 transition-all uppercase"
+                        >
+                          <Shield size={14} />
+                          Control Center
+                        </button>
+                      )}
 
                       <button 
                         onClick={handleLogout}
