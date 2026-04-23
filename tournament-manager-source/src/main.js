@@ -1260,25 +1260,58 @@ function renderConfigSetup(root) {
   });
 }
 
-function initTournament(config) {
-  const existing = state.tournaments.find(t => t.name.toLowerCase() === config.name.toLowerCase());
+function getCurrentSeason() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
+  const sY = isLateJan ? y - 1 : y;
+  return `${sY}/${sY + 1}`;
+}
+
+async function initTournament(config) {
+  const season = getCurrentSeason();
+  
+  // Check for duplicates in current season
+  const existing = state.tournaments.find(t => 
+    t.name.toLowerCase() === config.name.toLowerCase() && 
+    (t.season === season || !t.season)
+  );
+  
   if (existing) {
-    alert('A tournament with this name already exists. Choose a unique title.');
+    alert(`A tournament named "${config.name}" already exists in the ${season} season.`);
     return;
   }
 
-  state.tournament = {
-    id: `t-${Date.now()}`,
+  const tournamentId = `t-${Date.now()}`;
+  const newTournament = {
+    id: tournamentId,
     ...config,
+    season: season,
     teams: Array.from({ length: config.teamCount }, (_, i) => ({ id: i, name: `Team ${i + 1}`, players: [] })),
     fixtures: [],
     standings: [],
     groups: [],
     currentStage: config.type === 'groups' ? 'groups' : config.type,
     status: 'setup_teams',
-    createdAt: new Date().toISOString()
+    createdAt: Date.now()
   };
-  state.onboarding.step = 0; // Exit onboarding
+
+  state.tournament = newTournament;
+  state.onboarding.step = 0; 
+
+  // Sync to Firestore for Dashboard Visibility
+  try {
+    await setDoc(doc(db, 'tournaments', tournamentId), {
+      id: tournamentId,
+      name: config.name,
+      season: season,
+      createdAt: Date.now()
+    });
+    console.log('[KickOff] Tournament synced to Firestore ranking system');
+  } catch(e) {
+    console.error('[KickOff] Firestore sync failed:', e);
+  }
+
   saveState();
   render();
 }
