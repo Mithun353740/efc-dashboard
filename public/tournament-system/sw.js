@@ -1,9 +1,9 @@
 const CACHE_NAME = 'kickoff-v' + Date.now(); // Dynamic name to force update
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/logo.png'
+  '/tournament-system/',
+  '/tournament-system/index.html',
+  '/tournament-system/manifest.json',
+  '/tournament-system/logo.png'
 ];
 
 self.addEventListener('install', event => {
