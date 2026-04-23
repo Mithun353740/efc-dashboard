@@ -17,25 +17,9 @@ export default function Login() {
     if (user === 'QVFC' && pass === 'QVFC_19') {
       setIsLoading(true);
       try {
-        const { db } = await import('../firebase');
-        const { collection, query, where, getDocs } = await import('firebase/firestore');
-        
         await loginAnonymously();
         localStorage.setItem('adminLoggedIn', 'true');
         localStorage.setItem('userType', 'admin');
-
-        // Check if Admin is also a player
-        const q = query(collection(db, 'players'), where('name', '==', 'QVFC'));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const playerDoc = querySnapshot.docs[0];
-          const playerData = playerDoc.data();
-          localStorage.setItem('playerLoggedIn', 'true');
-          localStorage.setItem('playerId', playerDoc.id);
-          localStorage.setItem('playerName', playerData.name);
-          localStorage.setItem('playerImage', playerData.image || '');
-        }
-
         navigate('/admin');
       } catch (err: any) {
         setError('Firebase authentication failed: ' + (err.message || 'Unknown error'));
@@ -66,12 +50,19 @@ export default function Login() {
       if (!querySnapshot.empty) {
         const playerDoc = querySnapshot.docs[0];
         const playerData = playerDoc.data();
+        
         localStorage.setItem('playerLoggedIn', 'true');
         localStorage.setItem('playerId', playerDoc.id);
         localStorage.setItem('playerName', playerData.name);
         localStorage.setItem('playerImage', playerData.image || '');
         localStorage.setItem('userType', 'player');
-        navigate('/stats'); // Redirect to their stats or home
+
+        // Check if this player is also the Admin
+        if (playerData.email === 'mithun47490@gmail.com' || playerDoc.id === 'mithun-admin-id') { // Add any specific identifier
+           localStorage.setItem('adminLoggedIn', 'true');
+        }
+
+        navigate('/stats');
       } else {
         setError('Invalid player email or password');
       }
