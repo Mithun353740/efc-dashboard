@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock } from '../lib/store';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import TournamentManager from './TournamentManager';
 import TournamentWrapper from './TournamentWrapper';
 import { Player, Leader, MatchRecord } from '../types';
@@ -1015,6 +1015,21 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
   const [msg, setMsg] = React.useState({ type: '', text: '' });
   const [isLoading, setIsLoading] = React.useState(false);
   const [showRoleWarning, setShowRoleWarning] = React.useState(false);
+  const [assignedPlayerIds, setAssignedPlayerIds] = React.useState<string[]>([]);
+
+  const fetchAssignedPlayers = React.useCallback(async () => {
+    try {
+      const q = query(collection(db, 'players'), where('email', '!=', ''));
+      const snap = await getDocs(q);
+      setAssignedPlayerIds(snap.docs.map(d => d.id));
+    } catch (err) {
+      console.error('Error fetching assigned players:', err);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchAssignedPlayers();
+  }, [fetchAssignedPlayers]);
 
   const handleSelectPlayer = async (p: import('../types').Player) => {
     setSelectedPlayer(p);
@@ -1040,6 +1055,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
     try {
       await updateDoc(doc(db, 'players', selectedPlayer.id), { email, password, role });
       setMsg({ type: 'success', text: `✅ Credentials updated for ${selectedPlayer.name}` });
+      fetchAssignedPlayers();
     } catch (err: any) {
       setMsg({ type: 'error', text: '❌ Failed: ' + err.message });
     } finally {
@@ -1136,6 +1152,48 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
               {p.role === 'admin' && <span className="text-[7px] font-black text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded uppercase shrink-0">ADMIN</span>}
             </button>
           ))}
+        </div>
+      </div>
+
+      </div>
+
+      {/* Assigned Players Section */}
+      <div className="col-span-1 md:col-span-2 mt-8">
+        <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-10 backdrop-blur-xl">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-2xl font-black tracking-tighter uppercase italic">ASSIGNED PLAYERS</h3>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Players with active credentials ({assignedPlayerIds.length})</p>
+            </div>
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500 border border-emerald-500/20">
+              <Key size={20} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {players.filter(p => assignedPlayerIds.includes(p.id)).map(p => (
+              <button
+                key={p.id}
+                onClick={() => handleSelectPlayer(p)}
+                className="group relative flex items-center gap-3 p-3 bg-slate-900/40 border border-white/5 rounded-2xl hover:border-emerald-500/50 transition-all text-left overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0 grayscale group-hover:grayscale-0 transition-all" alt="" />
+                <div className="min-w-0 flex-1 relative z-10">
+                  <p className="text-[10px] font-black text-slate-200 truncate uppercase tracking-tight">{p.name}</p>
+                  <div className="flex items-center gap-1">
+                    <div className="w-1 h-1 rounded-full bg-emerald-500" />
+                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Active</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+            {assignedPlayerIds.length === 0 && (
+              <div className="col-span-full py-12 text-center border-2 border-dashed border-white/5 rounded-[2rem]">
+                 <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">No players assigned yet</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
