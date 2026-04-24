@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown } from 'lucide-react';
+import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock } from '../lib/store';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import TournamentManager from './TournamentManager';
 import { Player, Leader, MatchRecord } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
-import { auth, loginAnonymously } from '../firebase';
+import { auth, loginAnonymously, db } from '../firebase';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
 import { History } from 'lucide-react';
 
 export default function Admin() {
   const { players, leaders, matches, tournaments, systemLocks, dbError } = useFirebase();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks'>('players');
+  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   
   React.useEffect(() => {
@@ -386,6 +387,7 @@ export default function Admin() {
         {/* Sidebar Nav */}
         <div className="lg:col-span-3 space-y-2">
           <NavBtn active={activeTab === 'players'} onClick={() => setActiveTab('players')} icon={<Users size={18} />} label="PLAYERS" />
+          <NavBtn active={activeTab === 'credentials'} onClick={() => setActiveTab('credentials')} icon={<Key size={18} />} label="PLAYER CREDENTIALS" />
           <NavBtn active={activeTab === 'matches'} onClick={() => setActiveTab('matches')} icon={<LayoutDashboard size={18} />} label="MATCHES" />
           <NavBtn active={activeTab === 'leadership'} onClick={() => setActiveTab('leadership')} icon={<ShieldCheck size={18} />} label="LEADERSHIP" />
           <NavBtn active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History size={18} />} label="MATCH HISTORY" />
@@ -881,6 +883,10 @@ export default function Admin() {
                   </div>
                 </div>
               </motion.div>
+            ) : activeTab === 'credentials' ? (
+              <motion.div key="credentials" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                <CredentialsTab players={players} />
+              </motion.div>
             ) : activeTab === 'tournaments' ? (
               <motion.div
                 key="tournaments"
@@ -990,6 +996,165 @@ function Input({ label, value, onChange, placeholder, type = 'text' }: { label: 
     <div className="space-y-1">
       <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">{label}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder={placeholder} />
+    </div>
+  );
+}
+
+function CredentialsTab({ players }: { players: import('../types').Player[] }) {
+  const [search, setSearch] = React.useState('');
+  const [selectedPlayer, setSelectedPlayer] = React.useState<import('../types').Player | null>(null);
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [role, setRole] = React.useState<'admin' | 'player'>('player');
+  const [msg, setMsg] = React.useState({ type: '', text: '' });
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [showRoleWarning, setShowRoleWarning] = React.useState(false);
+
+  const handleSelectPlayer = async (p: import('../types').Player) => {
+    setSelectedPlayer(p);
+    setSearch(p.name);
+    setMsg({ type: '', text: '' });
+    try {
+      const snap = await getDoc(doc(db, 'players', p.id));
+      if (snap.exists()) {
+        const data = snap.data();
+        setEmail(data.email || '');
+        setPassword(data.password || '');
+        setRole(data.role || 'player');
+      }
+    } catch (err) {
+      console.error('Error fetching player credentials:', err);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!selectedPlayer) return;
+    setIsLoading(true);
+    setMsg({ type: '', text: '' });
+    try {
+      await updateDoc(doc(db, 'players', selectedPlayer.id), { email, password, role });
+      setMsg({ type: 'success', text: `✅ Credentials updated for ${selectedPlayer.name}` });
+    } catch (err: any) {
+      setMsg({ type: 'error', text: '❌ Failed: ' + err.message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      {/* Search & Select */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+        <h3 className="text-xl font-black tracking-tight mb-2">PLAYER CREDENTIALS</h3>
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">Set login email, password & admin role</p>
+        <div className="relative mb-6">
+          <Input label="SEARCH PLAYER" value={search} onChange={v => { setSearch(v); setSelectedPlayer(null); }} placeholder="Type player name..." />
+          <AnimatePresence>
+            {search && !selectedPlayer && (
+              <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute z-50 w-full mt-2 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+                {players.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 6).map(p => (
+                  <button key={p.id} type="button" onClick={() => handleSelectPlayer(p)} className="w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-0">
+                    <img src={p.image} className="w-8 h-8 rounded-lg object-cover" alt="" />
+                    <div>
+                      <p className="text-xs font-black">{p.name}</p>
+                      <p className="text-[9px] font-bold text-slate-500">#{p.number}</p>
+                    </div>
+                    {p.role === 'admin' && <span className="ml-auto text-[8px] font-black text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded uppercase">ADMIN</span>}
+                  </button>
+                ))}
+                {players.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).length === 0 && (
+                  <div className="p-4 text-center text-slate-500 text-xs font-bold">No players found</div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {selectedPlayer && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-brand-purple/5 border border-brand-purple/20 rounded-xl mb-4">
+              <img src={selectedPlayer.image} className="w-10 h-10 rounded-xl object-cover" alt="" />
+              <div>
+                <p className="text-xs font-black">{selectedPlayer.name}</p>
+                <p className="text-[9px] font-bold text-slate-500 uppercase">#{selectedPlayer.number}</p>
+              </div>
+              <span className={cn("ml-auto text-[8px] font-black px-2 py-0.5 rounded uppercase", role === 'admin' ? "bg-brand-purple/20 text-brand-purple border border-brand-purple/30" : "bg-white/5 text-slate-500 border border-white/10")}>
+                {role === 'admin' ? '⚡ ADMIN' : 'PLAYER'}
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2"><Mail size={10} className="text-brand-purple" />EMAIL ADDRESS</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="player@email.com" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2"><Lock size={10} className="text-brand-purple" />PASSWORD</label>
+              <input type="text" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Set login password" />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2"><ShieldCheck size={10} className="text-brand-purple" />ADMIN PRIVILEGES</label>
+              <button
+                type="button"
+                onClick={() => { if (role !== 'admin') setShowRoleWarning(true); else setRole('player'); }}
+                className={cn("w-full p-4 rounded-xl text-[10px] font-black tracking-widest transition-all border uppercase", role === 'admin' ? "bg-brand-purple/20 border-brand-purple text-brand-purple shadow-[0_0_15px_rgba(139,92,246,0.3)]" : "bg-white/5 border-white/10 text-slate-500 hover:border-white/20")}
+              >
+                {role === 'admin' ? '✓ ADMIN ACCESS GRANTED — CLICK TO REVOKE' : 'GRANT ADMIN ACCESS'}
+              </button>
+            </div>
+
+            {msg.text && (
+              <div className={cn("p-4 rounded-xl text-[10px] font-black uppercase tracking-widest", msg.type === 'success' ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500" : "bg-red-500/10 border border-red-500/20 text-red-500")}>
+                {msg.text}
+              </div>
+            )}
+
+            <button onClick={handleSave} disabled={isLoading} className="w-full py-4 glossy-btn rounded-xl disabled:opacity-50 uppercase text-xs font-black tracking-widest">
+              {isLoading ? 'SAVING...' : 'SAVE CREDENTIALS'}
+            </button>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Info Panel */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+        <h3 className="text-xl font-black tracking-tight mb-6">ALL PLAYERS</h3>
+        <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+          {players.map(p => (
+            <button key={p.id} onClick={() => handleSelectPlayer(p)} className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-left border border-white/5">
+              <img src={p.image} className="w-9 h-9 rounded-lg object-cover shrink-0" alt="" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black truncate">{p.name}</p>
+                <p className="text-[9px] font-bold text-slate-500">#{p.number}</p>
+              </div>
+              {p.role === 'admin' && <span className="text-[7px] font-black text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded uppercase shrink-0">ADMIN</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Admin Role Warning */}
+      <AnimatePresence>
+        {showRoleWarning && (
+          <div className="fixed inset-0 z-[600] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowRoleWarning(false)} className="absolute inset-0 bg-[#020617]/90 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-md bg-[#0f172a] border border-white/10 rounded-[2.5rem] p-10 shadow-3xl text-center overflow-hidden">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-red-500/10 blur-[100px] -z-10" />
+              <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-8 border border-red-500/20">
+                <ShieldCheck size={40} />
+              </div>
+              <h3 className="text-2xl font-black tracking-tighter uppercase italic mb-4">GRANT ADMIN PRIVILEGES?</h3>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight leading-relaxed mb-8">
+                Warning: <span className="text-white font-black">{selectedPlayer?.name}</span> will get full Control Center access — including players, matches, and system settings. This cannot be undone without an admin manually revoking it.
+              </p>
+              <div className="flex flex-col gap-3">
+                <button onClick={() => { setRole('admin'); setShowRoleWarning(false); }} className="w-full py-4 bg-red-500 text-white font-black text-xs tracking-widest rounded-2xl hover:bg-red-600 transition-all uppercase">YES, GRANT FULL ACCESS</button>
+                <button onClick={() => setShowRoleWarning(false)} className="w-full py-4 bg-white/5 text-slate-400 font-black text-xs tracking-widest rounded-2xl hover:bg-white/10 transition-all uppercase">CANCEL</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
