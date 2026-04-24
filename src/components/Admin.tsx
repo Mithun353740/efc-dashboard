@@ -1169,7 +1169,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {players.filter(p => assignedPlayerIds.includes(p.id)).map(p => (
+            {players.filter(p => assignedPlayerIds.includes(p.id) || p.role === 'admin').map(p => (
               <button
                 key={p.id}
                 onClick={() => handleSelectPlayer(p)}
@@ -1181,7 +1181,9 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
                   <p className="text-[10px] font-black text-slate-200 truncate uppercase tracking-tight">{p.name}</p>
                   <div className="flex items-center gap-1">
                     <div className="w-1 h-1 rounded-full bg-emerald-500" />
-                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Active</span>
+                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">
+                      {p.role === 'admin' ? '⚡ ADMIN' : 'Active'}
+                    </span>
                   </div>
                 </div>
               </button>
