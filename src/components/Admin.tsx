@@ -1155,8 +1155,6 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
         </div>
       </div>
 
-      </div>
-
       {/* Assigned Players Section */}
       <div className="col-span-1 md:col-span-2 mt-8">
         <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-10 backdrop-blur-xl">
