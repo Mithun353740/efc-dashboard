@@ -283,12 +283,16 @@ async function saveState(isBackup = false) {
 
 async function syncTournaments() {
   if (!state.user) return;
-  try {
-    const snap = await getDocs(collection(db, 'tournaments'));
+  const q = query(collection(db, 'tournaments'));
+  return onSnapshot(q, (snap) => {
     state.tournaments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Also cache locally
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: DATA_VERSION, tournaments: state.tournaments }));
-  } catch(e) { console.error('Firestore sync failed:', e); }
+    if (state.tournament) {
+      const updated = state.tournaments.find(t => t.id === state.tournament.id);
+      if (updated) state.tournament = updated;
+    }
+    render();
+  });
 }
 
 async function deleteTournamentFromFirestore(id) {
@@ -835,14 +839,19 @@ function renderTournamentCard(t) {
   const progress = total > 0 ? (played / total) * 100 : 0;
 
   let statusBg, statusText;
+  const now = Date.now();
+  const isFuture = t.startDate && new Date(t.startDate).getTime() > now;
+
   if (t.archived) {
     statusText = 'Archived'; statusBg = 'background:#0a0a12;color:#475569;border-color:#1e1e32';
+  } else if (isFuture) {
+    statusText = 'Upcoming'; statusBg = 'background:rgba(245,158,11,0.1);color:#f59e0b;border-color:rgba(245,158,11,0.25)';
   } else if (played === total && total > 0) {
     statusText = 'Completed'; statusBg = 'background:rgba(16,185,129,0.08);color:#34d399;border-color:rgba(16,185,129,0.2)';
   } else if (played > 0) {
     statusText = 'Live'; statusBg = 'background:rgba(59,130,246,0.1);color:#60a5fa;border-color:rgba(59,130,246,0.25)';
   } else {
-    statusText = 'Upcoming'; statusBg = 'background:#0a0a12;color:#475569;border-color:#1e1e32';
+    statusText = 'Setup'; statusBg = 'background:#0a0a12;color:#475569;border-color:#1e1e32';
   }
 
   const formatLabels = { round_robin:'Round Robin', knockout:'Knockout', league:'Full League', groups:'Group+KO' };
@@ -1333,6 +1342,7 @@ async function initTournament(config) {
     groups: [],
     currentStage: config.type === 'groups' ? 'groups' : config.type,
     status: 'setup_teams',
+    startDate: config.startDate || null,
     createdAt: Date.now()
   };
 
@@ -1928,12 +1938,7 @@ function toggleBottomSheet(payload, isCustom = false) {
           </button>
           ` : ''}
         </div>
-        ${state.isAdmin ? `
-        <div class="h-px bg-slate-800/50 my-3"></div>
-        <button id="logout-btn" class="w-full flex items-center justify-center gap-4 p-5 rounded-2xl border font-black uppercase text-[10px] tracking-[0.2em] transition-all" style="background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.2);color:#f87171">
-           ${ICONS.trash} Sign Out
-        </button>
-        ` : ''}
+        </div>
       </div>
     `;
   } else if (type === 'switcher') {
@@ -1942,12 +1947,12 @@ function toggleBottomSheet(payload, isCustom = false) {
         <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center border-b border-slate-800 pb-4">Tournament Registry</h4>
         <div class="space-y-3 max-h-[50vh] overflow-auto">
           ${state.tournaments.map(t => `
-            <button data-switch="${t.id}" class="w-full p-6 bg-slate-950 border ${state.tournament.id === t.id ? 'border-indigo-500 bg-indigo-500/5' : 'border-slate-800'} rounded-[2rem] flex items-center justify-between transition-all active:scale-[0.98]">
+            <button data-switch="${t.id}" class="w-full p-6 bg-slate-950 border ${state.tournament?.id === t.id ? 'border-indigo-500 bg-indigo-500/5' : 'border-slate-800'} rounded-[2rem] flex items-center justify-between transition-all active:scale-[0.98]">
                <div class="flex flex-col items-start">
-                 <span class="font-black text-sm uppercase tracking-tighter ${state.tournament.id === t.id ? 'text-indigo-400' : 'text-slate-100'}">${t.name}</span>
+                 <span class="font-black text-sm uppercase tracking-tighter ${state.tournament?.id === t.id ? 'text-indigo-400' : 'text-slate-100'}">${t.name}</span>
                  <span class="text-[9px] font-black text-slate-600 uppercase tracking-widest">${t.type} &bull; ${t.teams.length} Teams</span>
                </div>
-               ${state.tournament.id === t.id ? '<span class="text-indigo-500 text-xs">●</span>' : ''}
+               ${state.tournament?.id === t.id ? '<span class="text-indigo-500 text-xs">●</span>' : ''}
             </button>
           `).join('')}
         </div>
@@ -2075,12 +2080,9 @@ function renderApp(root) {
           <div class="px-4 pb-4">
             <div class="flex items-center justify-between px-3 py-2.5 rounded-xl" style="background:#0a0a12;border:1px solid #1e1e32">
               <div>
-                <div class="text-[8px] font-black uppercase tracking-widest" style="color:#334155">Signed in as</div>
-                <div class="text-xs font-black uppercase" style="color:#60a5fa">${state.user?.username || 'user'}</div>
+                <div class="text-[8px] font-black uppercase tracking-widest" style="color:#334155">Operational Registry</div>
+                <div class="text-xs font-black uppercase" style="color:#60a5fa">${state.tournament.name}</div>
               </div>
-              <button id="logout-btn-sidebar" class="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all" style="background:rgba(239,68,68,0.08);color:#f87171;border:1px solid rgba(239,68,68,0.15)" onmouseover="this.style.background='rgba(239,68,68,0.2)'" onmouseout="this.style.background='rgba(239,68,68,0.08)'">
-                Sign Out
-              </button>
             </div>
           </div>
           ` : ''}
@@ -2903,7 +2905,7 @@ function renderDashboard(container) {
           <p class="text-indigo-200 text-[10px] font-black uppercase tracking-widest mb-1 italic">Tournament Active</p>
           <h3 class="text-white font-black text-2xl leading-none tracking-tighter uppercase mb-6">${state.tournament.name}</h3>
           <button data-view="fixtures" class="w-full bg-white text-indigo-600 font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest shadow-xl flex items-center justify-center gap-2">
-            ${ICONS.league} Manage Schedule
+            ${ICONS.league} ${state.isAdmin ? 'Manage Schedule' : 'View Fixtures'}
           </button>
         </div>
 
