@@ -1,5 +1,5 @@
 console.log('[KickOff] main.js is initializing...');
-import { db } from './firebase.js';
+import { db, authPromise } from './firebase.js';
 import {
   collection, doc, setDoc, getDoc, getDocs, onSnapshot,
   updateDoc, deleteDoc, addDoc, serverTimestamp,
@@ -283,6 +283,15 @@ async function saveState(isBackup = false) {
 
 async function syncTournaments() {
   if (!state.user) return;
+  
+  // Wait for the secure connection (anonymous auth) before querying
+  try {
+    await authPromise;
+  } catch (e) {
+    console.error('Cannot sync: Auth failed', e);
+    return;
+  }
+
   const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
   
   return new Promise((resolve, reject) => {

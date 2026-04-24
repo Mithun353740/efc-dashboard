@@ -18,6 +18,14 @@ const auth = getAuth(app);
 const db = initializeFirestore(app, { experimentalForceLongPolling: true }, firebaseConfig.firestoreDatabaseId);
 
 // Ensure we are signed in anonymously so the security rules allow us to read/write
-signInAnonymously(auth).catch(err => console.error("Anonymous auth failed:", err));
+const authPromise = signInAnonymously(auth)
+  .then(user => {
+    console.log("[KickOff] Anonymous auth success:", user.user.uid);
+    return user;
+  })
+  .catch(err => {
+    console.error("Anonymous auth failed:", err);
+    throw err;
+  });
 
-export { db, auth };
+export { db, auth, authPromise };
