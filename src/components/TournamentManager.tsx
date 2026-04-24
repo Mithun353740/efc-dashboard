@@ -4,9 +4,10 @@ import { cn } from '../lib/utils';
 
 interface TournamentManagerProps {
   isControlCenter?: boolean;
+  tournamentId?: string;
 }
 
-export default function TournamentManager({ isControlCenter = false }: TournamentManagerProps) {
+export default function TournamentManager({ isControlCenter = false, tournamentId }: TournamentManagerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function TournamentManager({ isControlCenter = false }: Tournamen
       </div>
 
       <iframe 
-        src={`/tournament-system/index.html?admin=${isControlCenter}&v=${Date.now()}`} 
+        src={`/tournament-system/index.html?admin=${isControlCenter}${tournamentId ? `&tournamentId=${tournamentId}` : ''}&v=${Date.now()}`} 
         className="w-full h-full border-none"
         title="Tournament Manager"
         allow="clipboard-read; clipboard-write; fullscreen"

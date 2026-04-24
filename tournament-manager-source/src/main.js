@@ -191,7 +191,8 @@ function loadInitialState() {
 
 const urlParams = new URLSearchParams(window.location.search);
 const isAdmin = urlParams.get('admin') === 'true';
-console.log('[KickOff] URL Params:', window.location.search, 'isAdmin:', isAdmin);
+const urlTournamentId = urlParams.get('tournamentId');
+console.log('[KickOff] URL Params:', window.location.search, 'isAdmin:', isAdmin, 'urlTournamentId:', urlTournamentId);
 
 const state = {
   tournaments: [],
@@ -399,6 +400,16 @@ async function render() {
     `;
     _initialSyncDone = true;
     await syncTournaments();
+    
+    if (urlTournamentId) {
+      const found = state.tournaments.find(t => t.id === urlTournamentId);
+      if (found) {
+        state.tournament = found;
+        state.view = 'dashboard';
+        notifyParent('TOURNAMENT_OPENED', { id: found.id });
+      }
+    }
+    
     render();
     return;
   }

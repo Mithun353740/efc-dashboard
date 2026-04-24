@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, BarChart3, ShieldAlert } from 'lucide-react';
+import { Trophy, BarChart3, ShieldAlert, History } from 'lucide-react';
 import TournamentManager from './TournamentManager';
 import TournamentRanking from './TournamentRanking';
+import TournamentHistory from './TournamentHistory';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
 
-type View = 'manager' | 'ranking';
+type View = 'manager' | 'ranking' | 'history';
 
 interface TournamentWrapperProps {
   isEmbedded?: boolean;
@@ -15,6 +16,7 @@ interface TournamentWrapperProps {
 export default function TournamentWrapper({ isEmbedded = false }: TournamentWrapperProps) {
   const { systemLocks } = useFirebase();
   const [activeView, setActiveView] = useState<View>('manager');
+  const [activeTournamentId, setActiveTournamentId] = useState<string | undefined>(undefined);
   const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
   const isLocked = systemLocks?.tournaments && !isAdmin;
 
@@ -26,7 +28,7 @@ export default function TournamentWrapper({ isEmbedded = false }: TournamentWrap
         isEmbedded ? "sticky top-0" : "sticky top-[64px]"
       )}>
         <button
-          onClick={() => setActiveView('manager')}
+          onClick={() => { setActiveView('manager'); setActiveTournamentId(undefined); }}
           className={cn(
             "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase",
             activeView === 'manager' 
@@ -48,6 +50,18 @@ export default function TournamentWrapper({ isEmbedded = false }: TournamentWrap
         >
           <BarChart3 size={14} />
           Tournament Ranking
+        </button>
+        <button
+          onClick={() => setActiveView('history')}
+          className={cn(
+            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase",
+            activeView === 'history' 
+              ? "bg-brand-gradient text-white shadow-lg shadow-brand-purple/25" 
+              : "text-slate-400 hover:text-white hover:bg-white/5"
+          )}
+        >
+          <History size={14} />
+          History
         </button>
       </div>
 
@@ -86,9 +100,9 @@ export default function TournamentWrapper({ isEmbedded = false }: TournamentWrap
               transition={{ duration: 0.3, ease: 'easeOut' }}
               className="h-full"
             >
-              <TournamentManager isControlCenter={isAdmin} />
+              <TournamentManager isControlCenter={isAdmin} tournamentId={activeTournamentId} />
             </motion.div>
-          ) : (
+          ) : activeView === 'ranking' ? (
             <motion.div
               key="ranking"
               initial={{ opacity: 0, x: 20 }}
@@ -98,6 +112,20 @@ export default function TournamentWrapper({ isEmbedded = false }: TournamentWrap
               className="h-full"
             >
               <TournamentRanking />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="history"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="h-full"
+            >
+              <TournamentHistory onOpenTournament={(id) => {
+                setActiveTournamentId(id);
+                setActiveView('manager');
+              }} />
             </motion.div>
           )}
         </AnimatePresence>
