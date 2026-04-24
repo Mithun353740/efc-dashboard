@@ -284,14 +284,26 @@ async function saveState(isBackup = false) {
 async function syncTournaments() {
   if (!state.user) return;
   const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, (snap) => {
-    state.tournaments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: DATA_VERSION, tournaments: state.tournaments }));
-    if (state.tournament) {
-      const updated = state.tournaments.find(t => t.id === state.tournament.id);
-      if (updated) state.tournament = updated;
-    }
-    render();
+  
+  return new Promise((resolve, reject) => {
+    let first = true;
+    onSnapshot(q, (snap) => {
+      state.tournaments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: DATA_VERSION, tournaments: state.tournaments }));
+      if (state.tournament) {
+        const updated = state.tournaments.find(t => t.id === state.tournament.id);
+        if (updated) state.tournament = updated;
+      }
+      if (first) {
+        first = false;
+        resolve();
+      } else {
+        render();
+      }
+    }, (err) => {
+      console.error('Sync failed:', err);
+      if (first) reject(err);
+    });
   });
 }
 
