@@ -191,6 +191,7 @@ function loadInitialState() {
 
 const urlParams = new URLSearchParams(window.location.search);
 const isAdmin = urlParams.get('admin') === 'true';
+console.log('[KickOff] URL Params:', window.location.search, 'isAdmin:', isAdmin);
 
 const state = {
   tournaments: [],
@@ -210,6 +211,13 @@ const state = {
   isAdmin: isAdmin,
   dashboardPlayers: []
 };
+
+// Helper to notify parent dashboard
+function notifyParent(type, data = {}) {
+  if (window.parent !== window) {
+    window.parent.postMessage({ type, ...data }, '*');
+  }
+}
 
 // Handle message from parent (Dashboard)
 window.addEventListener('message', (event) => {
@@ -637,6 +645,7 @@ function renderTournamentList(root) {
       const id = btn.dataset.id;
       state.tournament = state.tournaments.find(t => t.id === id);
       state.view = 'dashboard';
+      notifyParent('TOURNAMENT_OPENED', { id });
       render();
     });
   });
@@ -654,6 +663,7 @@ function renderTournamentList(root) {
       const id = btn.dataset.id;
       state.tournament = state.tournaments.find(tr => tr.id === id);
       state.view = 'champion';
+      notifyParent('TOURNAMENT_OPENED', { id });
       render();
     });
   });
@@ -1993,6 +2003,7 @@ function toggleBottomSheet(payload, isCustom = false) {
        state.view = 'home';
        state.activeBottomSheet = null;
        container.innerHTML = '';
+       notifyParent('TOURNAMENT_CLOSED');
        render();
     });
   }
@@ -2115,6 +2126,14 @@ function setupAppListeners() {
       }
     }));
 
+    const exitToRegistryBtn = document.getElementById('exit-to-registry');
+    if (exitToRegistryBtn) exitToRegistryBtn.addEventListener('click', () => {
+      state.tournament = null;
+      state.view = 'home';
+      notifyParent('TOURNAMENT_CLOSED');
+      render();
+    });
+
     const switcherBtn = document.getElementById('mobile-switcher-btn');
     if (switcherBtn) switcherBtn.addEventListener('click', () => toggleBottomSheet('switcher'));
 
@@ -2127,6 +2146,7 @@ function setupAppListeners() {
     if (backBtn) backBtn.addEventListener('click', () => {
       state.tournament = null;
       state.view = 'home';
+      notifyParent('TOURNAMENT_CLOSED');
       render();
     });
 

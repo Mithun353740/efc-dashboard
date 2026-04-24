@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock } from '../lib/store';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import TournamentManager from './TournamentManager';
+import TournamentWrapper from './TournamentWrapper';
 import { Player, Leader, MatchRecord } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
@@ -888,15 +889,20 @@ export default function Admin() {
                 <CredentialsTab players={players} />
               </motion.div>
             ) : activeTab === 'tournaments' ? (
-              <motion.div
+              <div
                 key="tournaments"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="h-[calc(100vh-200px)] bg-brand-darker rounded-[2rem] overflow-hidden border border-white/5"
+                className="fixed inset-0 z-[100] bg-[#050508] overflow-auto"
               >
-                <TournamentManager isControlCenter={true} />
-              </motion.div>
+                <TournamentWrapper isEmbedded={true} />
+                {/* Overlay back button to return to dashboard */}
+                <button 
+                  onClick={() => setActiveTab('players')}
+                  className="fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-black/60 border border-white/10 rounded-2xl text-[10px] font-black tracking-widest text-slate-400 hover:text-white transition-all z-[10001] shadow-2xl backdrop-blur-xl flex items-center gap-2 group"
+                >
+                  <LayoutDashboard size={14} className="group-hover:text-brand-primary transition-colors" />
+                  EXIT TO CONTROL CENTER
+                </button>
+              </div>
             ) : activeTab === 'locks' ? (
               <motion.div key="locks" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">

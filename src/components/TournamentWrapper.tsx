@@ -8,16 +8,23 @@ import { useFirebase } from '../FirebaseContext';
 
 type View = 'manager' | 'ranking';
 
-export default function TournamentWrapper() {
+interface TournamentWrapperProps {
+  isEmbedded?: boolean;
+}
+
+export default function TournamentWrapper({ isEmbedded = false }: TournamentWrapperProps) {
   const { systemLocks } = useFirebase();
   const [activeView, setActiveView] = useState<View>('manager');
   const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
   const isLocked = systemLocks?.tournaments && !isAdmin;
 
   return (
-    <div className="min-h-screen bg-brand-dark flex flex-col">
+    <div className={cn("flex flex-col", !isEmbedded && "min-h-screen bg-brand-dark")}>
       {/* Sub Navigation */}
-      <div className="bg-white/5 border-b border-white/10 px-8 flex items-center justify-center gap-4 py-3 sticky top-[64px] z-40 backdrop-blur-xl">
+      <div className={cn(
+        "bg-white/5 border-b border-white/10 px-8 flex items-center justify-center gap-4 py-3 z-40 backdrop-blur-xl",
+        isEmbedded ? "sticky top-0" : "sticky top-[64px]"
+      )}>
         <button
           onClick={() => setActiveView('manager')}
           className={cn(
@@ -79,7 +86,7 @@ export default function TournamentWrapper() {
               transition={{ duration: 0.3, ease: 'easeOut' }}
               className="h-full"
             >
-              <TournamentManager />
+              <TournamentManager isControlCenter={isAdmin} />
             </motion.div>
           ) : (
             <motion.div
