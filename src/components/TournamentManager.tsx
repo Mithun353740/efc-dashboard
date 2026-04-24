@@ -51,7 +51,7 @@ export default function TournamentManager({ isControlCenter = false }: Tournamen
       </div>
 
       <iframe 
-        src={`/tournament-system/index.html?admin=${isControlCenter}`} 
+        src={`/tournament-system/index.html?admin=${isControlCenter}&v=${Date.now()}`} 
         className="w-full h-full border-none"
         title="Tournament Manager"
         allow="clipboard-read; clipboard-write; fullscreen"
