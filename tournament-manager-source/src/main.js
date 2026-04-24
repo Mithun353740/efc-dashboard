@@ -1,9 +1,9 @@
 console.log('[KickOff] main.js is initializing...');
 import { db } from './firebase.js';
 import {
-  collection, doc, setDoc, getDoc, getDocs,
+  collection, doc, setDoc, getDoc, getDocs, onSnapshot,
   updateDoc, deleteDoc, addDoc, serverTimestamp,
-  query, where
+  query, where, orderBy
 } from "firebase/firestore";
 import {
   bergerRoundRobin, seededKnockout,
@@ -283,7 +283,7 @@ async function saveState(isBackup = false) {
 
 async function syncTournaments() {
   if (!state.user) return;
-  const q = query(collection(db, 'tournaments'));
+  const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
   return onSnapshot(q, (snap) => {
     state.tournaments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: DATA_VERSION, tournaments: state.tournaments }));
