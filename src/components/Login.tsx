@@ -14,7 +14,9 @@ export default function Login() {
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (user === 'QVFC' && pass === 'QVFC_19') {
+    const normalizedUser = user.trim().toUpperCase();
+    
+    if (normalizedUser === 'QVFC' && pass === 'QVFC_19') {
       setIsLoading(true);
       try {
         await loginAnonymously();
@@ -27,7 +29,7 @@ export default function Login() {
         setIsLoading(false);
       }
     } else {
-      setError('Invalid admin credentials');
+      setError('Invalid admin credentials. Hint: Authorized admins can also log in via Player Access.');
     }
   };
 
@@ -224,6 +226,17 @@ export default function Login() {
 
           {error && <p className="text-[10px] font-bold text-red-500 text-center">{error}</p>}
         </form>
+
+        <div className="mt-12 pt-8 border-t border-white/5 flex flex-col items-center gap-4 text-center">
+          <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+            <Shield size={10} className="text-emerald-500" />
+            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">End-to-End Encryption Active</span>
+          </div>
+          <p className="text-[9px] font-bold text-slate-600 uppercase tracking-tight">
+            © 2026 Quantum Vortex FC. All rights reserved. <br/>
+            Official Club Management Protocol.
+          </p>
+        </div>
       </motion.div>
     </div>
   );
