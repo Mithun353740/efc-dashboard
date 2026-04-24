@@ -12,7 +12,7 @@ import { CLUB_LOGO, CLUB_NAME } from '../constants';
 import { History } from 'lucide-react';
 
 export default function Admin() {
-  const { players, leaders, matches, systemLocks, dbError } = useFirebase();
+  const { players, leaders, matches, tournaments, systemLocks, dbError } = useFirebase();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
@@ -39,7 +39,7 @@ export default function Admin() {
   }, []);
 
   // Player Form
-  const DEFAULT_PLAYER = { name: '', number: '', device: 'PS5', uid: '', image: '' };
+  const DEFAULT_PLAYER: Partial<Player> = { name: '', number: '', device: 'PS5', uid: '', image: '', role: 'player' };
   
   const [newPlayer, setNewPlayer] = useState(DEFAULT_PLAYER);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export default function Admin() {
   const [leaderMsg, setLeaderMsg] = useState({ text: '', type: '' });
   
   // Match Form
-  const [match, setMatch] = useState({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'QVFC Elite League Cup' });
+  const [match, setMatch] = useState({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'Friendly' });
   const [matchMsg, setMatchMsg] = useState({ text: '', type: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingMatch, setEditingMatch] = useState<MatchRecord | null>(null);
@@ -68,6 +68,7 @@ export default function Admin() {
   const [playerToDelete, setPlayerToDelete] = useState<string | null>(null);
   const [leaderToDelete, setLeaderToDelete] = useState<string | null>(null);
   const [isResyncing, setIsResyncing] = useState(false);
+  const [showAdminWarning, setShowAdminWarning] = useState(false);
 
   const compressImage = (base64Str: string, maxWidth = 1600, maxHeight = 1600): Promise<string> => {
     return new Promise((resolve) => {
@@ -192,7 +193,8 @@ export default function Admin() {
       image: newPlayer.image || existingPlayer?.image || 'https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=400&auto=format&fit=crop',
       form: existingPlayer ? existingPlayer.form : [],
       device: newPlayer.device,
-      uid: newPlayer.uid
+      uid: newPlayer.uid,
+      role: newPlayer.role as 'admin' | 'player'
     };
 
     try {
@@ -335,6 +337,7 @@ export default function Admin() {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-[#020617] text-white p-8">
       {/* Header */}
       <div className="max-w-6xl mx-auto flex justify-between items-center mb-12">
@@ -453,7 +456,8 @@ export default function Admin() {
                                     number: p.number,
                                     device: p.device,
                                     uid: p.uid,
-                                    image: p.image
+                                    image: p.image,
+                                    role: p.role || 'player'
                                   });
                                   setPlayerNameSearch(p.name);
                                 }}
@@ -504,9 +508,35 @@ export default function Admin() {
                           )}
                         </AnimatePresence>
                       </div>
-                      <Input label="UID (GAME ID)" value={newPlayer.uid} onChange={v => setNewPlayer({...newPlayer, uid: v})} placeholder="VORTEX_123" />
+                        <Input label="UID (GAME ID)" value={newPlayer.uid} onChange={v => setNewPlayer({...newPlayer, uid: v})} placeholder="VORTEX_123" />
                     </div>
-                    <Input label="DEVICE" value={newPlayer.device} onChange={v => setNewPlayer({...newPlayer, device: v})} placeholder="PS5 / PC" />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input label="DEVICE" value={newPlayer.device} onChange={v => setNewPlayer({...newPlayer, device: v})} placeholder="PS5 / PC" />
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
+                          ADMIN PRIVILEGES
+                          <ShieldCheck size={10} className={newPlayer.role === 'admin' ? "text-brand-purple" : "text-slate-600"} />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newPlayer.role !== 'admin') {
+                              setShowAdminWarning(true);
+                            } else {
+                              setNewPlayer({ ...newPlayer, role: 'player' });
+                            }
+                          }}
+                          className={cn(
+                            "w-full p-4 rounded-xl text-[10px] font-black tracking-widest transition-all border uppercase",
+                            newPlayer.role === 'admin' 
+                              ? "bg-brand-purple/20 border-brand-purple text-brand-purple shadow-[0_0_15px_rgba(139,92,246,0.3)]" 
+                              : "bg-white/5 border-white/10 text-slate-500 hover:border-white/20"
+                          )}
+                        >
+                          {newPlayer.role === 'admin' ? '✓ ADMIN GRANTED' : 'GRANT ADMIN'}
+                        </button>
+                      </div>
+                    </div>
                     
                     <div className="space-y-1">
                       <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">PICTURE (UPLOAD OR PASTE URL)</label>
@@ -643,17 +673,23 @@ export default function Admin() {
                       <select 
                         value={match.tournament}
                         onChange={e => setMatch({...match, tournament: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-brand-purple outline-none transition-all appearance-none cursor-pointer"
+                        className={cn(
+                          "w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-brand-purple outline-none transition-all appearance-none cursor-pointer",
+                          match.isExternal && !match.tournament ? "border-amber-500/30" : ""
+                        )}
                       >
-                        <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
-                        <option value="QVFC Elite League Cup Division 2" className="bg-brand-dark">QVFC Elite League Cup Division 2</option>
-                        <option value="Vortex Champions Cup" className="bg-brand-dark">Vortex Champions Cup</option>
-                        <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
+                        <option value="Friendly" className="bg-brand-dark">Friendly / Internal</option>
+                        {tournaments.map(t => (
+                          <option key={t.id} value={t.name} className="bg-brand-dark">{t.name}</option>
+                        ))}
                       </select>
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-brand-purple">
                         <ChevronDown size={16} />
                       </div>
                     </div>
+                    {match.isExternal && !match.tournament && (
+                      <p className="text-[8px] font-bold text-amber-500/70 uppercase tracking-widest mt-1">Tournament selection optional for external matches</p>
+                    )}
                   </div>
 
                   <button className="w-full py-6 glossy-btn rounded-2xl disabled:opacity-50 disabled:hover:scale-100" disabled={isSubmitting}>
@@ -819,10 +855,9 @@ export default function Admin() {
                                   className="bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-brand-purple outline-none mt-2 md:mt-0 w-full md:w-auto text-center"
                                 >
                                   <option value="Friendly" className="bg-brand-dark">Friendly</option>
-                                  <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
-                                  <option value="QVFC Elite League Cup Division 2" className="bg-brand-dark">QVFC Elite League Cup Division 2</option>
-                                  <option value="Vortex Champions Cup" className="bg-brand-dark">Vortex Champions Cup</option>
-                                  <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
+                                  {tournaments.map(t => (
+                                    <option key={t.id} value={t.name} className="bg-brand-dark">{t.name}</option>
+                                  ))}
                                 </select>
                                 <div className="flex gap-2 mt-2 md:mt-0 w-full md:w-auto justify-end">
                                   <button onClick={handleEditMatchSubmit} className="glossy-btn px-3 py-2 rounded text-[10px] font-black tracking-widest transition-all uppercase">SAVE</button>
@@ -894,6 +929,50 @@ export default function Admin() {
         </div>
       </div>
     </div>
+
+    {/* Admin Warning Modal */}
+    <AnimatePresence>
+      {showAdminWarning && (
+        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setShowAdminWarning(false)}
+            className="absolute inset-0 bg-[#020617]/90 backdrop-blur-md" 
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="relative w-full max-w-md bg-[#0f172a] border border-white/10 rounded-[2.5rem] p-10 shadow-3xl text-center overflow-hidden"
+          >
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-red-500/10 blur-[100px] -z-10" />
+            <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-8 border border-red-500/20">
+              <ShieldCheck size={40} />
+            </div>
+            <h3 className="text-2xl font-black tracking-tighter uppercase italic mb-4">GRANT ADMIN PRIVILEGES?</h3>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight leading-relaxed mb-8">
+              Warning: Assigning this player as an <span className="text-red-500">Administrator</span> will grant them full access to the Control Center, including the ability to delete players, modify matches, and change system settings.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => {
+                  setNewPlayer({ ...newPlayer, role: 'admin' });
+                  setShowAdminWarning(false);
+                }}
+                className="w-full py-4 bg-red-500 text-white font-black text-xs tracking-widest rounded-2xl hover:bg-red-600 transition-all uppercase italic"
+              >
+                YES, GRANT FULL ACCESS
+              </button>
+              <button 
+                onClick={() => setShowAdminWarning(false)}
+                className="w-full py-4 bg-white/5 text-slate-400 font-black text-xs tracking-widest rounded-2xl hover:bg-white/10 transition-all uppercase"
+              >
+                CANCEL
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
 

@@ -13,6 +13,7 @@ export interface Player {
   form: string[];
   device?: string;
   uid?: string;
+  role?: 'admin' | 'player';
 }
 
 export interface Leader {

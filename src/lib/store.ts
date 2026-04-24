@@ -110,8 +110,9 @@ export async function testFirestoreConnection() {
   } catch (error: any) {
     if (error?.message?.includes('the client is offline')) {
       console.error("Firestore is offline. Please check your Firebase configuration.");
-    } else if (error?.code === 'permission-denied' || error?.code === 'resource-exhausted' || String(error).toLowerCase().includes('quota')) {
-      console.warn("Quota exceeded or permission denied detected during connection test.");
+    } else if (error?.code === 'resource-exhausted' || String(error).toLowerCase().includes('quota') || String(error).toLowerCase().includes('resource-exhausted')) {
+      // Only fire quota error for actual quota exhaustion — NOT for permission-denied
+      console.warn("Quota exceeded detected during connection test.");
       const errInfo: FirestoreErrorInfo = {
         error: error.message || 'Quota exceeded',
         operationType: OperationType.GET,
@@ -121,11 +122,15 @@ export async function testFirestoreConnection() {
           email: auth.currentUser?.email || '',
           emailVerified: auth.currentUser?.emailVerified || false,
           isAnonymous: auth.currentUser?.isAnonymous || true,
-          providerInfo: auth.currentUser?.providerData.map(p => ({ providerId: p.providerId, displayName: p.displayName || '', email: p.email || '' })) || []
+          providerInfo: auth.currentUser?.providerData.map(p => ({ providerId: p.providerId, displayName: p.displayName || '', email: p.email || '' })) || [],
+          tenantId: null
         }
       };
       const event = new CustomEvent('firestore-error', { detail: errInfo });
       window.dispatchEvent(event);
+    } else if (error?.code === 'permission-denied') {
+      // Permission denied on the test collection is expected for anonymous users — ignore silently
+      console.log('Firestore connection test: permission-denied on test collection (expected for anon users).');
     }
   }
 }

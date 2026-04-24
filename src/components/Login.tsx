@@ -57,8 +57,8 @@ export default function Login() {
         localStorage.setItem('playerImage', playerData.image || '');
         localStorage.setItem('userType', 'player');
 
-        // Check if this player is also the Admin
-        if (playerData.email === 'mithun47490@gmail.com' || playerDoc.id === 'mithun-admin-id') { // Add any specific identifier
+        // Check if this player is also an Admin via their role field
+        if (playerData.role === 'admin' || playerData.email === 'mithun47490@gmail.com') {
            localStorage.setItem('adminLoggedIn', 'true');
         }
 

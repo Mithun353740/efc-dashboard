@@ -57,10 +57,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setIsLoadingLeaders(false);
         setIsLoadingMatches(false);
 
-        // Set dbError to trigger Read-Only UI and Admin Lock
-        if (errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('permission')) {
+        // Set dbError ONLY on true quota exhaustion — permission errors must NOT lock the UI
+        if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
           setDbError('QUOTA_EXCEEDED');
         } else {
+          // Permission denied, network offline, etc. — do NOT lock the admin Control Center
           setDbError('DATABASE_ERROR');
         }
       }

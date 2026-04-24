@@ -89,7 +89,15 @@ export default function TournamentRanking() {
     matches.forEach(m => {
       if (m.tournament && m.tournament !== 'Friendly') {
         if (getSeasonInfo(new Date(m.timestamp)).name === selectedSeason) {
-          names.add(m.tournament);
+          // Normalize via the legacy map (will be applied once it's defined in render,
+          // so we add both the raw name and resolved name for display)
+          const raw = m.tournament.toUpperCase();
+          const legacyMap: Record<string, string> = {
+            'QVFC ELITE LEAGUE CUP': 'QVFC ELITE LEAGUE CUP DIVISION 1',
+            'QVFC ELITE LEAGUE CUP DIV 1': 'QVFC ELITE LEAGUE CUP DIVISION 1',
+            'QVFC ELITE LEAGUE CUP DIV 2': 'QVFC ELITE LEAGUE CUP DIVISION 2',
+          };
+          names.add(legacyMap[raw] || raw);
         }
       }
     });
@@ -106,9 +114,26 @@ export default function TournamentRanking() {
     }
   }, [selectedSeason, seasonTournaments]);
 
+  // Legacy name mapping: maps old tournament names to their canonical current name
+  const LEGACY_NAME_MAP: Record<string, string> = {
+    'qvfc elite league cup': 'QVFC ELITE LEAGUE CUP DIVISION 1',
+    'qvfc elite league cup division 1': 'QVFC ELITE LEAGUE CUP DIVISION 1',
+    'qvfc elite league cup div 1': 'QVFC ELITE LEAGUE CUP DIVISION 1',
+    'qvfc elite league cup division 2': 'QVFC ELITE LEAGUE CUP DIVISION 2',
+    'qvfc elite league cup div 2': 'QVFC ELITE LEAGUE CUP DIVISION 2',
+  };
+
+  const resolveCanonicalName = (name: string): string => {
+    return LEGACY_NAME_MAP[name.toLowerCase()] || name.toUpperCase();
+  };
+
   // 3. Compute Standings
   const standings = useMemo(() => {
-    let tournamentMatches = matches.filter(m => m.tournament === selectedTournament);
+    // Filter matches: compare canonical (resolved) tournament names case-insensitively
+    let tournamentMatches = matches.filter(m => {
+      if (!m.tournament) return false;
+      return resolveCanonicalName(m.tournament) === resolveCanonicalName(selectedTournament);
+    });
     
     // Filter matches by season as well (to handle same tournament name across seasons)
     tournamentMatches = tournamentMatches.filter(m => {
