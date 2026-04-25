@@ -39,6 +39,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // because IndexedDB offline persistence might silently hide quota errors from onSnapshot
     testFirestoreConnection();
 
+    // Ensure anonymous auth for guests to access restricted collections (tournaments, etc.)
+    import('./firebase').then(({ loginAnonymously, auth }) => {
+      if (!auth.currentUser) {
+        loginAnonymously().catch(err => console.warn('[Firebase] Anonymous login failed:', err));
+      }
+    });
+
     const errorHandler = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (mounted && customEvent.detail?.error) {
