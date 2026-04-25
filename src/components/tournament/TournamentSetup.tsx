@@ -37,7 +37,6 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
           id: pId as string,
           name: player?.name || 'Unknown',
           shortName: player?.name?.substring(0, 3).toUpperCase() || 'UNK',
-          logo: player?.image,
         };
       });
 

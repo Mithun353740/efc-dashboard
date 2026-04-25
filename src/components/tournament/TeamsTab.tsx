@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tournament, Team } from '../../types';
+import { useFirebase } from '../../FirebaseContext';
 import { ChevronDown, ChevronUp, TrendingUp, Shield } from 'lucide-react';
 
 interface TeamsTabProps {
@@ -61,6 +62,7 @@ const formColor: Record<string, string> = {
 };
 
 export function TeamsTab({ tournament }: TeamsTabProps) {
+  const { players } = useFirebase();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const teams = useMemo(() => computeTeamStats(tournament), [tournament]);
 
@@ -88,13 +90,17 @@ export function TeamsTab({ tournament }: TeamsTabProps) {
               <span className="text-slate-600 font-black text-sm w-5 text-center flex-shrink-0">{i + 1}</span>
 
               {/* Avatar */}
-              {team.logo ? (
-                <img src={team.logo} className="w-10 h-10 rounded-xl object-cover border border-[#1e1e32] flex-shrink-0" alt={team.name} />
-              ) : (
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs flex-shrink-0">
-                  {team.shortName ?? team.name.substring(0, 3).toUpperCase()}
-                </div>
-              )}
+              {(() => {
+                const player = players.find(p => p.id === team.id);
+                if (player?.image) {
+                  return <img src={player.image} className="w-10 h-10 rounded-xl object-cover border border-[#1e1e32] flex-shrink-0" alt={team.name} />;
+                }
+                return (
+                  <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs flex-shrink-0">
+                    {team.shortName ?? team.name.substring(0, 3).toUpperCase()}
+                  </div>
+                );
+              })()}
 
               {/* Name & Form */}
               <div className="flex-1 min-w-0">

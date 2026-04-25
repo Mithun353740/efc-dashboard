@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Tournament, Team, Fixture } from '../../types';
+import { useFirebase } from '../../FirebaseContext';
 import { Medal, Shield, Goal } from 'lucide-react';
 
 interface StandingsTabProps {
@@ -85,6 +86,7 @@ const filterTabs: { id: StandingsFilter; label: string }[] = [
 ];
 
 export function StandingsTab({ tournament }: StandingsTabProps) {
+  const { players } = useFirebase();
   const [filter, setFilter] = useState<StandingsFilter>('overall');
   const standings = useMemo(() => computeStandings(tournament), [tournament]);
 
@@ -175,13 +177,17 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
 
               {/* Team */}
               <div className="flex items-center gap-3 min-w-0">
-                {row.team.logo ? (
-                  <img src={row.team.logo} className="w-9 h-9 rounded-xl object-cover border border-[#1e1e32] flex-shrink-0" alt={row.team.name} />
-                ) : (
-                  <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs flex-shrink-0">
-                    {row.team.shortName ?? row.team.name.substring(0, 3).toUpperCase()}
-                  </div>
-                )}
+                {(() => {
+                  const player = players.find(p => p.id === row.team.id);
+                  if (player?.image) {
+                    return <img src={player.image} className="w-9 h-9 rounded-xl object-cover border border-[#1e1e32] flex-shrink-0" alt={row.team.name} />;
+                  }
+                  return (
+                    <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs flex-shrink-0">
+                      {row.team.shortName ?? row.team.name.substring(0, 3).toUpperCase()}
+                    </div>
+                  );
+                })()}
                 <span className="font-black text-sm text-white truncate">{row.team.name}</span>
               </div>
 

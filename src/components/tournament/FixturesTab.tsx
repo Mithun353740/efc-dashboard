@@ -162,13 +162,17 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
                       <span className={`font-black text-sm truncate text-right ${isDone ? 'text-white' : 'text-slate-300'}`}>
                         {home?.name ?? 'TBD'}
                       </span>
-                      {home?.logo ? (
-                        <img src={home.logo} className="w-9 h-9 rounded-lg object-cover border border-[#1e1e32]" alt={home.name} />
-                      ) : (
-                        <div className="w-9 h-9 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs">
-                          {home?.shortName ?? '?'}
-                        </div>
-                      )}
+                      {(() => {
+                        const player = players.find(p => p.id === home?.id);
+                        if (player?.image) {
+                          return <img src={player.image} className="w-9 h-9 rounded-lg object-cover border border-[#1e1e32]" alt={home?.name} />;
+                        }
+                        return (
+                          <div className="w-9 h-9 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs">
+                            {home?.shortName ?? '?'}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Score Area */}
@@ -207,13 +211,17 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
 
                     {/* Away Team */}
                     <div className="flex-1 flex items-center justify-start gap-3">
-                      {away?.logo ? (
-                        <img src={away.logo} className="w-9 h-9 rounded-lg object-cover border border-[#1e1e32]" alt={away.name} />
-                      ) : (
-                        <div className="w-9 h-9 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 font-black text-xs">
-                          {away?.shortName ?? '?'}
-                        </div>
-                      )}
+                      {(() => {
+                        const player = players.find(p => p.id === away?.id);
+                        if (player?.image) {
+                          return <img src={player.image} className="w-9 h-9 rounded-lg object-cover border border-[#1e1e32]" alt={away?.name} />;
+                        }
+                        return (
+                          <div className="w-9 h-9 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 font-black text-xs">
+                            {away?.shortName ?? '?'}
+                          </div>
+                        );
+                      })()}
                       <span className={`font-black text-sm truncate ${isDone ? 'text-white' : 'text-slate-300'}`}>
                         {away?.name ?? 'TBD'}
                       </span>

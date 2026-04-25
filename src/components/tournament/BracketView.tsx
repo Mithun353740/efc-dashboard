@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Tournament, Fixture, Team } from '../../types';
+import { useFirebase } from '../../FirebaseContext';
 
 interface BracketViewProps {
   tournament: Tournament;
@@ -30,6 +31,7 @@ function getRoundLabel(roundIndex: number, totalRounds: number): string {
 }
 
 export function BracketView({ tournament }: BracketViewProps) {
+  const { players } = useFirebase();
   const teams = tournament.teams || [];
   const fixtures = (tournament.fixtures || []).filter(f => f.stage === 'knockout');
 
@@ -104,6 +106,7 @@ export function BracketView({ tournament }: BracketViewProps) {
                         isWinner={match.winner?.id === match.home?.id}
                         isCompleted={match.fixture.status === 'completed'}
                         position="home"
+                        players={players}
                       />
                       <div className="h-px bg-[#1e1e32]" />
                       {/* Away Team */}
@@ -113,6 +116,7 @@ export function BracketView({ tournament }: BracketViewProps) {
                         isWinner={match.winner?.id === match.away?.id}
                         isCompleted={match.fixture.status === 'completed'}
                         position="away"
+                        players={players}
                       />
                     </div>
 
@@ -139,22 +143,27 @@ interface MatchSlotProps {
   isWinner: boolean;
   isCompleted: boolean;
   position: 'home' | 'away';
+  players: any[];
 }
 
-function MatchSlot({ team, score, isWinner, isCompleted }: MatchSlotProps) {
+function MatchSlot({ team, score, isWinner, isCompleted, players }: MatchSlotProps) {
   return (
     <div className={`flex items-center gap-2 px-3 py-2.5 transition-colors ${
       isWinner ? 'bg-emerald-500/10' : ''
     }`}>
-      {team?.logo ? (
-        <img src={team.logo} className="w-6 h-6 rounded object-cover flex-shrink-0" alt={team.name} />
-      ) : (
-        <div className={`w-6 h-6 rounded flex items-center justify-center text-[8px] font-black flex-shrink-0 ${
-          team ? 'bg-indigo-500/20 text-indigo-400' : 'bg-[#1e1e32] text-slate-600'
-        }`}>
-          {team ? (team.shortName ?? team.name.substring(0, 3).toUpperCase()) : '?'}
-        </div>
-      )}
+      {(() => {
+        const player = players.find(p => p.id === team?.id);
+        if (player?.image) {
+          return <img src={player.image} className="w-6 h-6 rounded object-cover flex-shrink-0" alt={team?.name} />;
+        }
+        return (
+          <div className={`w-6 h-6 rounded flex items-center justify-center text-[8px] font-black flex-shrink-0 ${
+            team ? 'bg-indigo-500/20 text-indigo-400' : 'bg-[#1e1e32] text-slate-600'
+          }`}>
+            {team ? (team.shortName ?? team.name.substring(0, 3).toUpperCase()) : '?'}
+          </div>
+        );
+      })()}
       <span className={`flex-1 font-black text-xs truncate ${
         isWinner ? 'text-emerald-400' : team ? 'text-slate-300' : 'text-slate-600'
       }`}>
