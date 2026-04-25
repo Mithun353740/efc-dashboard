@@ -447,6 +447,15 @@ export async function saveTournament(tournament: Tournament) {
   }
 }
 
+export async function deleteTournament(id: string) {
+  const path = `tournaments/${id}`;
+  try {
+    await deleteDoc(doc(db, 'tournaments', id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
 // Bootstrap function
 export async function bootstrapData() {
   const path = 'players';

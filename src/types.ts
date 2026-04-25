@@ -38,9 +38,4 @@ export interface MatchRecord {
   tournament?: string;
 }
 
-export interface Tournament {
-  id: string;
-  name: string;
-  season: string;
-  createdAt: number;
-}
+export type { Tournament, Fixture, Team, TournamentFormat } from './types/tournament';
