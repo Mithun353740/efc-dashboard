@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock } from 'lucide-react';
+import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -10,7 +10,6 @@ import { cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
 import { auth, loginAnonymously, db } from '../firebase';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
-import { History } from 'lucide-react';
 
 export default function Admin() {
   const { players, leaders, matches, tournaments, systemLocks, dbError } = useFirebase();
@@ -386,20 +385,20 @@ export default function Admin() {
           </div>
         </div>
         
-        <div className="flex gap-4 items-center">
+        <div className="flex flex-wrap gap-2 md:gap-4 items-center justify-center md:justify-end">
           {authStatus === 'unauthenticated' && (
-            <div className="px-4 py-2 bg-amber-500/10 text-amber-500 rounded-full text-[8px] font-black tracking-widest animate-pulse">
+            <div className="px-3 py-1 bg-amber-500/10 text-amber-500 rounded-full text-[7px] md:text-[8px] font-black tracking-widest animate-pulse">
               AUTH REQUIRED
             </div>
           )}
           {dbError === 'QUOTA_EXCEEDED' ? (
-            <div className="px-4 py-2 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full text-[8px] font-black tracking-widest flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+            <div className="px-3 py-1 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full text-[7px] md:text-[8px] font-black tracking-widest flex items-center gap-2">
+              <div className="w-1 h-1 rounded-full bg-rose-500" />
               QUOTA EXCEEDED
             </div>
           ) : (
-            <div className="px-4 py-2 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full text-[8px] font-black tracking-widest flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full text-[7px] md:text-[8px] font-black tracking-widest flex items-center gap-2">
+              <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
               SYSTEM ACTIVE
             </div>
           )}
@@ -415,14 +414,14 @@ export default function Admin() {
               setIsResyncing(false);
             }} 
             disabled={isResyncing || dbError === 'QUOTA_EXCEEDED'}
-            className="px-6 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-full text-[10px] font-black tracking-widest transition-all disabled:opacity-50"
+            className="px-4 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all disabled:opacity-50"
           >
-            {isResyncing ? 'SYNCING...' : 'RESYNC STATS'}
+            {isResyncing ? 'SYNCING...' : 'RESYNC'}
           </button>
-          <button onClick={() => navigate('/')} className="px-6 py-2 bg-white/5 hover:bg-white/10 rounded-full text-[10px] font-black tracking-widest transition-all">
+          <button onClick={() => navigate('/')} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all">
             HOME
           </button>
-          <button onClick={() => { localStorage.removeItem('adminLoggedIn'); navigate('/login'); }} className="px-6 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full text-[10px] font-black tracking-widest transition-all">
+          <button onClick={() => { localStorage.removeItem('adminLoggedIn'); navigate('/login'); }} className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all">
             LOGOUT
           </button>
         </div>
@@ -430,14 +429,16 @@ export default function Admin() {
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Sidebar Nav */}
-        <div className="lg:col-span-3 space-y-2">
-          <NavBtn active={activeTab === 'players'} onClick={() => setActiveTab('players')} icon={<Users size={18} />} label="PLAYERS" />
-          <NavBtn active={activeTab === 'credentials'} onClick={() => setActiveTab('credentials')} icon={<Key size={18} />} label="PLAYER CREDENTIALS" />
-          <NavBtn active={activeTab === 'matches'} onClick={() => setActiveTab('matches')} icon={<LayoutDashboard size={18} />} label="MATCHES" />
-          <NavBtn active={activeTab === 'leadership'} onClick={() => setActiveTab('leadership')} icon={<ShieldCheck size={18} />} label="LEADERSHIP" />
-          <NavBtn active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History size={18} />} label="MATCH HISTORY" />
-          <NavBtn active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} icon={<Trophy size={18} />} label="TOURNAMENTS" />
-          <NavBtn active={activeTab === 'locks'} onClick={() => setActiveTab('locks')} icon={<ShieldCheck size={18} />} label="SYSTEM LOCKS" />
+        <div className="lg:col-span-3">
+          <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-4 lg:pb-0 no-scrollbar snap-x">
+            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'players'} onClick={() => setActiveTab('players')} icon={<Users size={18} />} label="PLAYERS" /></div>
+            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'credentials'} onClick={() => setActiveTab('credentials')} icon={<Key size={18} />} label="CREDENTIALS" /></div>
+            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'matches'} onClick={() => setActiveTab('matches')} icon={<LayoutDashboard size={18} />} label="MATCHES" /></div>
+            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'leadership'} onClick={() => setActiveTab('leadership')} icon={<ShieldCheck size={18} />} label="LEADERSHIP" /></div>
+            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History size={18} />} label="HISTORY" /></div>
+            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} icon={<Trophy size={18} />} label="TOURNAMENTS" /></div>
+            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'locks'} onClick={() => setActiveTab('locks')} icon={<ShieldCheck size={18} />} label="LOCKS" /></div>
+          </div>
         </div>
 
         {/* Main Content */}

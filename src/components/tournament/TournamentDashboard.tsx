@@ -13,7 +13,7 @@ import TournamentHistory from '../TournamentHistory';
 import { 
   Trophy, BarChart2, ListOrdered, Settings, ArrowLeft, Archive, 
   Trash2, Users, GitBranch, Goal, LayoutDashboard, History, 
-  ChevronRight, LogOut, ShieldCheck, Star
+  ChevronRight, LogOut, ShieldCheck, Star, Menu, X
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -31,6 +31,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleUpdate = (updated: Tournament) => setTournament(updated);
 
@@ -57,20 +58,39 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
   ];
 
   return (
-    <div className="flex min-h-screen bg-[#050508] text-white">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#050508] text-white">
+      {/* Mobile Top Nav */}
+      <div className="lg:hidden flex items-center justify-between p-4 border-b border-[#1e1e32] sticky top-0 bg-[#0a0a12] z-[60]">
+        <div className="flex items-center gap-2">
+           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+              <Trophy size={16} />
+           </div>
+           <span className="font-black text-xs uppercase tracking-tight truncate max-w-[150px]">{tournament.name}</span>
+        </div>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-400">
+           {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
       {/* Sidebar */}
-      <aside className="w-72 border-r border-[#1e1e32] bg-[#0a0a12] flex flex-col sticky top-0 h-screen z-50">
+      <aside className={cn(
+        "fixed inset-0 lg:relative lg:inset-auto w-full lg:w-72 border-r border-[#1e1e32] bg-[#0a0a12] flex flex-col h-screen lg:h-screen lg:sticky lg:top-0 z-[100] lg:z-50 transition-transform lg:translate-x-0",
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      )}>
         {/* Logo Section */}
-        <div className="p-8 border-b border-[#1e1e32]">
+        <div className="p-8 border-b border-[#1e1e32] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <Trophy className="text-white" size={24} />
             </div>
             <div>
               <h1 className="font-black text-lg tracking-tighter uppercase leading-none">KickOff</h1>
-              <p className="text-[8px] font-black tracking-widest text-slate-500 uppercase mt-1">Tournament Manager</p>
+              <p className="text-[8px] font-black tracking-widest text-slate-500 uppercase mt-1">Manager</p>
             </div>
           </div>
+          <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden p-2 text-slate-500 hover:text-white transition-colors">
+            <X size={20} />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -85,7 +105,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
               className={cn(
                 "w-full flex items-center justify-between px-6 py-4 rounded-2xl transition-all group",
                 activeTab === item.id 

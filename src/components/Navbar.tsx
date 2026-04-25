@@ -259,6 +259,7 @@ export default function Navbar() {
                   <Link
                     key={item.label}
                     to={item.path}
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="px-4 py-4 text-xs font-black tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 active:bg-slate-100 dark:active:bg-white/10 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
                   >
                     {item.label}
