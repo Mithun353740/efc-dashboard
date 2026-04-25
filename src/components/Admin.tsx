@@ -709,7 +709,11 @@ export default function Admin() {
                           match.isExternal && !match.tournament ? "border-amber-500/30" : ""
                         )}
                       >
-                        <option value="Friendly" className="bg-brand-dark">Friendly / Internal</option>
+                        <option value="Friendly" className="bg-brand-dark">Friendly / Internal Match</option>
+                        <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
+                        <option value="QVFC Elite League Cup Division 2" className="bg-brand-dark">QVFC Elite League Cup Div 2</option>
+                        <option value="Vortex Champions Cup" className="bg-brand-dark">Vortex Champions Cup</option>
+                        <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
                         {tournaments.map(t => (
                           <option key={t.id} value={t.name} className="bg-brand-dark">{t.name}</option>
                         ))}
@@ -886,6 +890,10 @@ export default function Admin() {
                                   className="bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-brand-purple outline-none mt-2 md:mt-0 w-full md:w-auto text-center"
                                 >
                                   <option value="Friendly" className="bg-brand-dark">Friendly</option>
+                                  <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
+                                  <option value="QVFC Elite League Cup Division 2" className="bg-brand-dark">QVFC Elite League Cup Div 2</option>
+                                  <option value="Vortex Champions Cup" className="bg-brand-dark">Vortex Champions Cup</option>
+                                  <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
                                   {tournaments.map(t => (
                                     <option key={t.id} value={t.name} className="bg-brand-dark">{t.name}</option>
                                   ))}
