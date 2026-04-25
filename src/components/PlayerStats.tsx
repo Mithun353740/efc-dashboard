@@ -49,7 +49,11 @@ export default function PlayerStats() {
     return Array.from(seasons).sort().reverse();
   }, [matches]);
 
-  const availableTournaments = ["QVFC Elite League Cup", "QVFC Elite League Cup Division 2", "Vortex Champions Cup", "Vortex Domestic Cup"];
+  const availableTournaments = useMemo(() => {
+    const core = ["QVFC Elite League Cup", "QVFC Elite League Cup Division 2", "Vortex Champions Cup", "Vortex Domestic Cup"];
+    const dynamic = tournaments.map(t => t.name);
+    return Array.from(new Set([...core, ...dynamic]));
+  }, [tournaments]);
 
   const computedPlayer = useMemo(() => {
     if (!selectedPlayer) return null;
