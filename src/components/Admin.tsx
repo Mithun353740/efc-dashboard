@@ -283,15 +283,28 @@ export default function Admin() {
       setMatchMsg({ text: '❌ Not authenticated with Firebase.', type: 'error' });
       return;
     }
-    if (!match.p1Id || match.p1Score === '' || match.p2Score === '') {
-      setMatchMsg({ text: '❌ Fill required fields', type: 'error' });
+
+    // Strict validation for Player 1
+    const p1 = players.find(p => p.id === match.p1Id || p.name.toLowerCase() === p1Search.trim().toLowerCase());
+    if (!p1) {
+      setMatchMsg({ text: '❌ Invalid Club Player (P1). Please select from the search suggestions.', type: 'error' });
       return;
     }
-    
-    const p1 = players.find(p => p.id === match.p1Id);
-    const p2 = match.isExternal ? undefined : players.find(p => p.id === match.p2Id);
 
-    if (!p1) return;
+    // Strict validation for Player 2
+    let p2: Player | undefined = undefined;
+    if (!match.isExternal) {
+      p2 = players.find(p => p.id === match.p2Id || p.name.toLowerCase() === p2Search.trim().toLowerCase());
+      if (!p2) {
+        setMatchMsg({ text: '❌ Invalid Opponent. Please select from search suggestions or toggle EXTERNAL.', type: 'error' });
+        return;
+      }
+    }
+
+    if (match.p1Score === '' || match.p2Score === '') {
+      setMatchMsg({ text: '❌ Please enter scores for both players.', type: 'error' });
+      return;
+    }
 
     setIsSubmitting(true);
     setMatchMsg({ text: '', type: '' });
