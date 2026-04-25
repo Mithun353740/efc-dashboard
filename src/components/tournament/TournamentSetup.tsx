@@ -5,6 +5,7 @@ import { saveTournament } from '../../lib/store';
 import { Tournament, TournamentFormat, Team } from '../../types';
 import { Trophy, Users, Calendar, ArrowRight, ArrowLeft, Shield, CheckCircle2 } from 'lucide-react';
 import { bergerRoundRobin, seededKnockout, generateGroupStage } from '../../lib/fixtureGen';
+import { getSeasonInfo } from '../../lib/utils';
 
 interface TournamentSetupProps {
   onComplete: (tournamentId: string) => void;
@@ -19,7 +20,7 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
   // Form State
   const [format, setFormat] = useState<TournamentFormat | null>(null);
   const [name, setName] = useState('');
-  const [season, setSeason] = useState('Season 1');
+  const [season] = useState(getSeasonInfo(new Date()).name);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
 
   const handleNext = () => setStep(prev => prev + 1);
@@ -80,9 +81,12 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
         currentStage,
         teams,
         fixtures,
-        groups: groups.length > 0 ? groups : undefined,
         createdAt: Date.now()
       };
+
+      if (groups.length > 0) {
+        newTournament.groups = groups;
+      }
 
       await saveTournament(newTournament);
       onComplete(newTournament.id);
@@ -196,9 +200,8 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
                     <input 
                       type="text" 
                       value={season}
-                      onChange={(e) => setSeason(e.target.value)}
-                      placeholder="e.g. Season 3"
-                      className="w-full bg-[#0a0a12] border border-[#1e1e32] rounded-2xl px-6 py-4 text-white font-bold focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                      readOnly
+                      className="w-full bg-[#050508] border border-[#1e1e32] rounded-2xl px-6 py-4 text-slate-500 font-bold focus:outline-none transition-all cursor-not-allowed"
                     />
                   </div>
                 </div>
