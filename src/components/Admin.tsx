@@ -337,6 +337,25 @@ export default function Admin() {
     }
   };
 
+  if (dbError === 'QUOTA_EXCEEDED') {
+    return (
+      <div className="min-h-screen bg-[#050508] flex items-center justify-center p-4">
+         <div className="max-w-2xl w-full bg-white/5 border border-white/10 rounded-3xl p-12 backdrop-blur-xl text-center shadow-2xl">
+            <div className="w-24 h-24 bg-rose-500/10 rounded-full flex items-center justify-center text-rose-500 mx-auto mb-6">
+              <ShieldCheck size={48} />
+            </div>
+            <h1 className="text-4xl font-black text-rose-500 tracking-tighter mb-4 uppercase">SYSTEM QUOTA EXCEEDED</h1>
+            <p className="text-slate-400 font-bold tracking-tight mb-8">Firebase Free Tier Quota Exceeded. The Control Center is temporarily locked to prevent out-of-sync local updates.</p>
+            <div className="bg-[#050508] border border-white/10 p-6 rounded-xl w-full mx-auto mb-8">
+              <p className="text-[10px] font-black tracking-widest text-slate-300 mb-2 uppercase">System Status</p>
+              <p className="text-[10px] font-bold text-slate-500">Live data fetching and dynamic updates are paused. The system will unlock automatically at midnight Pacific Time.</p>
+            </div>
+            <button onClick={() => navigate('/')} className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white rounded-full text-xs font-black tracking-widest transition-all">RETURN HOME</button>
+         </div>
+      </div>
+    );
+  }
+
   return (
     <>
     <div className="min-h-screen bg-[#020617] text-white p-8">
@@ -397,21 +416,8 @@ export default function Admin() {
 
         {/* Main Content */}
         <div className="lg:col-span-9 space-y-8">
-          {dbError === 'QUOTA_EXCEEDED' ? (
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-12 backdrop-blur-xl text-center flex flex-col items-center justify-center min-h-[400px]">
-              <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center text-rose-500 mb-6">
-                <ShieldCheck size={40} />
-              </div>
-              <h2 className="text-3xl font-black text-rose-500 tracking-tighter mb-4 uppercase">CONTROL CENTER LOCKED</h2>
-              <p className="text-slate-400 font-bold tracking-tight max-w-md mb-8">Firebase Free Tier Quota Exceeded. The Control Center is temporarily locked to prevent out-of-sync local updates.</p>
-              <div className="bg-brand-dark border border-white/10 p-6 rounded-xl w-full max-w-md">
-                <p className="text-[10px] font-black tracking-widest text-slate-300 mb-2 uppercase">System Status</p>
-                <p className="text-[10px] font-bold text-slate-500">Live data fetching and dynamic updates are paused. The system will unlock automatically at midnight Pacific Time.</p>
-              </div>
-            </div>
-          ) : (
-            <AnimatePresence mode="wait">
-              {activeTab === 'players' ? (
+          <AnimatePresence mode="wait">
+            {activeTab === 'players' ? (
               <motion.div key="players" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Add Player */}
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
@@ -936,7 +942,6 @@ export default function Admin() {
               </motion.div>
             ) : null}
             </AnimatePresence>
-          )}
         </div>
       </div>
     </div>

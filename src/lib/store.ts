@@ -444,6 +444,7 @@ export async function saveTournament(tournament: Tournament) {
     await setDoc(doc(db, 'tournaments', tournament.id), tournament);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
+    throw error;
   }
 }
 
