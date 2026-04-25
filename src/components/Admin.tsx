@@ -309,7 +309,7 @@ export default function Admin() {
     setIsSubmitting(true);
     setMatchMsg({ text: '', type: '' });
     try {
-      await addMatch(p1, Number(match.p1Score), Number(match.p2Score), p2, matches, match.tournament);
+      await addMatch(p1, Number(match.p1Score), Number(match.p2Score), p2, matches, match.tournament, match.isExternal ? p2Search : undefined);
       setMatchMsg({ text: '✅ Match recorded', type: 'success' });
       setMatch({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'QVFC Elite League Cup' });
       setP1Search('');
@@ -686,7 +686,12 @@ export default function Admin() {
                             </AnimatePresence>
                           </>
                         ) : (
-                          <input disabled className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white/20" placeholder="External Opponent" />
+                          <input 
+                            value={p2Search} 
+                            onChange={e => setP2Search(e.target.value)} 
+                            className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-brand-purple outline-none transition-all" 
+                            placeholder="External Opponent Name (Optional)" 
+                          />
                         )}
                       </div>
                       <input type="number" value={match.p2Score} onChange={e => setMatch({...match, p2Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />

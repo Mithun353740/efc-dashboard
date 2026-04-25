@@ -315,7 +315,7 @@ export async function savePlayer(player: Player) {
   }
 }
 
-export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2: Player | undefined, allMatches: MatchRecord[], tournament?: string) {
+export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2: Player | undefined, allMatches: MatchRecord[], tournament?: string, p2NameOverride?: string) {
   if (isQuotaExceeded) {
     throw new Error("SYSTEM LOCKED: Cannot add match while Quota is exceeded.");
   }
@@ -329,7 +329,7 @@ export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2:
     p1Name: p1.name,
     p1Score,
     p2Id: p2?.id,
-    p2Name: p2 ? p2.name : 'External Player',
+    p2Name: p2 ? p2.name : (p2NameOverride || 'External Opponent'),
     p2Score,
     tournament: tournament || 'Friendly',
   };
