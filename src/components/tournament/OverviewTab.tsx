@@ -95,13 +95,28 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
                 {recentActivity.map((f, i) => {
                   const h = getTeam(f.homeId);
                   const a = getTeam(f.awayId);
+                  const hPlayer = players.find(p => p.id === f.homeId);
+                  const aPlayer = players.find(p => p.id === f.awayId);
+                  
                   return (
-                    <div key={f.id} className="bg-[#050508] border border-[#1e1e32] rounded-2xl p-4 flex items-center justify-between">
-                      <span className="text-[10px] font-black text-white truncate w-24 text-right">{h?.name}</span>
-                      <div className="px-3 py-1 bg-indigo-600/10 border border-indigo-600/20 rounded-lg text-indigo-400 font-black text-xs">
+                    <div key={f.id} className="bg-[#050508] border border-[#1e1e32] rounded-2xl p-4 flex items-center justify-between group hover:border-indigo-500/30 transition-all">
+                      <div className="flex items-center gap-3 w-32 justify-end">
+                        <span className="text-[10px] font-black text-white truncate text-right">{h?.name}</span>
+                        <div className="w-6 h-6 rounded-lg overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex-shrink-0">
+                          {hPlayer?.image ? <img src={hPlayer.image} className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-indigo-400 m-auto" />}
+                        </div>
+                      </div>
+                      
+                      <div className="px-3 py-1 bg-indigo-600/10 border border-indigo-600/20 rounded-lg text-indigo-400 font-black text-xs shadow-[0_0_15px_rgba(99,102,241,0.1)] group-hover:bg-indigo-600 group-hover:text-white transition-all">
                         {f.homeScore} - {f.awayScore}
                       </div>
-                      <span className="text-[10px] font-black text-white truncate w-24">{a?.name}</span>
+                      
+                      <div className="flex items-center gap-3 w-32">
+                        <div className="w-6 h-6 rounded-lg overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex-shrink-0">
+                          {aPlayer?.image ? <img src={aPlayer.image} className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-indigo-400 m-auto" />}
+                        </div>
+                        <span className="text-[10px] font-black text-white truncate">{a?.name}</span>
+                      </div>
                     </div>
                   );
                 })}
@@ -119,13 +134,28 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
                 {nextEngagements.map((f, i) => {
                   const h = getTeam(f.homeId);
                   const a = getTeam(f.awayId);
+                  const hPlayer = players.find(p => p.id === f.homeId);
+                  const aPlayer = players.find(p => p.id === f.awayId);
+                  
                   return (
-                    <div key={f.id} className="bg-[#050508] border border-[#1e1e32] rounded-2xl p-4 flex items-center justify-between">
-                      <span className="text-[10px] font-black text-white truncate w-24 text-right">{h?.name || 'TBD'}</span>
-                      <div className="px-2 py-1 bg-white/5 border border-white/10 rounded text-slate-500 font-black text-[9px] uppercase tracking-widest">
+                    <div key={f.id} className="bg-[#050508] border border-[#1e1e32] rounded-2xl p-4 flex items-center justify-between group hover:border-indigo-500/30 transition-all">
+                      <div className="flex items-center gap-3 w-32 justify-end">
+                        <span className="text-[10px] font-black text-white truncate text-right">{h?.name || 'TBD'}</span>
+                        <div className="w-6 h-6 rounded-lg overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex-shrink-0">
+                          {hPlayer?.image ? <img src={hPlayer.image} className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-indigo-400 m-auto" />}
+                        </div>
+                      </div>
+                      
+                      <div className="px-2 py-1 bg-white/5 border border-white/10 rounded text-slate-500 font-black text-[9px] uppercase tracking-widest group-hover:bg-indigo-600 group-hover:text-white transition-all">
                         VS
                       </div>
-                      <span className="text-[10px] font-black text-white truncate w-24">{a?.name || 'TBD'}</span>
+                      
+                      <div className="flex items-center gap-3 w-32">
+                        <div className="w-6 h-6 rounded-lg overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex-shrink-0">
+                          {aPlayer?.image ? <img src={aPlayer.image} className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-indigo-400 m-auto" />}
+                        </div>
+                        <span className="text-[10px] font-black text-white truncate">{a?.name || 'TBD'}</span>
+                      </div>
                     </div>
                   );
                 })}
@@ -162,37 +192,44 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
         {/* Right Column */}
         <div className="space-y-8">
           {/* Top Scorer Spotlight */}
-          <div className="bg-gradient-to-br from-indigo-900/40 to-[#0a0a12] border border-indigo-500/30 rounded-[2rem] p-8 relative overflow-hidden group">
-            <div className="absolute -top-12 -right-12 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl" />
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Top Scorer</h3>
-              <Trophy className="w-5 h-5 text-yellow-500" />
+          <div className="bg-gradient-to-br from-indigo-900/40 to-[#0a0a12] border border-indigo-500/30 rounded-[2.5rem] p-8 relative overflow-hidden group">
+            <div className="absolute -top-12 -right-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
+            <div className="flex items-center justify-between mb-10">
+              <h3 className="text-[11px] font-black uppercase tracking-widest text-indigo-400">Golden Boot Race</h3>
+              <Trophy className="w-6 h-6 text-yellow-500 animate-pulse" />
             </div>
             
             {topScorer ? (
-              <div className="space-y-6">
-                <div className="flex items-center gap-6">
-                  <div className="w-24 h-24 rounded-[2rem] border-2 border-indigo-500/30 overflow-hidden bg-[#050508] relative group">
+              <div className="space-y-8">
+                <div className="flex items-center gap-8">
+                  <div className="w-32 h-32 rounded-[2.5rem] border-4 border-indigo-500/30 overflow-hidden bg-[#050508] relative group ring-8 ring-indigo-500/5">
                     {topScorerPlayer?.image ? (
-                      <img src={topScorerPlayer.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      <img src={topScorerPlayer.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-indigo-500/20"><User size={48} /></div>
+                      <div className="w-full h-full flex items-center justify-center text-indigo-500/20"><User size={64} /></div>
                     )}
                   </div>
                   <div>
-                    <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-none mb-2">{topScorer.name}</h4>
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{topScorer.played} Matches Played</p>
+                    <h4 className="text-2xl font-black text-white uppercase tracking-tighter leading-tight mb-2 max-w-[180px] break-words">{topScorer.name}</h4>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-600/10 border border-indigo-500/20 rounded-full text-[9px] font-black text-indigo-400 uppercase tracking-widest">
+                       {topScorer.played} Matches Played
+                    </div>
                   </div>
                 </div>
-                <div className="pt-6 border-t border-white/5">
+                <div className="pt-8 border-t border-white/5 relative">
                   <div className="flex justify-between items-end">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total Goals Scored</span>
-                    <span className="text-5xl font-black text-white tracking-tighter italic">{topScorer.goals}</span>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tournament Total</span>
+                      <div className="text-xs font-black text-white uppercase italic">Goals Scored</div>
+                    </div>
+                    <span className="text-7xl font-black text-white tracking-tighter italic drop-shadow-[0_0_20px_rgba(99,102,241,0.3)]">
+                       {topScorer.goals}
+                    </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-12 text-slate-600 font-black uppercase text-xs tracking-widest">No stats yet</div>
+              <div className="text-center py-12 text-slate-600 font-black uppercase text-xs tracking-widest">No stats available</div>
             )}
           </div>
 
