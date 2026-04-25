@@ -201,47 +201,71 @@ export function calculateOvrHybrid(player: Player, elo: number): number {
 
 export const INITIAL_PLAYERS: Player[] = [];
 
-// Real-time listeners
-export function subscribeToPlayers(callback: (players: Player[]) => void) {
+export async function fetchPlayers(): Promise<Player[]> {
+  const q = query(collection(db, 'players'));
+  const snap = await getDocs(q);
+  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+}
+
+export async function fetchLeaders(): Promise<Leader[]> {
+  const q = query(collection(db, 'leaders'));
+  const snap = await getDocs(q);
+  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
+}
+
+export async function fetchMatches(): Promise<MatchRecord[]> {
+  const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
+}
+
+export async function fetchTournaments(): Promise<Tournament[]> {
+  const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
+}
+
+// Real-time listeners (for Admins)
+export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void) {
   const path = 'players';
   const q = query(collection(db, path));
   return onSnapshot(q, (snapshot) => {
     const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
-    callback(players);
+    callback(players, snapshot.metadata.hasPendingWrites);
   }, (error) => {
     handleFirestoreError(error, OperationType.GET, path);
   });
 }
 
-export function subscribeToLeaders(callback: (leaders: Leader[]) => void) {
+export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boolean) => void) {
   const path = 'leaders';
   const q = query(collection(db, path));
   return onSnapshot(q, (snapshot) => {
     const leaders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
-    callback(leaders);
+    callback(leaders, snapshot.metadata.hasPendingWrites);
   }, (error) => {
     handleFirestoreError(error, OperationType.GET, path);
   });
 }
 
-export function subscribeToMatches(callback: (matches: MatchRecord[]) => void) {
+export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending: boolean) => void) {
   const path = 'matches';
   // Sorting by timestamp descending (newest first)
   const q = query(collection(db, path), orderBy('timestamp', 'desc'));
   return onSnapshot(q, (snapshot) => {
     const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
-    callback(matches);
+    callback(matches, snapshot.metadata.hasPendingWrites);
   }, (error) => {
     handleFirestoreError(error, OperationType.GET, path);
   });
 }
 
-export function subscribeToTournaments(callback: (tournaments: Tournament[]) => void) {
+export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void) {
   const path = 'tournaments';
   const q = query(collection(db, path), orderBy('createdAt', 'desc'));
   return onSnapshot(q, (snapshot) => {
     const tournaments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
-    callback(tournaments);
+    callback(tournaments, snapshot.metadata.hasPendingWrites);
   }, (error) => {
     handleFirestoreError(error, OperationType.GET, path);
   });

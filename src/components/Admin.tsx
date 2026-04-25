@@ -12,7 +12,7 @@ import { auth, loginAnonymously, db } from '../firebase';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
 
 export default function Admin() {
-  const { players, leaders, matches, tournaments, systemLocks, dbError } = useFirebase();
+  const { players, leaders, matches, tournaments, systemLocks, dbError, hasPendingWrites } = useFirebase();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
@@ -136,10 +136,14 @@ export default function Admin() {
         finalCanvas.width = finalWidth;
         finalCanvas.height = finalHeight;
         const finalCtx = finalCanvas.getContext('2d');
-        if (finalCtx) finalCtx.imageSmoothingQuality = 'high';
+        if (finalCtx) {
+          finalCtx.imageSmoothingEnabled = true;
+          finalCtx.imageSmoothingQuality = 'high';
+        }
         finalCtx?.drawImage(canvas, 0, 0, finalWidth, finalHeight);
 
-        resolve(finalCanvas.toDataURL('image/jpeg', 0.98));
+        // Use 0.75 compression for the perfect balance of "Crystal Clear" quality and database speed
+        resolve(finalCanvas.toDataURL('image/jpeg', 0.75));
       };
     });
   };
@@ -386,6 +390,12 @@ export default function Admin() {
         </div>
         
         <div className="flex flex-wrap gap-2 md:gap-4 items-center justify-center md:justify-end">
+          {hasPendingWrites && (
+            <div className="px-3 py-1 bg-brand-purple/10 text-brand-purple border border-brand-purple/20 rounded-full text-[7px] md:text-[8px] font-black tracking-widest flex items-center gap-2 animate-pulse">
+              <div className="w-1 h-1 rounded-full bg-brand-purple" />
+              SYNCING...
+            </div>
+          )}
           {authStatus === 'unauthenticated' && (
             <div className="px-3 py-1 bg-amber-500/10 text-amber-500 rounded-full text-[7px] md:text-[8px] font-black tracking-widest animate-pulse">
               AUTH REQUIRED

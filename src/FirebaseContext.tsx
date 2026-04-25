@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Player, Leader, MatchRecord, Tournament } from './types';
-import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, subscribeToTournaments, subscribeToSystemLocks, bootstrapData, sortRankedPlayers, testFirestoreConnection, computeGlobalElo, calculateOvrHybrid, addMatch } from './lib/store';
+import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, subscribeToTournaments, subscribeToSystemLocks, bootstrapData, sortRankedPlayers, testFirestoreConnection, computeGlobalElo, calculateOvrHybrid, addMatch, fetchPlayers, fetchLeaders, fetchMatches, fetchTournaments } from './lib/store';
 
 interface FirebaseContextType {
   players: Player[];
@@ -11,6 +11,7 @@ interface FirebaseContextType {
   systemLocks: Record<string, boolean>;
   isLoading: boolean;
   dbError: string | null;
+  hasPendingWrites: boolean;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
@@ -26,6 +27,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
   const [isMinLoadTimePassed, setIsMinLoadTimePassed] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [hasPendingWrites, setHasPendingWrites] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -51,59 +53,106 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (mounted && customEvent.detail?.error) {
         const errStr = String(customEvent.detail.error).toLowerCase();
         
-        // Attempt to rescue from cache
-        const cachedP = localStorage.getItem('vortex_players_cache');
-        const cachedL = localStorage.getItem('vortex_leaders_cache');
-        const cachedM = localStorage.getItem('vortex_matches_cache');
-        
-        if (cachedP) setPlayers(JSON.parse(cachedP));
-        if (cachedL) setLeaders(JSON.parse(cachedL));
-        if (cachedM) setMatches(JSON.parse(cachedM));
+        // ONLY rescue from cache if we have NO data at all
+        // If we already have data in memory, DO NOT overwrite it with stale cache
+        if (players.length === 0) {
+          const cachedP = localStorage.getItem('vortex_players_cache');
+          if (cachedP) setPlayers(JSON.parse(cachedP));
+        }
+        if (leaders.length === 0) {
+          const cachedL = localStorage.getItem('vortex_leaders_cache');
+          if (cachedL) setLeaders(JSON.parse(cachedL));
+        }
+        if (matches.length === 0) {
+          const cachedM = localStorage.getItem('vortex_matches_cache');
+          if (cachedM) setMatches(JSON.parse(cachedM));
+        }
         
         setIsLoadingPlayers(false);
         setIsLoadingLeaders(false);
         setIsLoadingMatches(false);
 
-        // Set dbError ONLY on true quota exhaustion — permission errors must NOT lock the UI
         if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
           setDbError('QUOTA_EXCEEDED');
         } else {
-          // Permission denied, network offline, etc. — do NOT lock the admin Control Center
           setDbError('DATABASE_ERROR');
         }
       }
     };
     window.addEventListener('firestore-error', errorHandler);
 
-    const unsubPlayers = subscribeToPlayers((data) => {
-      if (mounted) {
-        setPlayers(data);
-        localStorage.setItem('vortex_players_cache', JSON.stringify(data));
-        setIsLoadingPlayers(false);
-      }
-    });
+    const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+    let unsubPlayers: () => void = () => {};
+    let unsubLeaders: () => void = () => {};
+    let unsubMatches: () => void = () => {};
+    let unsubTournaments: () => void = () => {};
 
-    const unsubLeaders = subscribeToLeaders((data) => {
-      if (mounted) {
-        setLeaders(data);
-        localStorage.setItem('vortex_leaders_cache', JSON.stringify(data));
-        setIsLoadingLeaders(false);
-      }
-    });
+    if (isAdmin) {
+      unsubPlayers = subscribeToPlayers((data, pending) => {
+        if (mounted) {
+          setPlayers(data);
+          setHasPendingWrites(pending);
+          localStorage.setItem('vortex_players_cache', JSON.stringify(data));
+          setIsLoadingPlayers(false);
+        }
+      });
 
-    const unsubMatches = subscribeToMatches((data) => {
-      if (mounted) {
-        setMatches(data);
-        localStorage.setItem('vortex_matches_cache', JSON.stringify(data));
-        setIsLoadingMatches(false);
-      }
-    });
+      unsubLeaders = subscribeToLeaders((data, pending) => {
+        if (mounted) {
+          setLeaders(data);
+          setHasPendingWrites(pending);
+          localStorage.setItem('vortex_leaders_cache', JSON.stringify(data));
+          setIsLoadingLeaders(false);
+        }
+      });
 
-    const unsubTournaments = subscribeToTournaments((data) => {
-      if (mounted) {
-        setTournaments(data);
-      }
-    });
+      unsubMatches = subscribeToMatches((data, pending) => {
+        if (mounted) {
+          setMatches(data);
+          setHasPendingWrites(pending);
+          localStorage.setItem('vortex_matches_cache', JSON.stringify(data));
+          setIsLoadingMatches(false);
+        }
+      });
+
+      unsubTournaments = subscribeToTournaments((data, pending) => {
+        if (mounted) {
+          setTournaments(data);
+          setHasPendingWrites(pending);
+        }
+      });
+    } else {
+      // Public User: Manual Fetch every 5 Minutes
+      const SYNC_INTERVAL = 5 * 60 * 1000;
+      
+      const performFetch = async () => {
+        try {
+          const [p, l, m, t] = await Promise.all([
+            fetchPlayers(),
+            fetchLeaders(),
+            fetchMatches(),
+            fetchTournaments()
+          ]);
+          if (mounted) {
+            setPlayers(p);
+            setLeaders(l);
+            setMatches(m);
+            setTournaments(t);
+            setIsLoadingPlayers(false);
+            setIsLoadingLeaders(false);
+            setIsLoadingMatches(false);
+          }
+        } catch (err) {
+          console.error('[Sync] Public fetch failed:', err);
+        }
+      };
+
+      performFetch(); // Initial load
+      const intervalId = setInterval(performFetch, SYNC_INTERVAL);
+      
+      // Cleanup for public view
+      unsubPlayers = () => clearInterval(intervalId);
+    }
 
     const unsubLocks = subscribeToSystemLocks((locks) => {
       if (mounted) {
@@ -196,7 +245,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     tournaments,
     systemLocks,
     isLoading,
-    dbError
+    dbError,
+    hasPendingWrites
   };
 
   return (
