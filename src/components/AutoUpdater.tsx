@@ -7,29 +7,31 @@ export default function AutoUpdater() {
 
     const checkForUpdates = async () => {
       try {
-        // Fetch the static version file. Static files update immediately on refresh/deploy.
-        const res = await fetch(`/version.txt?cb=${Date.now()}`, {
+        // Appending a random timestamp prevents the browser from caching this exact fetch request
+        const res = await fetch(`/api/version-ping?cb=${Date.now()}`, {
           cache: 'no-store'
         });
         
-        if (!res.ok) return;
-        const liveServerVersion = (await res.text()).trim();
+        const data = await res.json();
+        const liveServerVersion = data.current_version;
 
         if (!localSessionVersion) {
+          // First time this session, just record the server's version
           sessionStorage.setItem('qv-app-version', liveServerVersion);
           localSessionVersion = liveServerVersion;
         } else if (localSessionVersion !== liveServerVersion) {
-          console.warn("UPDATE DETECTED: Code was updated on Git! Refreshing...");
+          // The server restarted (code was updated), but our session has the old code!
+          // Force a hard window reload from the server using true to bypass cache
+          console.warn("CRITICAL: Code update detected! Auto-refreshing client...");
           sessionStorage.setItem('qv-app-version', liveServerVersion);
           
-          // Force hard reload
-          window.location.reload();
+          // Use multiple strategies to force the browser to forget the past
+          window.location.href = window.location.pathname + '?updated=true&t=' + Date.now();
         }
       } catch (err) {
-        // Silently ignore errors
+        // Silently ignore ping errors (like if the user is offline or server temporarily unreachable)
       }
     };
-
 
     // Check immediately on mount
     checkForUpdates();

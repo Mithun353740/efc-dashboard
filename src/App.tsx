@@ -15,7 +15,7 @@ import Admin from './components/Admin';
 import Rankings from './components/Rankings';
 import PlayerStats from './components/PlayerStats';
 import Login from './components/Login';
-import TournamentWrapper from './components/TournamentWrapper';
+import Tournament from './components/Tournament';
 import AutoUpdater from './components/AutoUpdater';
 import { FirebaseProvider, useFirebase } from './FirebaseContext';
 import { INITIAL_PLAYERS } from './lib/store';
@@ -59,7 +59,7 @@ function AppContent() {
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="/rankings" element={<Rankings />} />
           <Route path="/stats" element={<PlayerStats />} />
-          <Route path="/tournament" element={<TournamentWrapper />} />
+          <Route path="/tournament" element={<Tournament />} />
         </Routes>
       </main>
       <Footer />
