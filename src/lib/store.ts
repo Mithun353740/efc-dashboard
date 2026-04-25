@@ -28,6 +28,7 @@ export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>
 }
 
 export async function toggleSystemLock(systemId: string, locked: boolean) {
+  if (isQuotaExceeded) return;
   try {
     const lockDoc = doc(db, 'settings', 'locks');
     await setDoc(lockDoc, { [systemId]: locked }, { merge: true });
@@ -64,6 +65,8 @@ interface FirestoreErrorInfo {
   }
 }
 
+let isQuotaExceeded = false;
+
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errStrRaw = error instanceof Error ? error.message : (typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error));
   const errInfo: FirestoreErrorInfo = {
@@ -85,12 +88,11 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     path
   };
   
-  if (errStrRaw.toLowerCase().includes('quota') || errStrRaw.toLowerCase().includes('exceeded')) {
-    console.warn('Firestore Quota Exceeded for path:', path);
-  } else {
-    console.error('Firestore Error: ', JSON.stringify(errInfo));
+  if (errStrRaw.toLowerCase().includes('quota') || errStrRaw.toLowerCase().includes('exceeded') || errStrRaw.toLowerCase().includes('resource-exhausted')) {
+    isQuotaExceeded = true;
+    console.warn('CRITICAL: Firestore Quota Exceeded. Disabling all local writes.');
   }
-  
+
   const event = new CustomEvent('firestore-error', { detail: errInfo });
   window.dispatchEvent(event);
 
@@ -299,6 +301,9 @@ export async function recalculateAllStats(players: Player[], allMatches: MatchRe
 }
 
 export async function savePlayer(player: Player) {
+  if (isQuotaExceeded) {
+    throw new Error("SYSTEM LOCKED: Cannot save player info while Quota is exceeded. Please refresh after reset.");
+  }
   const path = `players/${player.id}`;
   console.log('Saving player to Firestore:', path, player);
   try {
@@ -311,6 +316,9 @@ export async function savePlayer(player: Player) {
 }
 
 export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2: Player | undefined, allMatches: MatchRecord[], tournament?: string) {
+  if (isQuotaExceeded) {
+    throw new Error("SYSTEM LOCKED: Cannot add match while Quota is exceeded.");
+  }
   const batch = writeBatch(db);
   
   const matchRef = doc(collection(db, 'matches'));
@@ -345,6 +353,7 @@ export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2:
 }
 
 export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2Score: number, players: Player[], allMatches: MatchRecord[], newTournament?: string) {
+  if (isQuotaExceeded) return;
   const batch = writeBatch(db);
 
   const updatedMatchRecord: MatchRecord = {
@@ -382,8 +391,8 @@ export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-edit');
   }
 }
-
 export async function deleteMatchFromHistory(matchRecord: MatchRecord, players: Player[], allMatches: MatchRecord[]) {
+  if (isQuotaExceeded) return;
   const batch = writeBatch(db);
 
   batch.delete(doc(db, 'matches', matchRecord.id));
@@ -412,6 +421,7 @@ export async function deleteMatchFromHistory(matchRecord: MatchRecord, players: 
 }
 
 export async function deletePlayer(id: string) {
+  if (isQuotaExceeded) return;
   const path = `players/${id}`;
   try {
     await deleteDoc(doc(db, 'players', id));
@@ -439,6 +449,9 @@ export async function deleteLeader(id: string) {
 }
 
 export async function saveTournament(tournament: Tournament) {
+  if (isQuotaExceeded) {
+    throw new Error("SYSTEM LOCKED: Cannot update tournament while Quota is exceeded.");
+  }
   const path = `tournaments/${tournament.id}`;
   try {
     await setDoc(doc(db, 'tournaments', tournament.id), tournament);
@@ -449,6 +462,7 @@ export async function saveTournament(tournament: Tournament) {
 }
 
 export async function deleteTournament(id: string) {
+  if (isQuotaExceeded) return;
   const path = `tournaments/${id}`;
   try {
     await deleteDoc(doc(db, 'tournaments', id));

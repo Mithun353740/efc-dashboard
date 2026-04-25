@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tournament, Fixture, Team } from '../../types';
-import { saveTournament } from '../../lib/store';
+import { Tournament, Fixture, Team, Player } from '../../types';
+import { saveTournament, addMatch } from '../../lib/store';
+import { useFirebase } from '../../FirebaseContext';
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, Zap, Edit3, X, Check } from 'lucide-react';
 
 interface FixturesTabProps {
@@ -17,6 +18,7 @@ interface ScoreEntry {
 }
 
 export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps) {
+  const { players, matches } = useFirebase();
   const fixtures = tournament.fixtures || [];
   const rounds = Array.from(new Set(fixtures.map(f => f.round))).sort((a, b) => a - b);
   const [activeRound, setActiveRound] = useState<number>(rounds[0] ?? 1);
@@ -40,6 +42,21 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
         ? { ...f, homeScore: home, awayScore: away, status: 'completed' as const }
         : f
     );
+
+    // Record match globally for stats and rankings
+    const fixture = fixtures.find(f => f.id === editingScore.fixtureId);
+    if (fixture && fixture.status !== 'completed') {
+      const p1 = players.find(p => p.id === fixture.homeId);
+      const p2 = players.find(p => p.id === fixture.awayId);
+      if (p1) {
+        try {
+          await addMatch(p1, home, away, p2, matches, tournament.name);
+        } catch (err) {
+          console.error("Failed to link tournament match to global stats:", err);
+        }
+      }
+    }
+
     const updated: Tournament = { ...tournament, fixtures: updatedFixtures };
     await saveTournament(updated);
     onUpdate(updated);
