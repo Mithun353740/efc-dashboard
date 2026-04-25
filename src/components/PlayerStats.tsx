@@ -9,7 +9,7 @@ import { Player } from '../types';
 import { computePlayerStats } from '../lib/store';
 
 export default function PlayerStats() {
-  const { rankedPlayers: players, matches } = useFirebase();
+  const { rankedPlayers: players, matches, tournaments } = useFirebase();
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [search, setSearch] = useState('');
   const [searchParams] = useSearchParams();
@@ -50,7 +50,7 @@ export default function PlayerStats() {
   }, [matches]);
 
   const availableTournaments = useMemo(() => {
-    const core = ["QVFC Elite League Cup", "QVFC Elite League Cup Division 2", "Vortex Champions Cup", "Vortex Domestic Cup"];
+    const core = ["QVFC Elite League Cup Division 1", "QVFC Elite League Cup Division 2", "Vortex Champions Cup", "Vortex Domestic Cup"];
     const dynamic = tournaments.map(t => t.name);
     return Array.from(new Set([...core, ...dynamic]));
   }, [tournaments]);
