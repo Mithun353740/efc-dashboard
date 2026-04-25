@@ -13,6 +13,7 @@ export interface Player {
   form: string[];
   device?: string;
   uid?: string;
+  role?: 'admin' | 'player';
 }
 
 export interface Leader {
@@ -35,4 +36,11 @@ export interface MatchRecord {
   p2Name: string;
   p2Score: number;
   tournament?: string;
+}
+
+export interface Tournament {
+  id: string;
+  name: string;
+  season: string;
+  createdAt: number;
 }

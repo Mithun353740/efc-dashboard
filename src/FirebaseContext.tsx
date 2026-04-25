@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Player, Leader, MatchRecord } from './types';
-import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, bootstrapData, sortRankedPlayers, testFirestoreConnection, computeGlobalElo, calculateOvrHybrid } from './lib/store';
+import { Player, Leader, MatchRecord, Tournament } from './types';
+import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, subscribeToTournaments, subscribeToSystemLocks, bootstrapData, sortRankedPlayers, testFirestoreConnection, computeGlobalElo, calculateOvrHybrid } from './lib/store';
 
 interface FirebaseContextType {
   players: Player[];
   rankedPlayers: Player[];
   leaders: Leader[];
   matches: MatchRecord[];
+  tournaments: Tournament[];
+  systemLocks: Record<string, boolean>;
   isLoading: boolean;
   dbError: string | null;
 }
@@ -17,6 +19,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [matches, setMatches] = useState<MatchRecord[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>({});
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
   const [isLoadingLeaders, setIsLoadingLeaders] = useState(true);
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
@@ -53,10 +57,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setIsLoadingLeaders(false);
         setIsLoadingMatches(false);
 
-        // Set dbError to trigger Read-Only UI and Admin Lock
-        if (errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('permission')) {
+        // Set dbError ONLY on true quota exhaustion — permission errors must NOT lock the UI
+        if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
           setDbError('QUOTA_EXCEEDED');
         } else {
+          // Permission denied, network offline, etc. — do NOT lock the admin Control Center
           setDbError('DATABASE_ERROR');
         }
       }
@@ -87,7 +92,19 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Fallback: don't hang forever if collections are completely empty and snapshot takes time
+    const unsubTournaments = subscribeToTournaments((data) => {
+      if (mounted) {
+        setTournaments(data);
+      }
+    });
+
+    const unsubLocks = subscribeToSystemLocks((locks) => {
+      if (mounted) {
+        setSystemLocks(locks);
+      }
+    });
+
+    // FALLBACK: don't hang forever if collections are completely empty and snapshot takes time
     const timeout = setTimeout(() => {
       if (mounted) {
         setIsLoadingPlayers(false);
@@ -96,16 +113,55 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     }, 3500);
 
+    // TOURNAMENT INTEGRATION: Handle messages from the embedded Tournament System
+    const handleTournamentMessage = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== 'object') return;
+
+      const { type, match } = event.data;
+
+      // 1. Respond to player data requests
+      if (type === 'REQUEST_PLAYERS' && event.source) {
+        (event.source as Window).postMessage({ 
+          type: 'PLAYERS_LIST', 
+          players: playersRef.current 
+        }, { targetOrigin: '*' });
+      }
+
+      // 2. Handle automated match recording
+      if (type === 'MATCH_COMPLETED' && match) {
+        const { p1Id, p1Score, p2Id, p2Score, tournament } = match;
+        const player1 = playersRef.current.find(p => p.id === p1Id);
+        const player2 = playersRef.current.find(p => p.id === p2Id);
+
+        if (player1) {
+          console.log('[Dashboard] Auto-recording tournament match:', match);
+          addMatch(player1, p1Score, p2Score, player2, matchesRef.current, tournament)
+            .catch(err => console.error('[Dashboard] Match recording failed:', err));
+        }
+      }
+    };
+
+    window.addEventListener('message', handleTournamentMessage);
+
     return () => {
       mounted = false;
       window.removeEventListener('firestore-error', errorHandler);
+      window.removeEventListener('message', handleTournamentMessage);
       unsubPlayers();
       unsubLeaders();
       unsubMatches();
+      unsubTournaments();
+      unsubLocks();
       clearTimeout(timeout);
       clearTimeout(minLoadTimer);
     };
-  }, []);
+  }, []); // REMOVED dependencies to stop the infinite loop
+
+  // Sync refs for the message handler to use
+  const playersRef = React.useRef(players);
+  const matchesRef = React.useRef(matches);
+  React.useEffect(() => { playersRef.current = players; }, [players]);
+  React.useEffect(() => { matchesRef.current = matches; }, [matches]);
 
   const elos = React.useMemo(() => computeGlobalElo(players, matches), [players, matches]);
   const enrichedPlayers = players.map(p => ({
@@ -130,6 +186,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     rankedPlayers: sortRankedPlayers(enrichedPlayers),
     leaders: enrichedLeaders,
     matches,
+    tournaments,
+    systemLocks,
     isLoading,
     dbError
   };

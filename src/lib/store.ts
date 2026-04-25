@@ -1,4 +1,4 @@
-import { Player, Leader, MatchRecord } from '../types';
+import { Player, Leader, MatchRecord, Tournament } from '../types';
 import { db, auth } from '../firebase';
 import { 
   collection, 
@@ -13,6 +13,30 @@ import {
   limit,
   getDocFromServer
 } from 'firebase/firestore';
+
+export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>) => void) {
+  const q = query(collection(db, 'settings'));
+  return onSnapshot(q, (snapshot) => {
+    let locks = { tournaments: false };
+    snapshot.forEach((docSnap) => {
+      if (docSnap.id === 'locks') {
+        locks = docSnap.data() as Record<string, boolean>;
+      }
+    });
+    callback(locks);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, 'settings/locks');
+  });
+}
+
+export async function toggleSystemLock(systemId: string, locked: boolean) {
+  try {
+    const lockDoc = doc(db, 'settings', 'locks');
+    await setDoc(lockDoc, { [systemId]: locked }, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `settings/locks`);
+  }
+}
 
 export enum OperationType {
   CREATE = 'create',
@@ -86,8 +110,9 @@ export async function testFirestoreConnection() {
   } catch (error: any) {
     if (error?.message?.includes('the client is offline')) {
       console.error("Firestore is offline. Please check your Firebase configuration.");
-    } else if (error?.code === 'permission-denied' || error?.code === 'resource-exhausted' || String(error).toLowerCase().includes('quota')) {
-      console.warn("Quota exceeded or permission denied detected during connection test.");
+    } else if (error?.code === 'resource-exhausted' || String(error).toLowerCase().includes('quota') || String(error).toLowerCase().includes('resource-exhausted')) {
+      // Only fire quota error for actual quota exhaustion — NOT for permission-denied
+      console.warn("Quota exceeded detected during connection test.");
       const errInfo: FirestoreErrorInfo = {
         error: error.message || 'Quota exceeded',
         operationType: OperationType.GET,
@@ -97,11 +122,15 @@ export async function testFirestoreConnection() {
           email: auth.currentUser?.email || '',
           emailVerified: auth.currentUser?.emailVerified || false,
           isAnonymous: auth.currentUser?.isAnonymous || true,
-          providerInfo: auth.currentUser?.providerData.map(p => ({ providerId: p.providerId, displayName: p.displayName || '', email: p.email || '' })) || []
+          providerInfo: auth.currentUser?.providerData.map(p => ({ providerId: p.providerId, displayName: p.displayName || '', email: p.email || '' })) || [],
+          tenantId: null
         }
       };
       const event = new CustomEvent('firestore-error', { detail: errInfo });
       window.dispatchEvent(event);
+    } else if (error?.code === 'permission-denied') {
+      // Permission denied on the test collection is expected for anonymous users — ignore silently
+      console.log('Firestore connection test: permission-denied on test collection (expected for anon users).');
     }
   }
 }
@@ -202,6 +231,17 @@ export function subscribeToMatches(callback: (matches: MatchRecord[]) => void) {
   return onSnapshot(q, (snapshot) => {
     const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
     callback(matches);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.GET, path);
+  });
+}
+
+export function subscribeToTournaments(callback: (tournaments: Tournament[]) => void) {
+  const path = 'tournaments';
+  const q = query(collection(db, path), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    const tournaments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
+    callback(tournaments);
   }, (error) => {
     handleFirestoreError(error, OperationType.GET, path);
   });
@@ -397,6 +437,15 @@ export async function deleteLeader(id: string) {
     await deleteDoc(doc(db, 'leaders', id));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export async function saveTournament(tournament: Tournament) {
+  const path = `tournaments/${tournament.id}`;
+  try {
+    await setDoc(doc(db, 'tournaments', tournament.id), tournament);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
 

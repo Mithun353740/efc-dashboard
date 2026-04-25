@@ -1,12 +1,64 @@
+import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
-import { INITIAL_PLAYERS } from '../lib/store';
+import { INITIAL_PLAYERS, computePlayerStats, sortRankedPlayers } from '../lib/store';
 
 export default function EliteRankings() {
-  const { rankedPlayers } = useFirebase();
-  const activePlayers = rankedPlayers.length > 0 ? rankedPlayers : INITIAL_PLAYERS;
+  const { rankedPlayers, matches } = useFirebase();
+
+  const getSeasonInfo = (date: Date) => {
+    let start = new Date(2026, 3, 17); // April 17, 2026 (Anchor)
+    if (date >= start) {
+      while (true) {
+        let end = new Date(start);
+        end.setMonth(end.getMonth() + 9);
+        end.setDate(end.getDate() - 1);
+        if (date <= end) {
+          const sY = start.getFullYear();
+          const eY = end.getFullYear();
+          return { name: sY === eY ? `${sY} Season` : `${sY}/${eY}`, start, end };
+        }
+        start.setMonth(start.getMonth() + 9);
+        if (start.getFullYear() > 2100) break;
+      }
+    } else {
+      while (true) {
+        let nextStart = new Date(start);
+        start = new Date(start);
+        start.setMonth(start.getMonth() - 9);
+        let end = new Date(nextStart);
+        end.setDate(end.getDate() - 1);
+        if (date >= start && date <= end) {
+          const sY = start.getFullYear();
+          const eY = end.getFullYear();
+          return { name: sY === eY ? `${sY} Season` : `${sY}/${eY}`, start, end };
+        }
+        if (start.getFullYear() < 2020) break;
+      }
+    }
+    return { name: "Legacy", start: null, end: null };
+  };
+
+  // Get current season matches for "Top Performers This Season"
+  const currentSeasonPlayers = useMemo(() => {
+    const seasonId = getSeasonInfo(new Date()).name;
+
+    const seasonMatches = matches.filter(m => {
+      return getSeasonInfo(new Date(m.timestamp)).name === seasonId;
+    });
+
+    const playersWithSeasonStats = rankedPlayers.map(p => {
+      const stats = computePlayerStats(p, seasonMatches);
+      stats.ovr = p.ovr; // Keep global OVR
+      return stats;
+    }).filter(p => p.win > 0 || p.loss > 0 || p.draw > 0);
+
+    return sortRankedPlayers(playersWithSeasonStats);
+  }, [rankedPlayers, matches]);
+
+  const activePlayers = currentSeasonPlayers.length > 0 ? currentSeasonPlayers : rankedPlayers;
   const topPlayers = activePlayers.slice(0, 5);
 
   return (

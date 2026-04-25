@@ -10,8 +10,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
 
-    <link rel="icon" href="/logo.jpg" />
-    <link rel="apple-touch-icon" href="/logo.jpg" />
+    <link rel="icon" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
     
     <!-- Open Graph Meta Tags for beautiful previews on Discord/WhatsApp/Socials -->
     <meta property="og:title" content="Quantum Vortex FC | Official Portal" />
@@ -26,29 +26,11 @@
     <meta name="twitter:title" content="Quantum Vortex FC | Official Portal" />
     <meta name="twitter:description" content="Where Digital Strategy Meets Kinetic Chaos. View official club standings, analytics, and elite tournament match histories." />
     <meta name="twitter:image" content="https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=1200&h=630&auto=format&fit=crop" />
-    <script>
-      // Fix for "Uncaught TypeError: Cannot set property fetch of #<Window> which has only a getter"
-      // This occurs in some environments when libraries try to polyfill fetch.
-      (function() {
-        try {
-          var originalFetch = window.fetch;
-          if (originalFetch) {
-            Object.defineProperty(window, 'fetch', {
-              configurable: true,
-              enumerable: true,
-              get: function() { return originalFetch; },
-              set: function(v) { console.warn('Prevented attempt to overwrite window.fetch'); }
-            });
-          }
-        } catch (e) {
-          console.warn('Could not redefine window.fetch:', e);
-        }
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
+
 </html>
 

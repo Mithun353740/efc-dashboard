@@ -10,21 +10,46 @@ export default function Rankings() {
   const [selectedSeason, setSelectedSeason] = useState('All Time');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  const getSeasonInfo = (date: Date) => {
+    let start = new Date(2026, 3, 17); // April 17, 2026 (Anchor)
+    if (date >= start) {
+      while (true) {
+        let end = new Date(start);
+        end.setMonth(end.getMonth() + 9);
+        end.setDate(end.getDate() - 1);
+        if (date <= end) {
+          const sY = start.getFullYear();
+          const eY = end.getFullYear();
+          return { name: sY === eY ? `${sY} Season` : `${sY}/${eY}`, start, end };
+        }
+        start.setMonth(start.getMonth() + 9);
+        if (start.getFullYear() > 2100) break;
+      }
+    } else {
+      while (true) {
+        let nextStart = new Date(start);
+        start = new Date(start);
+        start.setMonth(start.getMonth() - 9);
+        let end = new Date(nextStart);
+        end.setDate(end.getDate() - 1);
+        if (date >= start && date <= end) {
+          const sY = start.getFullYear();
+          const eY = end.getFullYear();
+          return { name: sY === eY ? `${sY} Season` : `${sY}/${eY}`, start, end };
+        }
+        if (start.getFullYear() < 2020) break;
+      }
+    }
+    return { name: "Legacy", start: null, end: null };
+  };
+
   const availableSeasons = useMemo(() => {
     const seasons = new Set<string>();
     matches.forEach(m => {
-      const d = new Date(m.timestamp);
-      const y = d.getFullYear();
-      const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-      const sY = isLateJan ? y - 1 : y;
-      seasons.add(`${sY}/${sY + 1}`);
+      seasons.add(getSeasonInfo(new Date(m.timestamp)).name);
     });
     // Ensure current season
-    const d = new Date();
-    const y = d.getFullYear();
-    const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-    const sY = isLateJan ? y - 1 : y;
-    seasons.add(`${sY}/${sY + 1}`);
+    seasons.add(getSeasonInfo(new Date()).name);
     return Array.from(seasons).sort().reverse();
   }, [matches]);
 
@@ -35,11 +60,7 @@ export default function Rankings() {
 
     // Filter matches by season
     const seasonMatches = matches.filter(m => {
-      const d = new Date(m.timestamp);
-      const y = d.getFullYear();
-      const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-      const sY = isLateJan ? y - 1 : y;
-      return `${sY}/${sY + 1}` === selectedSeason;
+      return getSeasonInfo(new Date(m.timestamp)).name === selectedSeason;
     });
 
     // Compute new stats
