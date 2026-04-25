@@ -21,6 +21,11 @@ async function startServer() {
     res.json({ current_version: SERVER_BOOT_HASH });
   });
 
+  // Explicitly serve public files so Vite's SPA fallback doesn't swallow HTML files like tournament-system/index.html
+  if (process.env.NODE_ENV !== 'production') {
+    app.use(express.static(path.join(process.cwd(), 'public')));
+  }
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -50,14 +55,8 @@ async function startServer() {
     });
   }
 
-  // Handle SPA routing for dev if vite middleware misses it
-  app.get('*', (req, res, next) => {
-    if (process.env.NODE_ENV !== 'production') {
-       // Vite handles this usually, but just in case
-       req.url = '/';
-       return next();
-    }
-  });
+  // Let Vite handle its own SPA fallback in development.
+  // No need for a custom app.get('*') in dev because appType: 'spa' handles it.
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);

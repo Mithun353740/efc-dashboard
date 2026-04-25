@@ -108,15 +108,20 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
-    // Tournament Manager Collections
-    match /users/{userId} {
-      allow read, write: if request.auth != null;
-    }
+    // Tournaments collection
     match /tournaments/{tournamentId} {
       allow read: if true;
       allow write: if request.auth != null;
     }
-    match /activityLog/{logId} {
+
+    // Settings collection
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Locks subcollection (under settings)
+    match /settings/locks/{lockId} {
       allow read: if true;
       allow write: if request.auth != null;
     }

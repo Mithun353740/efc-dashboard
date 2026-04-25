@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Player, Leader, MatchRecord, Tournament } from './types';
-import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, subscribeToTournaments, subscribeToSystemLocks, bootstrapData, sortRankedPlayers, testFirestoreConnection, computeGlobalElo, calculateOvrHybrid } from './lib/store';
+import { subscribeToPlayers, subscribeToLeaders, subscribeToMatches, subscribeToTournaments, subscribeToSystemLocks, bootstrapData, sortRankedPlayers, testFirestoreConnection, computeGlobalElo, calculateOvrHybrid, addMatch } from './lib/store';
 
 interface FirebaseContextType {
   players: Player[];
@@ -38,13 +38,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // Actively probe the server once to see if quota is blown, 
     // because IndexedDB offline persistence might silently hide quota errors from onSnapshot
     testFirestoreConnection();
-
-    // Ensure anonymous auth for guests to access restricted collections (tournaments, etc.)
-    import('./firebase').then(({ loginAnonymously, auth }) => {
-      if (!auth.currentUser) {
-        loginAnonymously().catch(err => console.warn('[Firebase] Anonymous login failed:', err));
-      }
-    });
 
     const errorHandler = (e: Event) => {
       const customEvent = e as CustomEvent;

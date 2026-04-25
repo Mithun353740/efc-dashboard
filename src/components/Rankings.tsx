@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
-import { cn } from '../lib/utils';
+import { cn, getSeasonInfo } from '../lib/utils';
 import { INITIAL_PLAYERS, computePlayerStats, sortRankedPlayers } from '../lib/store';
 import { Trophy, ChevronDown, Filter } from 'lucide-react';
 
@@ -9,39 +9,6 @@ export default function Rankings() {
   const { rankedPlayers, matches } = useFirebase();
   const [selectedSeason, setSelectedSeason] = useState('All Time');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-
-  const getSeasonInfo = (date: Date) => {
-    let start = new Date(2026, 3, 17); // April 17, 2026 (Anchor)
-    if (date >= start) {
-      while (true) {
-        let end = new Date(start);
-        end.setMonth(end.getMonth() + 9);
-        end.setDate(end.getDate() - 1);
-        if (date <= end) {
-          const sY = start.getFullYear();
-          const eY = end.getFullYear();
-          return { name: sY === eY ? `${sY} Season` : `${sY}/${eY}`, start, end };
-        }
-        start.setMonth(start.getMonth() + 9);
-        if (start.getFullYear() > 2100) break;
-      }
-    } else {
-      while (true) {
-        let nextStart = new Date(start);
-        start = new Date(start);
-        start.setMonth(start.getMonth() - 9);
-        let end = new Date(nextStart);
-        end.setDate(end.getDate() - 1);
-        if (date >= start && date <= end) {
-          const sY = start.getFullYear();
-          const eY = end.getFullYear();
-          return { name: sY === eY ? `${sY} Season` : `${sY}/${eY}`, start, end };
-        }
-        if (start.getFullYear() < 2020) break;
-      }
-    }
-    return { name: "Legacy", start: null, end: null };
-  };
 
   const availableSeasons = useMemo(() => {
     const seasons = new Set<string>();

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, ChevronRight, Trophy, Target, Zap, Filter, ChevronDown, Info, X, Activity, Flame } from 'lucide-react';
 import { useFirebase } from '../FirebaseContext';
-import { cn } from '../lib/utils';
+import { cn, getSeasonInfo } from '../lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
 import { Player } from '../types';
@@ -42,18 +42,10 @@ export default function PlayerStats() {
   const availableSeasons = useMemo(() => {
     const seasons = new Set<string>();
     matches.forEach(m => {
-      const d = new Date(m.timestamp);
-      const y = d.getFullYear();
-      const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-      const sY = isLateJan ? y - 1 : y;
-      seasons.add(`${sY}/${sY + 1}`);
+      seasons.add(getSeasonInfo(new Date(m.timestamp)).name);
     });
     // Ensure current season
-    const d = new Date();
-    const y = d.getFullYear();
-    const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-    const sY = isLateJan ? y - 1 : y;
-    seasons.add(`${sY}/${sY + 1}`);
+    seasons.add(getSeasonInfo(new Date()).name);
     return Array.from(seasons).sort().reverse();
   }, [matches]);
 
@@ -67,11 +59,7 @@ export default function PlayerStats() {
     
     if (selectedSeason !== 'All Time') {
       filteredMatches = filteredMatches.filter(m => {
-        const d = new Date(m.timestamp);
-        const y = d.getFullYear();
-        const isLateJan = (d.getMonth() === 0 && d.getDate() <= 17);
-        const sY = isLateJan ? y - 1 : y;
-        return `${sY}/${sY + 1}` === selectedSeason;
+        return getSeasonInfo(new Date(m.timestamp)).name === selectedSeason;
       });
     }
 

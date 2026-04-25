@@ -15,17 +15,15 @@ import {
 } from 'firebase/firestore';
 
 export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>) => void) {
-  const q = query(collection(db, 'settings'));
-  return onSnapshot(q, (snapshot) => {
-    let locks = { tournaments: false };
-    snapshot.forEach((docSnap) => {
-      if (docSnap.id === 'locks') {
-        locks = docSnap.data() as Record<string, boolean>;
-      }
-    });
+  const docRef = doc(db, 'settings', 'locks');
+  return onSnapshot(docRef, (docSnap) => {
+    let locks: Record<string, boolean> = { tournaments: false };
+    if (docSnap.exists()) {
+      locks = docSnap.data() as Record<string, boolean>;
+    }
     callback(locks);
   }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, 'settings/locks');
+    handleFirestoreError(error, OperationType.GET, 'settings/locks');
   });
 }
 
@@ -122,7 +120,7 @@ export async function testFirestoreConnection() {
           email: auth.currentUser?.email || '',
           emailVerified: auth.currentUser?.emailVerified || false,
           isAnonymous: auth.currentUser?.isAnonymous || true,
-          providerInfo: auth.currentUser?.providerData.map(p => ({ providerId: p.providerId, displayName: p.displayName || '', email: p.email || '' })) || [],
+          providerInfo: auth.currentUser?.providerData.map(p => ({ providerId: p.providerId, displayName: p.displayName || '', email: p.email || '', photoUrl: p.photoURL || '' })) || [],
           tenantId: null
         }
       };
