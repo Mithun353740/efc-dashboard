@@ -286,7 +286,15 @@ async function syncTournaments() {
 
   try {
     const snap = await getDocs(collection(db, 'tournaments'));
-    state.tournaments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    state.tournaments = snap.docs.map(d => {
+      const data = d.data();
+      return { 
+        id: d.id, 
+        ...data, 
+        fixtures: data.fixtures || [],
+        teams: data.teams || []
+      };
+    });
     // Also cache locally
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: DATA_VERSION, tournaments: state.tournaments }));
   } catch(e) { console.error('Firestore sync failed:', e); }
@@ -779,8 +787,9 @@ function showToast(msg) {
 }
 
 function renderMobileTournamentCard(t) {
-  const played = t.fixtures.filter(m => m.status === 'completed').length;
-  const total = t.fixtures.length;
+  const fixtures = t.fixtures || [];
+  const played = fixtures.filter(m => m.status === 'completed').length;
+  const total = fixtures.length;
   const progress = total > 0 ? (played / total) * 100 : 0;
   const typeIcon = ICONS[t.type === 'groups' ? 'group' : (t.type === 'knockout' ? 'knockout' : 'league')];
   const nextDate = getNextMatchdayDate(t);
@@ -830,8 +839,9 @@ function getNextMatchdayDate(t) {
 }
 
 function renderTournamentCard(t) {
-  const played = t.fixtures.filter(m => m.status === 'completed').length;
-  const total = t.fixtures.length;
+  const fixtures = t.fixtures || [];
+  const played = fixtures.filter(m => m.status === 'completed').length;
+  const total = fixtures.length;
   const progress = total > 0 ? (played / total) * 100 : 0;
 
   let statusBg, statusText;
