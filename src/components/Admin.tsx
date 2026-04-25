@@ -61,6 +61,27 @@ export default function Admin() {
   const [editMatchScore2, setEditMatchScore2] = useState('');
   const [editMatchTournament, setEditMatchTournament] = useState('');
   
+  // Match History Filters
+  const [historyFilter, setHistoryFilter] = useState('All');
+
+  const historyMatches = useMemo(() => {
+    const duration = 15 * 24 * 60 * 60 * 1000;
+    const recent = matches.filter(m => Date.now() - m.timestamp <= duration);
+    if (historyFilter === 'All') return recent;
+    return recent.filter(m => (m.tournament || 'Friendly') === historyFilter);
+  }, [matches, historyFilter]);
+
+  const historyTournaments = useMemo(() => {
+    const tNames = new Set<string>(['All', 'Friendly']);
+    const duration = 15 * 24 * 60 * 60 * 1000;
+    matches.forEach(m => {
+      if (Date.now() - m.timestamp <= duration) {
+        tNames.add(m.tournament || 'Friendly');
+      }
+    });
+    return Array.from(tNames);
+  }, [matches]);
+  
   // Suggestions
   const [p1Search, setP1Search] = useState('');
   const [p2Search, setP2Search] = useState('');
@@ -311,7 +332,7 @@ export default function Admin() {
     try {
       await addMatch(p1, Number(match.p1Score), Number(match.p2Score), p2, matches, match.tournament, match.isExternal ? p2Search : undefined);
       setMatchMsg({ text: '✅ Match recorded', type: 'success' });
-      setMatch({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'QVFC Elite League Cup' });
+      setMatch({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'QVFC Elite League Cup Division 1' });
       setP1Search('');
       setP2Search('');
     } catch (err) {
@@ -710,7 +731,7 @@ export default function Admin() {
                         )}
                       >
                         <option value="Friendly" className="bg-brand-dark">Friendly / Internal Match</option>
-                        <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
+                        <option value="QVFC Elite League Cup Division 1" className="bg-brand-dark">QVFC Elite League Cup Div 1</option>
                         <option value="QVFC Elite League Cup Division 2" className="bg-brand-dark">QVFC Elite League Cup Div 2</option>
                         <option value="Vortex Champions Cup" className="bg-brand-dark">Vortex Champions Cup</option>
                         <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
@@ -861,12 +882,26 @@ export default function Admin() {
             ) : activeTab === 'history' ? (
               <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
-                  <h3 className="text-xl font-black mb-6 tracking-tight">MATCH HISTORY (LAST 7 DAYS)</h3>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                    <h3 className="text-xl font-black tracking-tight">MATCH HISTORY (LAST 15 DAYS)</h3>
+                    <div className="flex items-center gap-3">
+                      <Filter size={14} className="text-slate-500" />
+                      <select 
+                        value={historyFilter}
+                        onChange={e => setHistoryFilter(e.target.value)}
+                        className="bg-white/5 border border-white/10 p-2 rounded-xl text-[10px] font-black text-white focus:border-brand-purple outline-none transition-all"
+                      >
+                        {historyTournaments.map(t => (
+                          <option key={t} value={t} className="bg-[#0f172a]">{t.toUpperCase()}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                   <div className="space-y-4">
-                    {matches.length === 0 ? (
-                      <p className="text-slate-400 text-sm font-bold">No match history available.</p>
+                    {historyMatches.length === 0 ? (
+                      <p className="text-slate-400 text-sm font-bold">No matches found for the selected filter in the last 15 days.</p>
                     ) : (
-                      matches.filter(m => Date.now() - m.timestamp <= 7 * 24 * 60 * 60 * 1000).map(m => (
+                      historyMatches.map(m => (
                         <div key={m.id} className="bg-white/5 border border-white/10 p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div className="flex-1 flex flex-col gap-1">
                             <span className="text-[10px] text-slate-500 font-bold tracking-widest">{new Date(m.timestamp).toLocaleString()} • {m.tournament || 'Friendly'}</span>
@@ -890,7 +925,7 @@ export default function Admin() {
                                   className="bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-brand-purple outline-none mt-2 md:mt-0 w-full md:w-auto text-center"
                                 >
                                   <option value="Friendly" className="bg-brand-dark">Friendly</option>
-                                  <option value="QVFC Elite League Cup" className="bg-brand-dark">QVFC Elite League Cup</option>
+                                  <option value="QVFC Elite League Cup Division 1" className="bg-brand-dark">QVFC Elite League Cup Div 1</option>
                                   <option value="QVFC Elite League Cup Division 2" className="bg-brand-dark">QVFC Elite League Cup Div 2</option>
                                   <option value="Vortex Champions Cup" className="bg-brand-dark">Vortex Champions Cup</option>
                                   <option value="Vortex Domestic Cup" className="bg-brand-dark">Vortex Domestic Cup</option>
