@@ -6,7 +6,8 @@ import { FixturesTab } from './FixturesTab';
 import { StandingsTab } from './StandingsTab';
 import { TeamsTab } from './TeamsTab';
 import { BracketView } from './BracketView';
-import { Trophy, BarChart2, ListOrdered, Settings, ArrowLeft, Archive, Trash2, Users, GitBranch } from 'lucide-react';
+import { StatsTab } from './StatsTab';
+import { Trophy, BarChart2, ListOrdered, Settings, ArrowLeft, Archive, Trash2, Users, GitBranch, Goal } from 'lucide-react';
 
 interface TournamentDashboardProps {
   tournament: Tournament;
@@ -15,7 +16,7 @@ interface TournamentDashboardProps {
   onDeleted: () => void;
 }
 
-type Tab = 'overview' | 'fixtures' | 'standings' | 'teams' | 'bracket' | 'settings';
+type Tab = 'overview' | 'fixtures' | 'standings' | 'teams' | 'bracket' | 'settings' | 'stats';
 
 export function TournamentDashboard({ tournament: initialTournament, isAdmin, onBack, onDeleted }: TournamentDashboardProps) {
   const [tournament, setTournament] = useState<Tournament>(initialTournament);
@@ -44,6 +45,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'fixtures', label: 'Fixtures', icon: <ListOrdered className="w-4 h-4" /> },
     { id: 'standings', label: 'Standings', icon: <BarChart2 className="w-4 h-4" /> },
+    { id: 'stats', label: 'Top Scorers', icon: <Goal className="w-4 h-4" /> },
     { id: 'teams', label: 'Teams', icon: <Users className="w-4 h-4" /> },
     ...(isKnockout ? [{ id: 'bracket' as Tab, label: 'Bracket', icon: <GitBranch className="w-4 h-4" /> }] : []),
     ...(isAdmin ? [{ id: 'settings' as Tab, label: 'Settings', icon: <Settings className="w-4 h-4" /> }] : []),
@@ -147,6 +149,9 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
             )}
             {activeTab === 'bracket' && (
               <BracketView tournament={tournament} />
+            )}
+            {activeTab === 'stats' && (
+              <StatsTab tournament={tournament} />
             )}
             {activeTab === 'settings' && isAdmin && (
               <div className="max-w-2xl space-y-6">
