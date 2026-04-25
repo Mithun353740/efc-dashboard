@@ -6,7 +6,8 @@ import { FixturesTab } from './FixturesTab';
 import { StandingsTab } from './StandingsTab';
 import { TeamsTab } from './TeamsTab';
 import { BracketView } from './BracketView';
-import { Trophy, BarChart2, ListOrdered, Settings, ArrowLeft, Archive, Trash2, Users, GitBranch } from 'lucide-react';
+import { FantasyTab } from './FantasyTab';
+import { Trophy, BarChart2, ListOrdered, Settings, ArrowLeft, Archive, Trash2, Users, GitBranch, Star } from 'lucide-react';
 
 interface TournamentDashboardProps {
   tournament: Tournament;
@@ -15,7 +16,7 @@ interface TournamentDashboardProps {
   onDeleted: () => void;
 }
 
-type Tab = 'overview' | 'fixtures' | 'standings' | 'teams' | 'bracket' | 'settings';
+type Tab = 'overview' | 'fixtures' | 'standings' | 'teams' | 'bracket' | 'settings' | 'fantasy';
 
 export function TournamentDashboard({ tournament: initialTournament, isAdmin, onBack, onDeleted }: TournamentDashboardProps) {
   const [tournament, setTournament] = useState<Tournament>(initialTournament);
@@ -45,6 +46,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
     { id: 'fixtures', label: 'Fixtures', icon: <ListOrdered className="w-4 h-4" /> },
     { id: 'standings', label: 'Standings', icon: <BarChart2 className="w-4 h-4" /> },
     { id: 'teams', label: 'Teams', icon: <Users className="w-4 h-4" /> },
+    { id: 'fantasy', label: 'Fantasy', icon: <Star className="w-4 h-4" /> },
     ...(isKnockout ? [{ id: 'bracket' as Tab, label: 'Bracket', icon: <GitBranch className="w-4 h-4" /> }] : []),
     ...(isAdmin ? [{ id: 'settings' as Tab, label: 'Settings', icon: <Settings className="w-4 h-4" /> }] : []),
   ];
@@ -147,6 +149,9 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
             )}
             {activeTab === 'bracket' && (
               <BracketView tournament={tournament} />
+            )}
+            {activeTab === 'fantasy' && (
+              <FantasyTab tournament={tournament} isAdmin={isAdmin} onUpdate={handleUpdate} />
             )}
             {activeTab === 'settings' && isAdmin && (
               <div className="max-w-2xl space-y-6">

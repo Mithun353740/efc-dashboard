@@ -22,6 +22,7 @@ export interface Team {
   home?: TeamStats;
   away?: TeamStats;
   overall?: TeamStats;
+  fantasyPoints?: number;
 }
 
 export interface Fixture {
