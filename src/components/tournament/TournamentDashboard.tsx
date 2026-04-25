@@ -8,6 +8,7 @@ import { TeamsTab } from './TeamsTab';
 import { BracketView } from './BracketView';
 import { StatsTab } from './StatsTab';
 import { OverviewTab } from './OverviewTab';
+import { FantasyStandings } from './FantasyStandings';
 import TournamentHistory from '../TournamentHistory';
 import { 
   Trophy, BarChart2, ListOrdered, Settings, ArrowLeft, Archive, 
@@ -23,7 +24,7 @@ interface TournamentDashboardProps {
   onDeleted: () => void;
 }
 
-type Tab = 'dashboard' | 'fixtures' | 'standings' | 'scorers' | 'teams' | 'bracket' | 'history' | 'settings';
+type Tab = 'dashboard' | 'fixtures' | 'standings' | 'fantasy' | 'scorers' | 'teams' | 'bracket' | 'history' | 'settings';
 
 export function TournamentDashboard({ tournament: initialTournament, isAdmin, onBack, onDeleted }: TournamentDashboardProps) {
   const [tournament, setTournament] = useState<Tournament>(initialTournament);
@@ -47,6 +48,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
     { id: 'fixtures', label: 'Fixtures', icon: <ListOrdered size={18} /> },
     { id: 'standings', label: 'Standings', icon: <BarChart2 size={18} /> },
+    { id: 'fantasy', label: 'Fantasy Standings', icon: <Star size={18} /> },
     { id: 'scorers', label: 'Top Scorers', icon: <Goal size={18} /> },
     { id: 'teams', label: 'Teams', icon: <Users size={18} /> },
     ...(isKnockout ? [{ id: 'bracket' as Tab, label: 'Bracket', icon: <GitBranch size={18} /> }] : []),
@@ -167,6 +169,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
                 {activeTab === 'dashboard' && <OverviewTab tournament={tournament} />}
                 {activeTab === 'fixtures' && <FixturesTab tournament={tournament} isAdmin={isAdmin} onUpdate={handleUpdate} />}
                 {activeTab === 'standings' && <StandingsTab tournament={tournament} />}
+                {activeTab === 'fantasy' && <FantasyStandings tournament={tournament} />}
                 {activeTab === 'teams' && <TeamsTab tournament={tournament} />}
                 {activeTab === 'scorers' && <StatsTab tournament={tournament} />}
                 {activeTab === 'bracket' && <BracketView tournament={tournament} />}
