@@ -39,7 +39,7 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
 
     const updatedFixtures = fixtures.map(f =>
       f.id === editingScore.fixtureId
-        ? { ...f, homeScore: home, awayScore: away, status: 'completed' as const }
+        ? { ...f, homeScore: home, awayScore: away, status: 'completed' as const, updatedAt: Date.now() }
         : f
     );
 

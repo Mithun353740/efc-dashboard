@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Tournament, Team, Fixture } from '../../types';
 import { useFirebase } from '../../FirebaseContext';
-import { Medal, Shield, Goal } from 'lucide-react';
+import { calculateFantasyPoints } from '../../lib/fantasy';
+import { Medal, Shield, Goal, Star } from 'lucide-react';
 
 interface StandingsTabProps {
   tournament: Tournament;
@@ -149,7 +150,7 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
           ) : filter === 'away' ? (
             <><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GF:GA</span><span className="w-8">PTS</span></>
           ) : (
-            <><span className="w-6">P</span><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GD</span><span className="w-8">PTS</span></>
+            <><span className="w-6">P</span><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GD</span><span className="w-8">PTS</span><span className="w-8 text-yellow-500">FP</span></>
           )}
         </div>
       </div>
@@ -221,6 +222,7 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
                       {row.gd > 0 ? '+' : ''}{row.gd}
                     </span>
                     <span className="w-8 text-indigo-400">{row.pts}</span>
+                    <span className="w-8 text-yellow-500 font-black">{calculateFantasyPoints(row.team.id, tournament)}</span>
                   </>
                 )}
               </div>

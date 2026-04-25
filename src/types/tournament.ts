@@ -35,6 +35,7 @@ export interface Fixture {
   stage?: string;
   leg?: number;
   matchIndex?: number;
+  updatedAt?: number;
   date?: string | null;
   time?: string | null;
   venue?: string | null;

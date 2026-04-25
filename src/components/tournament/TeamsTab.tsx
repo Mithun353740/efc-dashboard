@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tournament, Team } from '../../types';
 import { useFirebase } from '../../FirebaseContext';
-import { ChevronDown, ChevronUp, TrendingUp, Shield } from 'lucide-react';
+import { calculateFantasyPoints } from '../../lib/fantasy';
+import { ChevronDown, ChevronUp, TrendingUp, Shield, Star } from 'lucide-react';
 
 interface TeamsTabProps {
   tournament: Tournament;
@@ -119,6 +120,10 @@ export function TeamsTab({ tournament }: TeamsTabProps) {
 
               {/* Quick Stats */}
               <div className="hidden md:flex items-center gap-6 flex-shrink-0">
+                <div className="text-center">
+                  <div className="text-lg font-black text-yellow-500">{calculateFantasyPoints(team.id, tournament)}</div>
+                  <div className="text-[9px] font-black uppercase tracking-widest text-slate-600">FTSY</div>
+                </div>
                 <div className="text-center">
                   <div className="text-lg font-black text-white">{team.pts}</div>
                   <div className="text-[9px] font-black uppercase tracking-widest text-slate-600">PTS</div>
