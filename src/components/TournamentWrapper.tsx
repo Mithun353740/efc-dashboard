@@ -23,47 +23,49 @@ export default function TournamentWrapper({ isEmbedded = false }: TournamentWrap
   return (
     <div className={cn("flex flex-col", !isEmbedded && "min-h-screen bg-brand-dark")}>
       {/* Sub Navigation */}
-      <div className={cn(
-        "bg-white/5 border-b border-white/10 px-8 flex items-center justify-center gap-4 py-3 z-40 backdrop-blur-xl",
-        isEmbedded ? "sticky top-0" : "sticky top-[64px]"
-      )}>
-        <button
-          onClick={() => { setActiveView('manager'); setActiveTournamentId(undefined); }}
-          className={cn(
-            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase",
-            activeView === 'manager' 
-              ? "bg-brand-gradient text-white shadow-lg shadow-brand-purple/25" 
-              : "text-slate-400 hover:text-white hover:bg-white/5"
-          )}
-        >
-          <Trophy size={14} />
-          Tournaments
-        </button>
-        <button
-          onClick={() => setActiveView('ranking')}
-          className={cn(
-            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase",
-            activeView === 'ranking' 
-              ? "bg-brand-gradient text-white shadow-lg shadow-brand-purple/25" 
-              : "text-slate-400 hover:text-white hover:bg-white/5"
-          )}
-        >
-          <BarChart3 size={14} />
-          Tournament Ranking
-        </button>
-        <button
-          onClick={() => setActiveView('history')}
-          className={cn(
-            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase",
-            activeView === 'history' 
-              ? "bg-brand-gradient text-white shadow-lg shadow-brand-purple/25" 
-              : "text-slate-400 hover:text-white hover:bg-white/5"
-          )}
-        >
-          <History size={14} />
-          History
-        </button>
-      </div>
+      {(!isEmbedded || !isAdmin) && (
+        <div className={cn(
+          "bg-white/5 border-b border-white/10 px-8 flex items-center justify-center gap-4 py-3 z-40 backdrop-blur-xl",
+          isEmbedded ? "sticky top-0" : "sticky top-[64px]"
+        )}>
+          <button
+            onClick={() => { setActiveView('manager'); setActiveTournamentId(undefined); }}
+            className={cn(
+              "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase",
+              activeView === 'manager' 
+                ? "bg-brand-gradient text-white shadow-lg shadow-brand-purple/25" 
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            )}
+          >
+            <Trophy size={14} />
+            Tournaments
+          </button>
+          <button
+            onClick={() => setActiveView('ranking')}
+            className={cn(
+              "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase",
+              activeView === 'ranking' 
+                ? "bg-brand-gradient text-white shadow-lg shadow-brand-purple/25" 
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            )}
+          >
+            <BarChart3 size={14} />
+            Tournament Ranking
+          </button>
+          <button
+            onClick={() => setActiveView('history')}
+            className={cn(
+              "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase",
+              activeView === 'history' 
+                ? "bg-brand-gradient text-white shadow-lg shadow-brand-purple/25" 
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            )}
+          >
+            <History size={14} />
+            History
+          </button>
+        </div>
+      )}
 
       <main className="flex-grow">
         <AnimatePresence mode="wait">

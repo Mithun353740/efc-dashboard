@@ -17,15 +17,25 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = initializeFirestore(app, { experimentalForceLongPolling: true }, firebaseConfig.firestoreDatabaseId);
 
-// Ensure we are signed in anonymously so the security rules allow us to read/write
-const authPromise = signInAnonymously(auth)
-  .then(user => {
-    console.log("[KickOff] Anonymous auth success:", user.user.uid);
-    return user;
-  })
-  .catch(err => {
-    console.error("Anonymous auth failed:", err);
-    throw err;
+// Listen for auth state rather than forcing anonymous login
+const authPromise = new Promise((resolve, reject) => {
+  const unsubscribe = auth.onAuthStateChanged((user) => {
+    if (user) {
+      console.log("[KickOff] Auth state resolved:", user.uid, user.isAnonymous ? "(Anonymous)" : "(Authenticated)");
+      resolve(user);
+    } else {
+      // Only sign in anonymously if there's no parent auth state
+      signInAnonymously(auth)
+        .then(u => {
+          console.log("[KickOff] Anonymous auth fallback success:", u.user.uid);
+          resolve(u);
+        })
+        .catch(err => {
+          console.error("Anonymous auth fallback failed:", err);
+          reject(err);
+        });
+    }
   });
+});
 
 export { db, auth, authPromise };
