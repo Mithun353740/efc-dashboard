@@ -358,6 +358,17 @@ export default function Admin() {
               AUTH REQUIRED
             </div>
           )}
+          {dbError === 'QUOTA_EXCEEDED' ? (
+            <div className="px-4 py-2 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full text-[8px] font-black tracking-widest flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              QUOTA EXCEEDED
+            </div>
+          ) : (
+            <div className="px-4 py-2 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full text-[8px] font-black tracking-widest flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              SYSTEM ACTIVE
+            </div>
+          )}
           <button 
             onClick={async () => {
               setIsResyncing(true);
