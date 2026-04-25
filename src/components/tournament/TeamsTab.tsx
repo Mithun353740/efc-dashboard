@@ -120,10 +120,6 @@ export function TeamsTab({ tournament }: TeamsTabProps) {
               {/* Quick Stats */}
               <div className="hidden md:flex items-center gap-6 flex-shrink-0">
                 <div className="text-center">
-                  <div className="text-lg font-black text-yellow-500">{team.fantasyPoints || 0}</div>
-                  <div className="text-[9px] font-black uppercase tracking-widest text-slate-600">FTSY</div>
-                </div>
-                <div className="text-center">
                   <div className="text-lg font-black text-white">{team.pts}</div>
                   <div className="text-[9px] font-black uppercase tracking-widest text-slate-600">PTS</div>
                 </div>

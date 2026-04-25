@@ -149,7 +149,7 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
           ) : filter === 'away' ? (
             <><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GF:GA</span><span className="w-8">PTS</span></>
           ) : (
-            <><span className="w-6">P</span><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GD</span><span className="w-8">PTS</span><span className="w-8 text-yellow-500">FP</span></>
+            <><span className="w-6">P</span><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GD</span><span className="w-8">PTS</span></>
           )}
         </div>
       </div>
@@ -221,7 +221,6 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
                       {row.gd > 0 ? '+' : ''}{row.gd}
                     </span>
                     <span className="w-8 text-indigo-400">{row.pts}</span>
-                    <span className="w-8 text-yellow-500">{row.team.fantasyPoints || 0}</span>
                   </>
                 )}
               </div>
