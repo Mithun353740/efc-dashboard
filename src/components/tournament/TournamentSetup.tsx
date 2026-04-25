@@ -88,6 +88,7 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
       onComplete(newTournament.id);
     } catch (error) {
       console.error('Failed to generate tournament', error);
+      alert(`Failed to initialize engine: ${error instanceof Error ? error.message : String(error)}`);
       setIsGenerating(false);
     }
   };

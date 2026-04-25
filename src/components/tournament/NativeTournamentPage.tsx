@@ -5,7 +5,10 @@ import { useFirebase } from '../../FirebaseContext';
 import { TournamentList } from './TournamentList';
 import { TournamentSetup } from './TournamentSetup';
 import { TournamentDashboard } from './TournamentDashboard';
+import TournamentRanking from '../TournamentRanking';
+import TournamentHistory from '../TournamentHistory';
 import { Tournament } from '../../types';
+import { cn } from '../../lib/utils';
 
 type View = 'list' | 'setup' | 'dashboard';
 
@@ -19,6 +22,7 @@ export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPa
   const isLocked = systemLocks?.tournaments && !isAdmin;
 
   const [view, setView] = useState<View>('list');
+  const [activeTab, setActiveTab] = useState<'live' | 'rankings' | 'history'>('live');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const selectedTournament: Tournament | undefined = tournaments.find(t => t.id === selectedId);
@@ -69,8 +73,17 @@ export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPa
   }
 
   return (
-    <AnimatePresence mode="wait">
+    <div className="relative min-h-screen bg-[#050508]">
       {view === 'list' && (
+        <div className="sticky top-0 z-[40] bg-[#050508]/80 backdrop-blur-md border-b border-white/5 py-4 px-4 flex items-center justify-center gap-2 overflow-x-auto no-scrollbar">
+          <button onClick={() => setActiveTab('live')} className={cn("px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap", activeTab === 'live' ? "bg-brand-purple text-brand-dark shadow-[0_0_15px_rgba(139,92,246,0.3)]" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white")}>Live Tournaments</button>
+          <button onClick={() => setActiveTab('rankings')} className={cn("px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap", activeTab === 'rankings' ? "bg-brand-purple text-brand-dark shadow-[0_0_15px_rgba(139,92,246,0.3)]" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white")}>Standings</button>
+          <button onClick={() => setActiveTab('history')} className={cn("px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap", activeTab === 'history' ? "bg-brand-purple text-brand-dark shadow-[0_0_15px_rgba(139,92,246,0.3)]" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white")}>History</button>
+        </div>
+      )}
+
+      <AnimatePresence mode="wait">
+        {view === 'list' && activeTab === 'live' && (
         <motion.div
           key="list"
           initial={{ opacity: 0, y: 12 }}
@@ -83,6 +96,30 @@ export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPa
             onNewTournament={isAdmin ? handleNewTournament : undefined}
             isAdmin={isAdmin}
           />
+        </motion.div>
+      )}
+
+      {view === 'list' && activeTab === 'rankings' && (
+        <motion.div
+          key="rankings"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.25 }}
+        >
+          <TournamentRanking />
+        </motion.div>
+      )}
+
+      {view === 'list' && activeTab === 'history' && (
+        <motion.div
+          key="history"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.25 }}
+        >
+          <TournamentHistory onOpenTournament={handleSelectTournament} />
         </motion.div>
       )}
 
@@ -130,5 +167,6 @@ export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPa
         </motion.div>
       )}
     </AnimatePresence>
+    </div>
   );
 }
