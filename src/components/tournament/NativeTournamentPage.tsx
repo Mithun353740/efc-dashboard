@@ -9,9 +9,13 @@ import { Tournament } from '../../types';
 
 type View = 'list' | 'setup' | 'dashboard';
 
-export function NativeTournamentPage() {
+interface NativeTournamentPageProps {
+  forcePublic?: boolean;
+}
+
+export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPageProps = {}) {
   const { systemLocks, tournaments } = useFirebase();
-  const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+  const isAdmin = forcePublic ? false : localStorage.getItem('adminLoggedIn') === 'true';
   const isLocked = systemLocks?.tournaments && !isAdmin;
 
   const [view, setView] = useState<View>('list');

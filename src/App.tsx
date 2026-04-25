@@ -59,7 +59,7 @@ function AppContent() {
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="/rankings" element={<Rankings />} />
           <Route path="/stats" element={<PlayerStats />} />
-          <Route path="/tournament" element={<NativeTournamentPage />} />
+          <Route path="/tournament" element={<NativeTournamentPage forcePublic={true} />} />
         </Routes>
       </main>
       <Footer />

@@ -4,8 +4,7 @@ import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, Shield
 import { useNavigate } from 'react-router-dom';
 import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import TournamentManager from './TournamentManager';
-import TournamentWrapper from './TournamentWrapper';
+import { NativeTournamentPage } from './tournament/NativeTournamentPage';
 import { Player, Leader, MatchRecord } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
@@ -893,7 +892,7 @@ export default function Admin() {
                 key="tournaments"
                 className="fixed inset-0 z-[100] bg-[#050508] overflow-auto"
               >
-                <TournamentWrapper isEmbedded={true} />
+                <NativeTournamentPage forcePublic={false} />
                 {/* Overlay back button to return to dashboard */}
                 <button 
                   onClick={() => setActiveTab('players')}
