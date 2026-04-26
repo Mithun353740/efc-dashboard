@@ -99,8 +99,8 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
                   const aPlayer = players.find(p => p.id === f.awayId);
                   
                   return (
-                    <div key={f.id} className="bg-[#050508] border border-[#1e1e32] rounded-2xl p-4 flex items-center justify-between group hover:border-indigo-500/30 transition-all">
-                      <div className="flex items-center gap-3 w-32 justify-end">
+                    <div key={f.id} className="bg-[#050508] border border-[#1e1e32] rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-2 group hover:border-indigo-500/30 transition-all">
+                      <div className="flex items-center gap-1.5 sm:gap-3 flex-1 min-w-0 justify-end">
                         <span className="text-[10px] font-black text-white truncate text-right">{h?.name}</span>
                         <div className="w-6 h-6 rounded-lg overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex-shrink-0">
                           {hPlayer?.image ? <img src={hPlayer.image} className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-indigo-400 m-auto" />}
@@ -111,7 +111,7 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
                         {f.homeScore} - {f.awayScore}
                       </div>
                       
-                      <div className="flex items-center gap-3 w-32">
+                      <div className="flex items-center gap-1.5 sm:gap-3 flex-1 min-w-0">
                         <div className="w-6 h-6 rounded-lg overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex-shrink-0">
                           {aPlayer?.image ? <img src={aPlayer.image} className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-indigo-400 m-auto" />}
                         </div>
@@ -138,8 +138,8 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
                   const aPlayer = players.find(p => p.id === f.awayId);
                   
                   return (
-                    <div key={f.id} className="bg-[#050508] border border-[#1e1e32] rounded-2xl p-4 flex items-center justify-between group hover:border-indigo-500/30 transition-all">
-                      <div className="flex items-center gap-3 w-32 justify-end">
+                    <div key={f.id} className="bg-[#050508] border border-[#1e1e32] rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-2 group hover:border-indigo-500/30 transition-all">
+                      <div className="flex items-center gap-1.5 sm:gap-3 flex-1 min-w-0 justify-end">
                         <span className="text-[10px] font-black text-white truncate text-right">{h?.name || 'TBD'}</span>
                         <div className="w-6 h-6 rounded-lg overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex-shrink-0">
                           {hPlayer?.image ? <img src={hPlayer.image} className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-indigo-400 m-auto" />}
@@ -150,7 +150,7 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
                         VS
                       </div>
                       
-                      <div className="flex items-center gap-3 w-32">
+                      <div className="flex items-center gap-1.5 sm:gap-3 flex-1 min-w-0">
                         <div className="w-6 h-6 rounded-lg overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex-shrink-0">
                           {aPlayer?.image ? <img src={aPlayer.image} className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-indigo-400 m-auto" />}
                         </div>
@@ -201,8 +201,8 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
             
             {topScorer ? (
               <div className="space-y-8">
-                <div className="flex items-center gap-8">
-                  <div className="w-32 h-32 rounded-[2.5rem] border-4 border-indigo-500/30 overflow-hidden bg-[#050508] relative group ring-8 ring-indigo-500/5">
+                <div className="flex items-center gap-4 sm:gap-8">
+                  <div className="w-20 h-20 sm:w-32 sm:h-32 rounded-[2rem] border-4 border-indigo-500/30 overflow-hidden bg-[#050508] relative group ring-8 ring-indigo-500/5 flex-shrink-0">
                     {topScorerPlayer?.image ? (
                       <img src={topScorerPlayer.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                     ) : (
@@ -210,7 +210,7 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
                     )}
                   </div>
                   <div>
-                    <h4 className="text-2xl font-black text-white uppercase tracking-tighter leading-tight mb-2 max-w-[180px] break-words">{topScorer.name}</h4>
+                    <h4 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tighter leading-tight mb-2 break-words">{topScorer.name}</h4>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-600/10 border border-indigo-500/20 rounded-full text-[9px] font-black text-indigo-400 uppercase tracking-widest">
                        {topScorer.played} Matches Played
                     </div>

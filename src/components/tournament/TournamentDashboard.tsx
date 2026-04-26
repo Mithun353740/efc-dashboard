@@ -197,7 +197,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
         </header>
 
         {/* Scrollable Content */}
-        <div className="flex-1 p-10 overflow-y-auto no-scrollbar">
+        <div className="flex-1 p-4 md:p-8 lg:p-10 overflow-y-auto no-scrollbar">
            <AnimatePresence mode="wait">
              <motion.div
                key={activeTab}
