@@ -57,43 +57,13 @@ export async function toggleSystemLock(systemId: string, locked: boolean) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CACHE INVALIDATION SYSTEM
-// A single document `settings/meta` stores a `lastUpdated` timestamp.
-// Every admin write bumps this timestamp. Public users check ONLY this
-// one document (1 read) to know if their localStorage cache is still fresh.
-// If fresh → serve from cache (0 reads). If stale → fetch all (normal reads).
+// SYSTEM METADATA
 // ─────────────────────────────────────────────────────────────────────────────
 
 const META_DOC_PATH = 'settings/meta';
 
 /**
- * Returns the server's last updated timestamp (epoch ms), or 0 on failure.
- * This is a SINGLE document read — the cheapest possible Firebase operation.
- */
-export async function fetchLastUpdated(): Promise<number> {
-  try {
-    const snap = await getDocFromServer(doc(db, META_DOC_PATH));
-    if (snap.exists()) {
-      const data = snap.data();
-      // serverTimestamp() stores as a Firestore Timestamp object
-      const ts = data?.lastUpdated;
-      if (ts && typeof ts.toMillis === 'function') return ts.toMillis();
-      if (typeof ts === 'number') return ts;
-    }
-  } catch (error: any) {
-    if (error?.code === 'resource-exhausted' || String(error).toLowerCase().includes('quota')) {
-      isQuotaExceeded = true;
-      const event = new CustomEvent('firestore-error', { detail: { error: error.message || 'Quota exceeded', operationType: OperationType.GET, path: META_DOC_PATH } });
-      window.dispatchEvent(event);
-    }
-    console.warn('[Meta] Could not fetch lastUpdated:', error);
-  }
-  return 0;
-}
-
-/**
- * Called after every admin write to signal to all public users
- * that their cached data is now stale.
+ * Called after every admin write to signal the last update time.
  */
 async function updateLastUpdated(): Promise<void> {
   try {
