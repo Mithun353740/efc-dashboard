@@ -1,4 +1,4 @@
-import logoImage from './assets/logo.png';
+import logoImage from './assets/logo.jpg';
 
 export const CLUB_LOGO = logoImage;
 export const CLUB_NAME = "Quantum Vortex FC";
