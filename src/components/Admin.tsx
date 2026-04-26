@@ -419,14 +419,14 @@ export default function Admin() {
                 await recalculateAllStats(players, matches);
                 alert('All player stats resynced successfully based on Match History.');
               } catch(e) {
-                alert('Failed to resync stats.');
+                alert('Failed to resync stats. If quota is still exceeded, this will fail.');
               }
               setIsResyncing(false);
             }} 
-            disabled={isResyncing || dbError === 'QUOTA_EXCEEDED'}
+            disabled={isResyncing}
             className="px-4 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all disabled:opacity-50"
           >
-            {isResyncing ? 'SYNCING...' : 'RESYNC'}
+            {isResyncing ? 'SYNCING...' : 'FORCE RESYNC'}
           </button>
           <button onClick={() => navigate('/')} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all">
             HOME

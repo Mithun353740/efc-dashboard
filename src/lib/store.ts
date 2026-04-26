@@ -676,23 +676,31 @@ export function sortRankedPlayers(players: Player[]): Player[] {
     if (totalMatchesA === 0 && totalMatchesB > 0) return 1;
     if (totalMatchesB === 0 && totalMatchesA > 0) return -1;
 
-    // 2. Points (Highest first)
+    // 2. OVR (Overall Rating is the true measure of skill for all-time global ranking)
+    if (b.ovr !== a.ovr) return b.ovr - a.ovr;
+
+    // 3. Win Percentage (Tie breaker for same OVR)
+    const winPctA = totalMatchesA > 0 ? a.win / totalMatchesA : 0;
+    const winPctB = totalMatchesB > 0 ? b.win / totalMatchesB : 0;
+    if (winPctB !== winPctA) return winPctB - winPctA;
+
+    // 4. Points
     const pointsA = a.win * 3 + a.draw;
     const pointsB = b.win * 3 + b.draw;
     if (pointsB !== pointsA) return pointsB - pointsA;
     
-    // 3. Goal Difference (Highest first)
+    // 5. Goal Difference
     const gdA = a.goalsScored - a.goalsConceded;
     const gdB = b.goalsScored - b.goalsConceded;
     if (gdB !== gdA) return gdB - gdA;
 
-    // 4. Goals Scored (Highest first)
+    // 6. Goals Scored
     if (b.goalsScored !== a.goalsScored) return b.goalsScored - a.goalsScored;
     
-    // 5. Total Wins (Highest first)
+    // 7. Total Wins
     if (b.win !== a.win) return b.win - a.win;
     
-    // 6. Matches Played (FEWER matches played ranks higher if perfectly tied on all above - "Games in Hand")
+    // 8. Matches Played (FEWER matches played ranks higher if tied - "Games in Hand")
     if (totalMatchesA !== totalMatchesB) return totalMatchesA - totalMatchesB;
     
     // 7. Alphabetical order fallback
