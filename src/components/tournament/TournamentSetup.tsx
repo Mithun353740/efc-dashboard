@@ -209,7 +209,7 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
                     />
                   </div>
                 </div>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Starting Date <span className="text-indigo-400">(Optional)</span></label>
                       <input

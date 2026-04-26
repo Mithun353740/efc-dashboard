@@ -153,7 +153,7 @@ export default function PlayerSettingsModal({ isOpen, onClose }: PlayerSettingsM
             {/* Background Glow */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-80 bg-brand-purple/10 blur-[120px] -z-10 pointer-events-none" />
 
-            <div className="p-10">
+            <div className="p-6 sm:p-10">
               {/* Header */}
               <div className="flex items-center justify-between mb-8">
                 <div>
@@ -200,7 +200,7 @@ export default function PlayerSettingsModal({ isOpen, onClose }: PlayerSettingsM
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
                       <Hash size={11} className="text-brand-purple" /> Game UID
