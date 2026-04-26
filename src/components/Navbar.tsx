@@ -72,7 +72,7 @@ export default function Navbar() {
   return (
     <nav className="flex items-center justify-between px-8 py-4 bg-white dark:bg-brand-dark border-b border-slate-100 dark:border-white/10 sticky top-0 z-[100] transition-colors">
       <Link to="/" className="flex items-center gap-3">
-        <div className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-brand-dark dark:bg-brand-purple/10 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
+        <div className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-[#0f172a] dark:bg-[#020617] border border-brand-purple/40 shadow-[0_0_30px_rgba(139,92,246,0.6)] transition-all hover:shadow-[0_0_40px_rgba(139,92,246,0.8)]">
           <img 
             src={CLUB_LOGO}
             alt={CLUB_NAME} 

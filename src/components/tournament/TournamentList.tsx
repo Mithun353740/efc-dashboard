@@ -1,5 +1,6 @@
 import React from 'react';
 import { useFirebase } from '../../FirebaseContext';
+import { CLUB_LOGO } from '../../constants';
 import { TournamentCard } from './TournamentCard';
 import { Plus, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -38,8 +39,8 @@ export function TournamentList({
       <div className="max-w-7xl mx-auto space-y-16 relative z-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-[0_0_40px_rgba(59,130,246,0.3)]">
-              <Trophy className="w-10 h-10 text-white" />
+            <div className="w-16 h-16 md:w-20 md:h-20 shrink-0 rounded-full overflow-hidden bg-[#0a0a12] border border-blue-500/40 flex items-center justify-center shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-all hover:shadow-[0_0_40px_rgba(59,130,246,0.8)]">
+              <img src={CLUB_LOGO} alt="Official Tournaments" className="w-full h-full object-cover" />
             </div>
             <div className="space-y-3">
               {isAdmin && (

@@ -380,7 +380,7 @@ export default function Admin() {
       {/* Header */}
       <div className="max-w-6xl mx-auto flex justify-between items-center mb-12">
         <div className="flex items-center gap-4 md:gap-6">
-          <div className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden bg-brand-purple/20 flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.3)]">
+          <div className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden bg-[#020617] border border-brand-purple/40 flex items-center justify-center shadow-[0_0_30px_rgba(139,92,246,0.6)] transition-all hover:shadow-[0_0_40px_rgba(139,92,246,0.8)]">
             <img src={CLUB_LOGO} alt={CLUB_NAME} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           </div>
           <div>
