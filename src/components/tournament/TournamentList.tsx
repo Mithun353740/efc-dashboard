@@ -3,14 +3,25 @@ import { useFirebase } from '../../FirebaseContext';
 import { TournamentCard } from './TournamentCard';
 import { Plus, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Tournament } from '../../types';
 
 interface TournamentListProps {
   onSelectTournament: (id: string) => void;
   onNewTournament?: () => void;
   isAdmin?: boolean;
+  isRegistrationLocked?: boolean;
+  loggedInPlayerId?: string | null;
+  onRegister?: (tournament: Tournament, e: React.MouseEvent) => void;
 }
 
-export function TournamentList({ onSelectTournament, onNewTournament, isAdmin }: TournamentListProps) {
+export function TournamentList({
+  onSelectTournament,
+  onNewTournament,
+  isAdmin,
+  isRegistrationLocked,
+  loggedInPlayerId,
+  onRegister,
+}: TournamentListProps) {
   const { tournaments } = useFirebase();
 
   const activeTournaments = tournaments.filter(t => !t.archived);
@@ -64,19 +75,31 @@ export function TournamentList({ onSelectTournament, onNewTournament, isAdmin }:
             <Trophy className="w-16 h-16 text-slate-700 mx-auto" />
             <h2 className="text-2xl font-black text-slate-400 tracking-tight">No Active Tournaments</h2>
             <p className="text-slate-600 font-medium">
-              {isAdmin ? "Click 'New Tournament' to create your first competition." : "Check back later for new competitions."}
+              {isAdmin ? "Click 'New Tournament' to create your first competition." : 'Check back later for new competitions.'}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {activeTournaments.map(t => (
-              <React.Fragment key={t.id}>
-                <TournamentCard
-                  tournament={t}
-                  onClick={onSelectTournament}
-                />
-              </React.Fragment>
-            ))}
+            {activeTournaments.map(t => {
+              const isRegistered = loggedInPlayerId
+                ? (t.registeredPlayerIds || []).includes(loggedInPlayerId)
+                : false;
+              const isFull = t.maxTeams !== undefined && t.teams.length >= t.maxTeams;
+              return (
+                <React.Fragment key={t.id}>
+                  <TournamentCard
+                    tournament={t}
+                    onClick={onSelectTournament}
+                    isAdmin={isAdmin}
+                    isRegistrationLocked={isRegistrationLocked}
+                    isRegistered={isRegistered}
+                    isFull={isFull && !isRegistered}
+                    loggedInPlayerId={loggedInPlayerId}
+                    onRegister={onRegister}
+                  />
+                </React.Fragment>
+              );
+            })}
           </div>
         )}
 
@@ -92,6 +115,7 @@ export function TournamentList({ onSelectTournament, onNewTournament, isAdmin }:
                   <TournamentCard
                     tournament={t}
                     onClick={onSelectTournament}
+                    isAdmin={isAdmin}
                   />
                 </React.Fragment>
               ))}

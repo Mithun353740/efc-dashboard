@@ -21,6 +21,8 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
   const [format, setFormat] = useState<TournamentFormat | null>(null);
   const [name, setName] = useState('');
   const [season] = useState(getSeasonInfo(new Date()).name);
+  const [startingDate, setStartingDate] = useState('');
+  const [maxTeams, setMaxTeams] = useState<string>('');
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
 
   const handleNext = () => setStep(prev => prev + 1);
@@ -80,7 +82,10 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
         currentStage,
         teams,
         fixtures,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        ...(startingDate ? { startingDate } : {}),
+        ...(maxTeams && !isNaN(Number(maxTeams)) && Number(maxTeams) > 0 ? { maxTeams: Number(maxTeams) } : {}),
+        registeredPlayerIds: [],
       };
 
       if (groups.length > 0) {
@@ -204,6 +209,29 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
                     />
                   </div>
                 </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Starting Date <span className="text-indigo-400">(Optional)</span></label>
+                      <input
+                        type="date"
+                        value={startingDate}
+                        onChange={(e) => setStartingDate(e.target.value)}
+                        className="w-full bg-[#0a0a12] border border-[#1e1e32] rounded-2xl px-6 py-4 text-white font-bold focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all [color-scheme:dark]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Max Registration Slots <span className="text-indigo-400">(Optional)</span></label>
+                      <input
+                        type="number"
+                        value={maxTeams}
+                        onChange={(e) => setMaxTeams(e.target.value)}
+                        placeholder="e.g. 8"
+                        min="2"
+                        max="64"
+                        className="w-full bg-[#0a0a12] border border-[#1e1e32] rounded-2xl px-6 py-4 text-white font-bold focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                  </div>
 
                 <div>
                   <div className="flex justify-between items-end mb-4">
@@ -291,6 +319,20 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
                     <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Season</div>
                     <div className="text-xl font-black text-white tracking-tight">{season}</div>
                   </div>
+                  {startingDate && (
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Starting Date</div>
+                      <div className="text-xl font-black text-indigo-400 tracking-tight">
+                        {new Date(startingDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                    </div>
+                  )}
+                  {maxTeams && (
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Max Registration Slots</div>
+                      <div className="text-xl font-black text-white tracking-tight">{maxTeams} Teams</div>
+                    </div>
+                  )}
                 </div>
               </div>
 

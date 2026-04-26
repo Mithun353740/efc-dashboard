@@ -13,7 +13,7 @@ import TournamentHistory from '../TournamentHistory';
 import { 
   Trophy, BarChart2, ListOrdered, Settings, ArrowLeft, Archive, 
   Trash2, Users, GitBranch, Goal, LayoutDashboard, History, 
-  ChevronRight, LogOut, ShieldCheck, Star, Menu, X
+  ChevronRight, LogOut, ShieldCheck, Star, Menu, X, CalendarDays, Hash
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -32,6 +32,9 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [editStartDate, setEditStartDate] = useState(initialTournament.startingDate || '');
+  const [editMaxTeams, setEditMaxTeams] = useState(initialTournament.maxTeams ? String(initialTournament.maxTeams) : '');
+  const [dateSaveMsg, setDateSaveMsg] = useState('');
 
   const handleUpdate = (updated: Tournament) => setTournament(updated);
 
@@ -41,6 +44,23 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
     await saveTournament(updated);
     setTournament(updated);
     setIsSaving(false);
+  };
+
+  const handleSaveDateSettings = async () => {
+    setIsSaving(true);
+    setDateSaveMsg('');
+    const updated: Tournament = {
+      ...tournament,
+      startingDate: editStartDate || undefined,
+      maxTeams: editMaxTeams && !isNaN(Number(editMaxTeams)) && Number(editMaxTeams) > 1
+        ? Number(editMaxTeams)
+        : undefined,
+    };
+    await saveTournament(updated);
+    setTournament(updated);
+    setIsSaving(false);
+    setDateSaveMsg('✅ Saved');
+    setTimeout(() => setDateSaveMsg(''), 2500);
   };
 
   const isKnockout = tournament.type === 'knockout' || tournament.type === 'groups';
@@ -209,6 +229,48 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
                         <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center">
                           <Trophy className="text-white" size={24} />
                         </div>
+                     </div>
+
+                     {/* Starting Date & Max Teams */}
+                     <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-[2rem] p-8 space-y-6">
+                       <div className="flex items-center gap-3 mb-2">
+                         <CalendarDays size={18} className="text-indigo-400" />
+                         <h4 className="font-black text-white uppercase tracking-tighter">Registration Settings</h4>
+                       </div>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                         <div className="space-y-2">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Starting Date</label>
+                           <input
+                             type="date"
+                             value={editStartDate}
+                             onChange={e => setEditStartDate(e.target.value)}
+                             className="w-full bg-[#050508] border border-[#1e1e32] rounded-xl px-4 py-3 text-white font-bold focus:border-indigo-500 focus:outline-none transition-all [color-scheme:dark]"
+                           />
+                         </div>
+                         <div className="space-y-2">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Max Registration Slots</label>
+                           <input
+                             type="number"
+                             value={editMaxTeams}
+                             onChange={e => setEditMaxTeams(e.target.value)}
+                             min="2" max="64"
+                             placeholder="No limit"
+                             className="w-full bg-[#050508] border border-[#1e1e32] rounded-xl px-4 py-3 text-white font-bold focus:border-indigo-500 focus:outline-none transition-all"
+                           />
+                         </div>
+                       </div>
+
+                       <div className="flex items-center gap-4">
+                         <button
+                           onClick={handleSaveDateSettings}
+                           disabled={isSaving}
+                           className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                         >
+                           {isSaving ? 'Saving...' : 'Save Settings'}
+                         </button>
+                         {dateSaveMsg && <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{dateSaveMsg}</span>}
+                       </div>
                      </div>
 
                      <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-[2rem] p-8 space-y-6">

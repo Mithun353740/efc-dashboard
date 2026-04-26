@@ -67,4 +67,10 @@ export interface Tournament {
   groups?: Group[];
   scheduling?: TournamentScheduling;
   createdAt?: number;
+  /** ISO date string e.g. "2026-05-10" — shows as Upcoming badge on cards */
+  startingDate?: string;
+  /** Player IDs who have self-registered for this tournament */
+  registeredPlayerIds?: string[];
+  /** Max teams allowed via self-registration (undefined = no limit) */
+  maxTeams?: number;
 }

@@ -9,9 +9,11 @@ import {
   query, 
   orderBy,
   getDocs,
+  getDoc,
   writeBatch,
   limit,
-  getDocFromServer
+  getDocFromServer,
+  serverTimestamp
 } from 'firebase/firestore';
 
 export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>) => void) {
@@ -27,6 +29,23 @@ export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>
   });
 }
 
+/**
+ * One-time fetch of system locks for public (non-admin) users.
+ * Much cheaper than keeping a permanent onSnapshot listener open.
+ */
+export async function fetchSystemLocks(): Promise<Record<string, boolean>> {
+  try {
+    const docSnap = await getDoc(doc(db, 'settings', 'locks'));
+    if (docSnap.exists()) {
+      return docSnap.data() as Record<string, boolean>;
+    }
+  } catch (error) {
+    // Non-critical for public users — fail silently
+    console.warn('[Locks] Could not fetch system locks:', error);
+  }
+  return { tournaments: false };
+}
+
 export async function toggleSystemLock(systemId: string, locked: boolean) {
   if (isQuotaExceeded) return;
   try {
@@ -34,6 +53,54 @@ export async function toggleSystemLock(systemId: string, locked: boolean) {
     await setDoc(lockDoc, { [systemId]: locked }, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `settings/locks`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CACHE INVALIDATION SYSTEM
+// A single document `settings/meta` stores a `lastUpdated` timestamp.
+// Every admin write bumps this timestamp. Public users check ONLY this
+// one document (1 read) to know if their localStorage cache is still fresh.
+// If fresh → serve from cache (0 reads). If stale → fetch all (normal reads).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const META_DOC_PATH = 'settings/meta';
+
+/**
+ * Returns the server's last updated timestamp (epoch ms), or 0 on failure.
+ * This is a SINGLE document read — the cheapest possible Firebase operation.
+ */
+export async function fetchLastUpdated(): Promise<number> {
+  try {
+    const snap = await getDocFromServer(doc(db, META_DOC_PATH));
+    if (snap.exists()) {
+      const data = snap.data();
+      // serverTimestamp() stores as a Firestore Timestamp object
+      const ts = data?.lastUpdated;
+      if (ts && typeof ts.toMillis === 'function') return ts.toMillis();
+      if (typeof ts === 'number') return ts;
+    }
+  } catch (error: any) {
+    if (error?.code === 'resource-exhausted' || String(error).toLowerCase().includes('quota')) {
+      isQuotaExceeded = true;
+      const event = new CustomEvent('firestore-error', { detail: { error: error.message || 'Quota exceeded', operationType: OperationType.GET, path: META_DOC_PATH } });
+      window.dispatchEvent(event);
+    }
+    console.warn('[Meta] Could not fetch lastUpdated:', error);
+  }
+  return 0;
+}
+
+/**
+ * Called after every admin write to signal to all public users
+ * that their cached data is now stale.
+ */
+async function updateLastUpdated(): Promise<void> {
+  try {
+    await setDoc(doc(db, META_DOC_PATH), { lastUpdated: serverTimestamp() }, { merge: true });
+  } catch (error) {
+    // Non-critical — if this fails, cache just stays valid a bit longer
+    console.warn('[Meta] Could not update lastUpdated timestamp:', error);
   }
 }
 
@@ -225,6 +292,76 @@ export async function fetchTournaments(): Promise<Tournament[]> {
   return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAYER SELF-REGISTRATION
+// Adds the player as a Team entry in the tournament and records their player ID
+// in registeredPlayerIds. Calls saveTournament() which already bumps the
+// cache-invalidation timestamp — all public users will see the update.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function registerPlayerInTournament(
+  tournament: Tournament,
+  playerId: string,
+  playerName: string,
+  playerImage: string
+): Promise<void> {
+  if (isQuotaExceeded) {
+    throw new Error('SYSTEM LOCKED: Cannot register while quota is exceeded.');
+  }
+
+  // Prevent duplicate registration
+  const alreadyRegistered = (tournament.registeredPlayerIds || []).includes(playerId);
+  if (alreadyRegistered) {
+    throw new Error('You are already registered for this tournament.');
+  }
+
+  // Check slot limit
+  if (tournament.maxTeams !== undefined && tournament.teams.length >= tournament.maxTeams) {
+    throw new Error('This tournament is full. No more slots available.');
+  }
+
+  const newTeam = {
+    id: playerId,
+    name: playerName,
+    shortName: playerName.substring(0, 3).toUpperCase(),
+    logo: playerImage || undefined,
+  };
+
+  const updatedTournament: Tournament = {
+    ...tournament,
+    teams: [...tournament.teams, newTeam],
+    registeredPlayerIds: [...(tournament.registeredPlayerIds || []), playerId],
+  };
+
+  await saveTournament(updatedTournament);
+  // saveTournament already calls updateLastUpdated() — no need to call it again
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAYER PROFILE UPDATE
+// Updates only the profile fields (image, uid, device) for a player.
+// Uses updateDoc (partial update) — cheaper than a full setDoc.
+// Bumps the cache invalidation timestamp so all users get fresh data.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function updatePlayerProfile(
+  playerId: string,
+  updates: { image?: string; uid?: string; device?: string }
+): Promise<void> {
+  if (isQuotaExceeded) {
+    throw new Error('SYSTEM LOCKED: Cannot update profile while quota is exceeded.');
+  }
+  if (!playerId) throw new Error('No player ID provided.');
+
+  try {
+    await setDoc(doc(db, 'players', playerId), updates, { merge: true });
+    await updateLastUpdated();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `players/${playerId}`);
+  }
+}
+
+
 // Real-time listeners (for Admins)
 export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void) {
   const path = 'players';
@@ -319,6 +456,7 @@ export async function recalculateAllStats(players: Player[], allMatches: MatchRe
   });
   try {
     await batch.commit();
+    await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-recalculate-stats');
   }
@@ -333,6 +471,8 @@ export async function savePlayer(player: Player) {
   try {
     await setDoc(doc(db, 'players', player.id), player);
     console.log('Player saved successfully');
+    // Signal all public users their cache is now stale
+    await updateLastUpdated();
   } catch (error) {
     console.error('Error in savePlayer:', error);
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -371,6 +511,8 @@ export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2:
 
   try {
     await batch.commit();
+    // Signal all public users their cache is now stale
+    await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-update');
   }
@@ -411,6 +553,8 @@ export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2
 
   try {
     await batch.commit();
+    // Signal all public users their cache is now stale
+    await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-edit');
   }
@@ -439,6 +583,8 @@ export async function deleteMatchFromHistory(matchRecord: MatchRecord, players: 
 
   try {
     await batch.commit();
+    // Signal all public users their cache is now stale
+    await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, 'batch-match-delete');
   }
@@ -449,6 +595,7 @@ export async function deletePlayer(id: string) {
   const path = `players/${id}`;
   try {
     await deleteDoc(doc(db, 'players', id));
+    await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
@@ -458,6 +605,7 @@ export async function saveLeader(leader: Leader) {
   const path = `leaders/${leader.id}`;
   try {
     await setDoc(doc(db, 'leaders', leader.id), leader);
+    await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -467,6 +615,7 @@ export async function deleteLeader(id: string) {
   const path = `leaders/${id}`;
   try {
     await deleteDoc(doc(db, 'leaders', id));
+    await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
@@ -479,6 +628,7 @@ export async function saveTournament(tournament: Tournament) {
   const path = `tournaments/${tournament.id}`;
   try {
     await setDoc(doc(db, 'tournaments', tournament.id), tournament);
+    await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
     throw error;
@@ -490,6 +640,7 @@ export async function deleteTournament(id: string) {
   const path = `tournaments/${id}`;
   try {
     await deleteDoc(doc(db, 'tournaments', id));
+    await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
