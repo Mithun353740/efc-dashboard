@@ -1194,7 +1194,10 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
                     <img src={p.image} className="w-8 h-8 rounded-lg object-cover" alt="" />
                     <div>
                       <p className="text-xs font-black">{p.name}</p>
-                      <p className="text-[9px] font-bold text-slate-500">#{p.number}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[9px] font-bold text-slate-500">#{p.number}</p>
+                        {p.email && <span className="text-[8px] font-black text-brand-purple opacity-70">• {p.email}</span>}
+                      </div>
                     </div>
                     {p.role === 'admin' && <span className="ml-auto text-[8px] font-black text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded uppercase">ADMIN</span>}
                   </button>
@@ -1262,7 +1265,10 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
               <img src={p.image} className="w-9 h-9 rounded-lg object-cover shrink-0" alt="" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black truncate">{p.name}</p>
-                <p className="text-[9px] font-bold text-slate-500">#{p.number}</p>
+                <div className="flex flex-col">
+                  <p className="text-[9px] font-bold text-slate-500">#{p.number}</p>
+                  {p.email && <p className="text-[8px] font-black text-brand-purple truncate opacity-80">{p.email}</p>}
+                </div>
               </div>
               {p.role === 'admin' && <span className="text-[7px] font-black text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded uppercase shrink-0">ADMIN</span>}
             </button>
