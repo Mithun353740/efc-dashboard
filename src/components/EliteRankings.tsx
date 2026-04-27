@@ -75,7 +75,8 @@ export default function EliteRankings() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-4 gap-1 md:gap-4 mt-3 md:mt-8 pt-3 md:pt-6 border-t border-slate-200 dark:border-white/10">
+                <div className="grid grid-cols-5 gap-1 md:gap-4 mt-3 md:mt-8 pt-3 md:pt-6 border-t border-slate-200 dark:border-white/10">
+                  <Stat label="MP" value={player.win + player.loss + player.draw} />
                   <Stat label="W" value={player.win} />
                   <Stat label="L" value={player.loss} />
                   <Stat label="D" value={player.draw} />

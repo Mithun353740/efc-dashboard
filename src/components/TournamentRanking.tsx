@@ -229,9 +229,9 @@ export default function TournamentRanking() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/5">
-                  <th className="p-4 md:p-7 text-[9px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-12 md:w-20">POS</th>
+                  <th className="p-2 md:p-7 text-[9px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center w-12 md:w-20">POS</th>
                   <th className="p-4 md:p-7 text-[9px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase">MEMBER</th>
-                  <th className="p-2 md:p-7 text-[9px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">P</th>
+                  <th className="p-2 md:p-7 text-[9px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">MP</th>
                   <th className="p-2 md:p-7 text-[9px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">W</th>
                   <th className="p-2 md:p-7 text-[9px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">D</th>
                   <th className="p-2 md:p-7 text-[9px] md:text-[10px] font-black text-slate-400 tracking-widest uppercase text-center">L</th>

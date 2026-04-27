@@ -33,7 +33,8 @@ export default function Legion() {
                   </span>
                 </div>
                 
-                <div className="grid grid-cols-4 gap-0.5 md:gap-2 mt-2 md:mt-4 pt-1.5 md:pt-3 border-t border-slate-50 dark:border-white/10">
+                <div className="grid grid-cols-5 gap-0.5 md:gap-2 mt-2 md:mt-4 pt-1.5 md:pt-3 border-t border-slate-50 dark:border-white/10">
+                  <MiniStat label="MP" value={player.win + player.loss + player.draw} />
                   <MiniStat label="W" value={player.win} />
                   <MiniStat label="L" value={player.loss} />
                   <MiniStat label="D" value={player.draw} />

@@ -102,7 +102,8 @@ export function FantasyStandings({ tournament }: FantasyStandingsProps) {
         <div className="grid grid-cols-[3rem_1fr_auto] items-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 px-6 gap-6">
           <span>Rank</span>
           <span>Player / Manager</span>
-          <div className="flex gap-10 text-right w-[300px] justify-end pr-4">
+          <div className="flex gap-8 text-right w-[340px] justify-end pr-4">
+            <span className="w-10">MP</span>
             <span className="w-10">Goals</span>
             <span className="w-10">Wins</span>
             <span className="w-10">CS</span>
@@ -138,7 +139,8 @@ export function FantasyStandings({ tournament }: FantasyStandingsProps) {
                   </div>
                 </div>
 
-                <div className="flex gap-10 text-right font-black text-sm w-[300px] justify-end pr-4 items-center">
+                <div className="flex gap-8 text-right font-black text-sm w-[340px] justify-end pr-4 items-center">
+                  <span className="w-10 text-slate-400">{row.played}</span>
                   <span className="w-10 text-slate-300">{row.goals}</span>
                   <span className="w-10 text-emerald-500">{row.wins}</span>
                   <span className="w-10 text-blue-400">{row.cleanSheets}</span>

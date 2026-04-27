@@ -106,6 +106,7 @@ export default function Rankings() {
                 <tr className="bg-brand-dark dark:bg-brand-gradient text-white border-b border-white/20">
                   <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase w-6 lg:w-auto text-center lg:text-left">#</th>
                   <th className="p-2 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase">PLAYER</th>
+                  <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center">MP</th>
                   <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center">W</th>
                   <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center">D</th>
                   <th className="p-1 lg:p-6 text-[10px] lg:text-[10px] font-black tracking-widest uppercase text-center">L</th>
@@ -147,6 +148,7 @@ export default function Rankings() {
                         </div>
                       </div>
                     </td>
+                    <td className="p-1 lg:p-6 text-center text-[10px] lg:text-sm font-black text-slate-600 dark:text-slate-400">{player.win + player.draw + player.loss}</td>
                     <td className="p-1 lg:p-6 text-center text-[10px] lg:text-sm font-bold text-slate-600 dark:text-slate-400">{player.win}</td>
                     <td className="p-1 lg:p-6 text-center text-[10px] lg:text-sm font-bold text-slate-600 dark:text-slate-400">{player.draw}</td>
                     <td className="p-1 lg:p-6 text-center text-[10px] lg:text-sm font-bold text-slate-600 dark:text-slate-400">{player.loss}</td>
