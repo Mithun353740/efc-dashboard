@@ -1133,18 +1133,12 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
   const [assignedPlayerIds, setAssignedPlayerIds] = React.useState<string[]>([]);
 
   const fetchAssignedPlayers = React.useCallback(async () => {
-    try {
-      const q = query(collection(db, 'players'), where('email', '!=', ''));
-      const snap = await getDocs(q);
-      setAssignedPlayerIds(snap.docs.map(d => d.id));
-    } catch (err) {
-      console.error('Error fetching assigned players:', err);
-    }
+    // Redundant - we now use the players array from context which already has emails
   }, []);
 
   React.useEffect(() => {
-    fetchAssignedPlayers();
-  }, [fetchAssignedPlayers]);
+    // Redundant - we now use the players array from context which already has emails
+  }, []);
 
   const handleSelectPlayer = async (p: import('../types').Player) => {
     setSelectedPlayer(p);
@@ -1170,7 +1164,6 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
     try {
       await updateDoc(doc(db, 'players', selectedPlayer.id), { email, password, role });
       setMsg({ type: 'success', text: `✅ Credentials updated for ${selectedPlayer.name}` });
-      fetchAssignedPlayers();
     } catch (err: any) {
       setMsg({ type: 'error', text: '❌ Failed: ' + err.message });
     } finally {
@@ -1290,7 +1283,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {players.filter(p => assignedPlayerIds.includes(p.id) || p.role === 'admin').map(p => (
+            {players.filter(p => p.email || p.role === 'admin').map(p => (
               <button
                 key={p.id}
                 onClick={() => handleSelectPlayer(p)}
@@ -1309,7 +1302,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
                 </div>
               </button>
             ))}
-            {assignedPlayerIds.length === 0 && (
+            {players.filter(p => p.email || p.role === 'admin').length === 0 && (
               <div className="col-span-full py-12 text-center border-2 border-dashed border-white/5 rounded-[2rem]">
                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">No players assigned yet</p>
               </div>

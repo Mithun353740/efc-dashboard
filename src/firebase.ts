@@ -9,13 +9,13 @@ export const auth = getAuth(app);
 export const db = initializeFirestore(app, { experimentalForceLongPolling: false }, firebaseConfig.firestoreDatabaseId);
 
 // Enable offline persistence so when Quota is exceeded, it falls back to the local device cache
-// enableMultiTabIndexedDbPersistence(db).catch((err) => {
-//   if (err.code === 'failed-precondition') {
-//     console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time.");
-//   } else if (err.code === 'unimplemented') {
-//     console.warn("The current browser does not support all of the features required to enable persistence.");
-//   }
-// });
+enableMultiTabIndexedDbPersistence(db).catch((err) => {
+  if (err.code === 'failed-precondition') {
+    console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time.");
+  } else if (err.code === 'unimplemented') {
+    console.warn("The current browser does not support all of the features required to enable persistence.");
+  }
+});
 
 export const googleProvider = new GoogleAuthProvider();
 
