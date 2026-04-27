@@ -10,35 +10,42 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // The main owner (Mithun)
     function isSuperAdmin() {
       return isAuthenticated() && request.auth.token.email == "mithun47490@gmail.com";
     }
 
-    // Check if the user is an admin. 
-    // Currently, we also allow anonymous users WHO ARE LOGGED IN THROUGH THE ADMIN PANEL 
-    // to have write access, but this is less secure. 
-    // For "Full Proof" security, we rely on the SuperAdmin email.
+    // A user is an Admin if they are the SuperAdmin OR if they have a registered session in the admins collection
     function isAdmin() {
-      return isSuperAdmin();
+      return isSuperAdmin() || exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
 
+    // Admins collection (Internal list of authorized sessions)
+    match /admins/{uid} {
+      allow read: if true;
+      // Allow registration if:
+      // 1. It's Mithun
+      // 2. The session belongs to a player who already has the 'admin' role in their player document
+      allow write: if isSuperAdmin() || (
+        request.auth.uid == uid && 
+        exists(/databases/$(database)/documents/players/$(request.resource.data.playerId)) && 
+        get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.role == 'admin'
+      ) || (
+        request.auth.uid == uid && request.resource.data.type == 'master' // Allow password-based master login
+      );
+    }
+
     // Players collection
     match /players/{playerId} {
       allow read: if true;
-      // Admins can manage all players. 
-      // Individual players can update their own profile (if we had UID matching enabled).
-      // For now, restrict to Admin to prevent guests from messing with stats.
       allow write: if isAdmin();
       
-      // Allow partial updates for profile settings (image, device) if they know their ID
-      // This is a middle-ground for the current login system.
+      // Allow players to update their own basic profile fields
       allow update: if isAuthenticated() && 
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['image', 'device', 'uid']));
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['image', 'device', 'uid', 'email', 'password']));
     }
 
     // Leaders collection
@@ -56,9 +63,7 @@ service cloud.firestore {
     // Tournaments collection
     match /tournaments/{tournamentId} {
       allow read: if true;
-      // Only admins can create or delete tournaments
       allow create, delete: if isAdmin();
-      // Players need to be able to UPDATE a tournament to register (add themselves to 'teams')
       allow update: if isAuthenticated();
     }
 
@@ -68,7 +73,6 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Locks subcollection (under settings)
     match /settings/locks/{lockId} {
       allow read: if true;
       allow write: if isAdmin();

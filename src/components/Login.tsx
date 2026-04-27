@@ -22,6 +22,18 @@ export default function Login() {
         await loginAnonymously();
         localStorage.setItem('adminLoggedIn', 'true');
         localStorage.setItem('userType', 'admin');
+        
+        // Register this session in Firestore for security rules
+        const { auth, db } = await import('../firebase');
+        const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+        if (auth.currentUser) {
+          await setDoc(doc(db, 'admins', auth.currentUser.uid), {
+            type: 'master',
+            lastActive: serverTimestamp(),
+            role: 'admin'
+          });
+        }
+        
         navigate('/admin');
       } catch (err: any) {
         setError('Firebase authentication failed: ' + (err.message || 'Unknown error'));
@@ -62,6 +74,21 @@ export default function Login() {
         // Check if this player is also an Admin via their role field
         if (playerData.role === 'admin' || playerData.email === 'mithun47490@gmail.com') {
            localStorage.setItem('adminLoggedIn', 'true');
+           // Register this session as an Admin session in Firestore for security rules
+           try {
+             const { auth } = await import('../firebase');
+             const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+             if (auth.currentUser) {
+               await setDoc(doc(db, 'admins', auth.currentUser.uid), {
+                 playerId: playerDoc.id,
+                 email: user,
+                 lastActive: serverTimestamp(),
+                 role: 'admin'
+               });
+             }
+           } catch (err) {
+             console.warn('[Security] Could not register admin session:', err);
+           }
         }
 
         navigate('/stats');
