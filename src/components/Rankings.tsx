@@ -6,7 +6,7 @@ import { INITIAL_PLAYERS, computePlayerStats, sortRankedPlayers } from '../lib/s
 import { Trophy, ChevronDown, Filter } from 'lucide-react';
 
 export default function Rankings() {
-  const { rankedPlayers, matches } = useFirebase();
+  const { rankedPlayers, matches, elos } = useFirebase();
   const [selectedSeason, setSelectedSeason] = useState('All Time');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -32,13 +32,13 @@ export default function Rankings() {
 
     // Compute new stats
     const seasonPlayers = rankedPlayers.map(player => {
-      const stats = computePlayerStats(player, seasonMatches);
+      const stats = computePlayerStats(player, seasonMatches, elos[player.id] || 1200);
       stats.ovr = player.ovr; // Keep global OVR
       return stats;
     }).filter(p => p.win > 0 || p.loss > 0 || p.draw > 0);
 
     return sortRankedPlayers(seasonPlayers);
-  }, [rankedPlayers, matches, selectedSeason]);
+  }, [rankedPlayers, matches, selectedSeason, elos]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark py-20 px-4 md:px-8 transition-colors">

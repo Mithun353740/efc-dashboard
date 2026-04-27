@@ -24,6 +24,7 @@ export default function Tournament() {
   }, [matches]);
 
   // Compute standings for the selected tournament
+  const { elos } = useFirebase();
   const standings = useMemo(() => {
     let tournamentMatches = matches.filter(m => m.tournament === selectedTournament);
     
@@ -36,7 +37,7 @@ export default function Tournament() {
     // Compute stats for all players using ONLY the tournament matches
     const unsortedTournamentPlayers = rankedPlayers
       .map(player => {
-        const stats = computePlayerStats(player, tournamentMatches);
+        const stats = computePlayerStats(player, tournamentMatches, elos[player.id] || 1200);
         // FORCE GIT SYNC: Lock the universal All-Time OVR into the tournament stats
         stats.ovr = player.ovr;
         return stats;
@@ -44,7 +45,7 @@ export default function Tournament() {
       .filter(p => p.win > 0 || p.loss > 0 || p.draw > 0); // Only show players who played in this tournament
       
     return sortRankedPlayers(unsortedTournamentPlayers);
-  }, [rankedPlayers, matches, selectedTournament, selectedSeason]);
+  }, [rankedPlayers, matches, selectedTournament, selectedSeason, elos]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] flex flex-col items-center p-8 transition-colors">

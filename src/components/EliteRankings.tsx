@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { INITIAL_PLAYERS, computePlayerStats, sortRankedPlayers } from '../lib/store';
 
 export default function EliteRankings() {
-  const { rankedPlayers, matches } = useFirebase();
+  const { rankedPlayers, matches, elos } = useFirebase();
 
   // Get current season matches for "Top Performers This Season"
   const currentSeasonPlayers = useMemo(() => {
@@ -17,13 +17,13 @@ export default function EliteRankings() {
     });
 
     const playersWithSeasonStats = rankedPlayers.map(p => {
-      const stats = computePlayerStats(p, seasonMatches);
+      const stats = computePlayerStats(p, seasonMatches, elos[p.id] || 1200);
       stats.ovr = p.ovr; // Keep global OVR
       return stats;
     }).filter(p => p.win > 0 || p.loss > 0 || p.draw > 0);
 
     return sortRankedPlayers(playersWithSeasonStats);
-  }, [rankedPlayers, matches]);
+  }, [rankedPlayers, matches, elos]);
 
   const activePlayers = currentSeasonPlayers.length > 0 ? currentSeasonPlayers : rankedPlayers;
   const topPlayers = activePlayers.slice(0, 5);

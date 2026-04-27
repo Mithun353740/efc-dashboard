@@ -379,7 +379,7 @@ export function subscribeToTournaments(callback: (tournaments: Tournament[], has
 }
 
 // Write operations
-export function computePlayerStats(player: Player, allMatches: MatchRecord[]): Player {
+export function computePlayerStats(player: Player, allMatches: MatchRecord[], elo: number): Player {
   let win = 0, loss = 0, draw = 0, goalsScored = 0, goalsConceded = 0;
   
   const playerMatches = allMatches
@@ -406,7 +406,7 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[]): P
     return myScore > oppScore ? 'W' : myScore < oppScore ? 'L' : 'D';
   });
 
-  return {
+  const updatedPlayer: Player = {
     ...player,
     win,
     loss,
@@ -414,14 +414,20 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[]): P
     goalsScored,
     goalsConceded,
     form,
-    ovr: calculateOvrHybrid(player, 1200) // Fallback OVR
   };
+
+  // Use the provided ELO for the final OVR calculation
+  updatedPlayer.ovr = calculateOvrHybrid(updatedPlayer, elo);
+  
+  return updatedPlayer;
 }
 
 export async function recalculateAllStats(players: Player[], allMatches: MatchRecord[]) {
   const batch = writeBatch(db);
+  const elos = computeGlobalElo(players, allMatches);
+  
   players.forEach(p => {
-    const updatedPlayer = computePlayerStats(p, allMatches);
+    const updatedPlayer = computePlayerStats(p, allMatches, elos[p.id] || 1200);
     batch.set(doc(db, 'players', p.id), updatedPlayer);
   });
   try {
@@ -470,12 +476,13 @@ export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2:
   batch.set(matchRef, matchRecord);
   
   const updatedMatches = [...allMatches, matchRecord];
+  const elos = computeGlobalElo([p1, ...(p2 ? [p2] : [])], updatedMatches);
 
-  const updatedP1 = computePlayerStats(p1, updatedMatches);
+  const updatedP1 = computePlayerStats(p1, updatedMatches, elos[p1.id] || 1200);
   batch.set(doc(db, 'players', p1.id), updatedP1);
 
   if (p2) {
-    const updatedP2 = computePlayerStats(p2, updatedMatches);
+    const updatedP2 = computePlayerStats(p2, updatedMatches, elos[p2.id] || 1200);
     batch.set(doc(db, 'players', p2.id), updatedP2);
   }
 
@@ -506,17 +513,18 @@ export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2
   });
 
   const updatedMatches = allMatches.map(m => m.id === oldMatch.id ? updatedMatchRecord : m);
+  const elos = computeGlobalElo(players, updatedMatches);
 
   const p1 = players.find(p => p.id === oldMatch.p1Id);
   if (p1) {
-    const updatedP1 = computePlayerStats(p1, updatedMatches);
+    const updatedP1 = computePlayerStats(p1, updatedMatches, elos[p1.id] || 1200);
     batch.set(doc(db, 'players', p1.id), updatedP1);
   }
 
   if (oldMatch.p2Id) {
     const p2 = players.find(p => p.id === oldMatch.p2Id);
     if (p2) {
-      const updatedP2 = computePlayerStats(p2, updatedMatches);
+      const updatedP2 = computePlayerStats(p2, updatedMatches, elos[p2.id] || 1200);
       batch.set(doc(db, 'players', p2.id), updatedP2);
     }
   }
@@ -536,17 +544,18 @@ export async function deleteMatchFromHistory(matchRecord: MatchRecord, players: 
   batch.delete(doc(db, 'matches', matchRecord.id));
 
   const updatedMatches = allMatches.filter(m => m.id !== matchRecord.id);
+  const elos = computeGlobalElo(players, updatedMatches);
 
   const p1 = players.find(p => p.id === matchRecord.p1Id);
   if (p1) {
-    const updatedP1 = computePlayerStats(p1, updatedMatches);
+    const updatedP1 = computePlayerStats(p1, updatedMatches, elos[p1.id] || 1200);
     batch.set(doc(db, 'players', p1.id), updatedP1);
   }
 
   if (matchRecord.p2Id) {
     const p2 = players.find(p => p.id === matchRecord.p2Id);
     if (p2) {
-      const updatedP2 = computePlayerStats(p2, updatedMatches);
+      const updatedP2 = computePlayerStats(p2, updatedMatches, elos[p2.id] || 1200);
       batch.set(doc(db, 'players', p2.id), updatedP2);
     }
   }

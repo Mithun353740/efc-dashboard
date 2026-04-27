@@ -89,6 +89,7 @@ export default function TournamentRanking() {
   };
 
   // 3. Compute Standings
+  const { elos } = useFirebase();
   const standings = useMemo(() => {
     // Filter matches: compare canonical (resolved) tournament names case-insensitively
     let tournamentMatches = matches.filter(m => {
@@ -103,14 +104,14 @@ export default function TournamentRanking() {
 
     const unsortedTournamentPlayers = rankedPlayers
       .map(player => {
-        const stats = computePlayerStats(player, tournamentMatches);
+        const stats = computePlayerStats(player, tournamentMatches, elos[player.id] || 1200);
         stats.ovr = player.ovr;
         return stats;
       })
       .filter(p => p.win > 0 || p.loss > 0 || p.draw > 0);
       
     return sortRankedPlayers(unsortedTournamentPlayers);
-  }, [rankedPlayers, matches, selectedTournament, selectedSeason]);
+  }, [rankedPlayers, matches, selectedTournament, selectedSeason, elos]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] flex flex-col items-center p-4 md:p-8 transition-colors">

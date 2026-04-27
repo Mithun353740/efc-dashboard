@@ -9,7 +9,7 @@ import { Player } from '../types';
 import { computePlayerStats } from '../lib/store';
 
 export default function PlayerStats() {
-  const { rankedPlayers: players, matches, tournaments } = useFirebase();
+  const { rankedPlayers: players, matches, tournaments, elos } = useFirebase();
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [search, setSearch] = useState('');
   const [searchParams] = useSearchParams();
@@ -71,14 +71,14 @@ export default function PlayerStats() {
       filteredMatches = filteredMatches.filter(m => (m.tournament || 'Friendly') === selectedTournament);
     }
 
-    const computedStats = computePlayerStats(selectedPlayer, filteredMatches);
+    const computedStats = computePlayerStats(selectedPlayer, filteredMatches, elos[selectedPlayer.id] || 1200);
     
     // FORCE GIT SYNC: Ensure universal OVR is maintained across all filters
     // to prevent player's OVR from dropping in sub-tournaments
     computedStats.ovr = selectedPlayer.ovr;
 
     return computedStats;
-  }, [selectedPlayer, selectedSeason, selectedTournament, matches]);
+  }, [selectedPlayer, selectedSeason, selectedTournament, matches, elos]);
 
   const chartData = computedPlayer ? [
     { name: 'WINS', value: computedPlayer.win, color: '#22c55e' },

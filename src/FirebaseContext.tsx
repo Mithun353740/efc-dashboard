@@ -28,6 +28,7 @@ interface FirebaseContextType {
   matches: MatchRecord[];
   tournaments: Tournament[];
   systemLocks: Record<string, boolean>;
+  elos: Record<string, number>;
   isLoading: boolean;
   dbError: string | null;
   hasPendingWrites: boolean;
@@ -229,6 +230,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     matches,
     tournaments,
     systemLocks,
+    elos,
     isLoading,
     dbError,
     hasPendingWrites
