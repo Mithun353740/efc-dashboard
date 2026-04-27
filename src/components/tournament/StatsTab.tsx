@@ -48,7 +48,7 @@ export function StatsTab({ tournament }: StatsTabProps) {
   }, [tournament]);
 
   const topScorers = [...stats].sort((a, b) => b.goals - a.goals || a.played - b.played).slice(0, 5);
-  const bestDefense = [...stats].sort((a, b) => a.conceded - b.conceded || b.played - a.played).slice(0, 5);
+  const bestDefense = [...stats].sort((a, b) => b.cleanSheets - a.cleanSheets || a.conceded - b.conceded).slice(0, 5);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -137,8 +137,8 @@ export function StatsTab({ tournament }: StatsTabProps) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-black text-white">{s.conceded}</div>
-                  <div className="text-[9px] font-black text-emerald-500 uppercase">Against</div>
+                  <div className="text-2xl font-black text-white">{s.cleanSheets}</div>
+                  <div className="text-[9px] font-black text-emerald-500 uppercase">CS</div>
                 </div>
               </motion.div>
             );

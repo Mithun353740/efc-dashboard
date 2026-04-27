@@ -146,9 +146,9 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
           {filter === 'cleansheets' ? (
             <span className="w-8">CS</span>
           ) : filter === 'home' ? (
-            <><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GF:GA</span><span className="w-8">PTS</span></>
+            <><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GF</span><span className="w-8">PTS</span></>
           ) : filter === 'away' ? (
-            <><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GF:GA</span><span className="w-8">PTS</span></>
+            <><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GF</span><span className="w-8">PTS</span></>
           ) : (
             <><span className="w-6">P</span><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GD</span><span className="w-8">PTS</span></>
           )}
@@ -201,7 +201,7 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
                     <span className="w-6 text-slate-300">{row.homeWon}</span>
                     <span className="w-6 text-slate-400">{row.homeDraw}</span>
                     <span className="w-6 text-slate-500">{row.homeLost}</span>
-                    <span className="w-10 text-slate-400">{row.homeGF}:{row.homeGA}</span>
+                    <span className="w-10 text-slate-400">{row.homeGF}</span>
                     <span className="w-8 text-indigo-400">{row.homePts}</span>
                   </>
                 ) : filter === 'away' ? (
@@ -209,7 +209,7 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
                     <span className="w-6 text-slate-300">{row.awayWon}</span>
                     <span className="w-6 text-slate-400">{row.awayDraw}</span>
                     <span className="w-6 text-slate-500">{row.awayLost}</span>
-                    <span className="w-10 text-slate-400">{row.awayGF}:{row.awayGA}</span>
+                    <span className="w-10 text-slate-400">{row.awayGF}</span>
                     <span className="w-8 text-indigo-400">{row.awayPts}</span>
                   </>
                 ) : (

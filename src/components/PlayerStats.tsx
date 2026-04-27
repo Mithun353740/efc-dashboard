@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ChevronRight, Trophy, Target, Zap, Filter, ChevronDown, Info, X, Activity, Flame } from 'lucide-react';
+import { Search, ChevronRight, Trophy, Target, Zap, Filter, ChevronDown, Info, X, Activity, Flame, Shield } from 'lucide-react';
 import { useFirebase } from '../FirebaseContext';
 import { cn, getSeasonInfo } from '../lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';

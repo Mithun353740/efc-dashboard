@@ -158,7 +158,6 @@ export function TeamsTab({ tournament }: TeamsTabProps) {
                         { label: 'Drawn', value: team.drawn, color: 'text-amber-400' },
                         { label: 'Lost', value: team.lost, color: 'text-red-400' },
                         { label: 'GF', value: team.gf, color: 'text-blue-400' },
-                        { label: 'GA', value: team.ga, color: 'text-slate-400' },
                         { label: 'GD', value: (team.gd > 0 ? '+' : '') + team.gd, color: team.gd >= 0 ? 'text-emerald-400' : 'text-red-400' },
                         { label: 'Clean Sheets', value: team.cs, color: 'text-purple-400' },
                       ].map(stat => (
