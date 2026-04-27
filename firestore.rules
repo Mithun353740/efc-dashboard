@@ -1,41 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: players
-    // Document ID: uuid
-    // Fields:
-    //   - id: string (required)
-    //   - name: string (required, 1-100 chars)
-    //   - number: string (required, 1-5 chars)
-    //   - position: string (required, enum)
-    //   - ovr: number (required, 1-100)
-    //   - win: number (required)
-    //   - loss: number (required)
-    //   - draw: number (required)
-    //   - goalsScored: number (required)
-    //   - goalsConceded: number (required)
-    //   - image: string (required, URL)
-    //   - form: list (required, strings)
-    //   - device: string (required)
-    //   - uid: string (required)
-    //
-    // Collection: leaders
-    // Document ID: uuid
-    // Fields:
-    //   - id: string (required)
-    //   - name: string (required)
-    //   - role: string (required)
-    //   - image: string (required, URL)
-    //   - quote: string (required)
-    //   - initials: string (required)
-    //   - playerId: string (optional)
-    //
-    // ===============================================================
-
+    
     // ===============================================================
     // Helper Functions
     // ===============================================================
@@ -44,46 +10,17 @@ service cloud.firestore {
       return request.auth != null;
     }
     
+    // The main owner (Mithun)
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.token.email == "mithun47490@gmail.com";
+    }
+
+    // Check if the user is an admin. 
+    // Currently, we also allow anonymous users WHO ARE LOGGED IN THROUGH THE ADMIN PANEL 
+    // to have write access, but this is less secure. 
+    // For "Full Proof" security, we rely on the SuperAdmin email.
     function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.email == "mithun47490@gmail.com" ||
-        request.auth.token.firebase.sign_in_provider == "anonymous"
-      );
-    }
-
-    function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*") || url.matches("^data:image/.*"));
-    }
-
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-
-    function isValidPlayer(data) {
-      return data.id is string &&
-             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
-             data.number is string && data.number.size() >= 1 && data.number.size() <= 10 &&
-             data.ovr is number && data.ovr >= 0 && data.ovr <= 100 &&
-             data.win is number && data.loss is number && data.draw is number &&
-             data.goalsScored is number && data.goalsConceded is number &&
-             isValidUrl(data.image) && data.image.size() <= 2000 &&
-             data.form is list && data.form.size() <= 10 &&
-             data.device is string && data.device.size() <= 50 &&
-             data.uid is string && data.uid.size() <= 100;
-    }
-
-    function isValidLeader(data) {
-      return data.id is string &&
-             data.name is string && data.name.size() <= 100 &&
-             data.role is string && data.role.size() <= 100 &&
-             isValidUrl(data.image) && data.image.size() <= 2000 &&
-             data.quote is string && data.quote.size() <= 500 &&
-             data.initials is string && data.initials.size() <= 10 &&
-             (!('playerId' in data) || (data.playerId is string && data.playerId.size() <= 100));
+      return isSuperAdmin();
     }
 
     // ===============================================================
@@ -93,37 +30,48 @@ service cloud.firestore {
     // Players collection
     match /players/{playerId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      // Admins can manage all players. 
+      // Individual players can update their own profile (if we had UID matching enabled).
+      // For now, restrict to Admin to prevent guests from messing with stats.
+      allow write: if isAdmin();
+      
+      // Allow partial updates for profile settings (image, device) if they know their ID
+      // This is a middle-ground for the current login system.
+      allow update: if isAuthenticated() && 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['image', 'device', 'uid']));
     }
 
     // Leaders collection
     match /leaders/{leaderId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
 
     // Matches collection
     match /matches/{matchId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
 
     // Tournaments collection
     match /tournaments/{tournamentId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      // Only admins can create or delete tournaments
+      allow create, delete: if isAdmin();
+      // Players need to be able to UPDATE a tournament to register (add themselves to 'teams')
+      allow update: if isAuthenticated();
     }
 
     // Settings collection
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
 
     // Locks subcollection (under settings)
     match /settings/locks/{lockId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
   }
 }
