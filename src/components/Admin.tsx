@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter } from 'lucide-react';
+import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -1383,12 +1383,14 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const [configSaving, setConfigSaving] = React.useState(false);
 
   // ── Match & Engine state (lazy-loaded, quota-safe) ──
-  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'config'>('clubs');
+  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'config'|'auction'>('clubs');
 
   // Tournaments state
   const [tournaments, setTournaments] = React.useState<ClubTournament[]>([]);
   const [tLoaded, setTLoaded] = React.useState(false);
   const [tFormName, setTFormName] = React.useState('');
+  const [editingTId, setEditingTId] = React.useState<string | null>(null);
+  const [tStatusForm, setTStatusForm] = React.useState({ status: 'active', reason: '' });
 
   // Fixtures state
   const [fixtures, setFixtures] = React.useState<ClubFixture[]>([]);
@@ -1556,6 +1558,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
         id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
         name: tFormName.toUpperCase(),
         season: config.season,
+        status: 'active',
         createdAt: Date.now()
       };
       await saveClubTournament(nt);
@@ -1573,6 +1576,20 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
       await deleteClubTournament(id);
       setTournaments(tournaments.filter(t => t.id !== id));
       flashMatch('✅ Deleted', true);
+    } catch (e: any) { flashMatch('❌ ' + e.message, false); }
+    finally { setMatchBusy(false); }
+  };
+
+  const handleUpdateTournamentStatus = async (id: string) => {
+    const t = tournaments.find(x => x.id === id);
+    if (!t) return;
+    setMatchBusy(true);
+    try {
+      const nt = { ...t, status: tStatusForm.status as any, statusReason: tStatusForm.reason };
+      await saveClubTournament(nt);
+      setTournaments(tournaments.map(x => x.id === id ? nt : x));
+      setEditingTId(null);
+      flashMatch('✅ Tournament updated', true);
     } catch (e: any) { flashMatch('❌ ' + e.message, false); }
     finally { setMatchBusy(false); }
   };
@@ -1664,12 +1681,12 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     <div className="space-y-6">
       {/* SubTab Nav */}
       <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-2xl flex-wrap">
-        {(['clubs','tournaments','fixtures','matches','config'] as const).map(t => (
+        {(['clubs','tournaments','fixtures','matches','config','auction'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)}
             className={cn('flex-1 min-w-[100px] py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all',
               subTab === t ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
             )}>
-            {t === 'clubs' ? '⚽ CLUBS' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : '⚙️ CONFIG'}
+            {t === 'clubs' ? '⚽ CLUBS' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : t === 'config' ? '⚙️ CONFIG' : '🔨 AUCTION'}
           </button>
         ))}
       </div>
@@ -1829,12 +1846,46 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
             {!tLoaded ? <p className="text-slate-500 text-xs font-bold animate-pulse">Loading...</p> : tournaments.length === 0 ? <p className="text-slate-500 text-xs font-bold">No club tournaments created for this season.</p> : (
               <div className="space-y-3">
                 {tournaments.map(t => (
-                  <div key={t.id} className="bg-[#0f172a] rounded-xl border border-white/10 p-4 flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-black text-sm text-white uppercase">{t.name}</p>
-                      <p className="text-[9px] text-slate-500 uppercase tracking-widest">{new Date(t.createdAt).toLocaleDateString()}</p>
+                  <div key={t.id} className="bg-[#0f172a] rounded-xl border border-white/10 p-4 flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <p className="font-black text-sm text-white uppercase">{t.name}</p>
+                          <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded",
+                            t.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
+                            t.status === 'paused' ? 'bg-amber-500/20 text-amber-400' :
+                            t.status === 'postponed' ? 'bg-red-500/20 text-red-400' :
+                            'bg-slate-500/20 text-slate-400'
+                          )}>
+                            {t.status}
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">{new Date(t.createdAt).toLocaleDateString()}</p>
+                        {t.statusReason && <p className="text-[10px] font-bold text-slate-400 mt-1 italic">"{t.statusReason}"</p>}
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button onClick={() => {
+                          if (editingTId === t.id) setEditingTId(null);
+                          else { setEditingTId(t.id); setTStatusForm({ status: t.status || 'active', reason: t.statusReason || '' }); }
+                        }} className="px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl transition-all text-[10px] font-black uppercase">
+                          {editingTId === t.id ? 'CANCEL' : 'EDIT'}
+                        </button>
+                        <button onClick={() => handleDelTournament(t.id)} disabled={matchBusy} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all disabled:opacity-50"><Trash2 size={14} /></button>
+                      </div>
                     </div>
-                    <button onClick={() => handleDelTournament(t.id)} disabled={matchBusy} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all disabled:opacity-50"><Trash2 size={14} /></button>
+                    {editingTId === t.id && (
+                      <div className="pt-3 border-t border-white/5 flex flex-wrap gap-3">
+                        <select value={tStatusForm.status} onChange={e => setTStatusForm({...tStatusForm, status: e.target.value})} className="bg-black/50 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none">
+                          <option value="active">ACTIVE</option>
+                          <option value="paused">PAUSED</option>
+                          <option value="postponed">POSTPONED</option>
+                          <option value="completed">COMPLETED</option>
+                        </select>
+                        <input value={tStatusForm.reason} onChange={e => setTStatusForm({...tStatusForm, reason: e.target.value})} placeholder="Reason (optional)..."
+                          className="flex-1 bg-black/50 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
+                        <button onClick={() => handleUpdateTournamentStatus(t.id)} disabled={matchBusy} className="px-4 py-2 bg-amber-500 text-black text-[10px] font-black rounded uppercase">Save</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2091,6 +2142,19 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── AUCTION subtab ── */}
+      {subTab === 'auction' && (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl text-center py-20">
+          <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 mx-auto mb-4">
+            <span className="text-2xl">🔨</span>
+          </div>
+          <h3 className="text-2xl font-black tracking-tight mb-2 uppercase">Auction Coming Soon</h3>
+          <p className="text-slate-400 text-xs font-bold max-w-md mx-auto">
+            The player distribution auction system is currently under development. Check back later.
+          </p>
         </div>
       )}
 

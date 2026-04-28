@@ -107,6 +107,8 @@ export interface ClubTournament {
   id: string;
   name: string;      // e.g. "Vortex Winter Cup"
   season: string;    // e.g. "QVFC Club Season 2026/2027"
+  status: 'active' | 'paused' | 'postponed' | 'completed';
+  statusReason?: string;
   createdAt: number;
 }
 

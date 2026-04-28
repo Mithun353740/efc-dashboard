@@ -7,7 +7,7 @@ import {
   fetchClubTournaments, fetchClubFixtures, saveClubFixture
 } from '../lib/store';
 import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture } from '../types';
-import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield } from 'lucide-react';
+import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -210,7 +210,7 @@ export default function ClubManager() {
   const [config, setConfig] = useState<ClubSystemConfig | null>(null);
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'market' | 'rankings' | 'fixtures'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'market' | 'rankings' | 'fixtures' | 'auction'>('overview');
   const [msg, setMsg] = useState({ text: '', type: '' });
 
   const playerId = localStorage.getItem('playerId') || '';
@@ -250,6 +250,7 @@ export default function ClubManager() {
   const tabs = [
     { id: 'overview', label: 'MY CLUB', icon: <Shield size={14} /> },
     { id: 'market', label: 'MARKET', icon: <ShoppingCart size={14} /> },
+    { id: 'auction', label: 'AUCTION', icon: <Hammer size={14} /> },
     { id: 'rankings', label: 'RANKINGS', icon: <Trophy size={14} /> },
     { id: 'fixtures', label: 'FIXTURES', icon: <Calendar size={14} /> },
   ] as const;
@@ -323,6 +324,22 @@ export default function ClubManager() {
             {activeTab === 'rankings' && (
               <motion.div key="rankings" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
                 <RankingsTab clubs={clubs} players={players} myClub={myClub} config={config} />
+              </motion.div>
+            )}
+            {activeTab === 'auction' && (
+              <motion.div key="auction" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-16 backdrop-blur-xl text-center">
+                  <div className="w-20 h-20 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-amber-500/20">
+                    <Hammer size={36} className="text-amber-500" />
+                  </div>
+                  <h3 className="text-3xl font-black text-white mb-2 uppercase tracking-tighter italic">Auction House</h3>
+                  <p className="text-slate-400 text-sm font-bold max-w-md mx-auto mb-8">
+                    The player distribution auction system is currently being built by the federation. This is where clubs will bid for world-class talent soon.
+                  </p>
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 text-amber-500 rounded-full text-[10px] font-black tracking-widest uppercase">
+                    Status: Under Development
+                  </div>
+                </div>
               </motion.div>
             )}
             {activeTab === 'fixtures' && (
@@ -673,6 +690,7 @@ function FixturesTab({ config, clubs, myClub, squad, players, setMsg }: { config
           fetchClubFixtures(config.season)
         ]);
         setTournaments(ts);
+        // Only show fixtures for active or completed tournaments
         setFixtures(fs.sort((a, b) => b.createdAt - a.createdAt));
       } catch (e) {
         console.error(e);
@@ -681,6 +699,17 @@ function FixturesTab({ config, clubs, myClub, squad, players, setMsg }: { config
     }
     load();
   }, [config?.season]);
+
+  const activeFixtures = fixtures.filter(f => {
+    const t = tournaments.find(x => x.id === f.tournamentId);
+    return t?.status !== 'completed'; // Keep active/paused/postponed
+  });
+
+  const completedFixtures = fixtures.filter(f => {
+    const t = tournaments.find(x => x.id === f.tournamentId);
+    return t?.status === 'completed' || f.status === 'completed';
+  });
+
 
   const activeTourneyIds = [...new Set(fixtures.map(f => f.tournamentId))];
 
@@ -778,10 +807,25 @@ function FixturesTab({ config, clubs, myClub, squad, players, setMsg }: { config
 
         return (
           <div key={tId} className="space-y-6">
-            <h3 className="text-xl font-black text-white tracking-widest uppercase flex items-center gap-3">
-              <Trophy className="text-amber-500" size={20} />
-              {tourney.name}
-            </h3>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <h3 className="text-xl font-black text-white tracking-widest uppercase flex items-center gap-3">
+                <Trophy className="text-amber-500" size={20} />
+                {tourney.name}
+              </h3>
+              {tourney.status !== 'active' && (
+                <div className={cn("px-4 py-2 rounded-xl border flex items-center gap-3",
+                  tourney.status === 'paused' ? 'bg-amber-500/10 border-amber-500/30 text-amber-500' :
+                  tourney.status === 'postponed' ? 'bg-red-500/10 border-red-500/30 text-red-500' :
+                  'bg-slate-500/10 border-slate-500/30 text-slate-500'
+                )}>
+                  <AlertCircle size={16} />
+                  <div>
+                    <p className="text-[10px] font-black uppercase leading-tight">{tourney.status}</p>
+                    {tourney.statusReason && <p className="text-[9px] font-bold opacity-70">{tourney.statusReason}</p>}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {tFix.map(f => {
@@ -835,7 +879,12 @@ function FixturesTab({ config, clubs, myClub, squad, players, setMsg }: { config
                     {/* Action Area */}
                     <div className="p-4 bg-black/40 border-t border-white/5 flex-1 flex flex-col justify-end">
                       {isParticipant && (f.status === 'scheduled' || f.status === 'lineups_pending') && !iHaveSubmitted ? (
-                        selFixtureId === f.id ? (
+                        tourney.status !== 'active' ? (
+                          <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-center">
+                            <Lock size={16} className="text-slate-500 mx-auto mb-2" />
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Locked: Tournament {tourney.status}</p>
+                          </div>
+                        ) : selFixtureId === f.id ? (
                           <div className="space-y-4">
                             <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest text-center">Select {f.lineupSize} Players</p>
                             <div className="flex flex-wrap gap-2 justify-center">
@@ -862,7 +911,12 @@ function FixturesTab({ config, clubs, myClub, squad, players, setMsg }: { config
                           </button>
                         )
                       ) : isParticipant && f.status === 'matchups_pending' && isHome ? (
-                        selFixtureId === f.id ? (
+                        tourney.status !== 'active' ? (
+                          <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-center">
+                            <Lock size={16} className="text-slate-500 mx-auto mb-2" />
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Locked: Tournament {tourney.status}</p>
+                          </div>
+                        ) : selFixtureId === f.id ? (
                           <div className="space-y-4">
                             <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest text-center">HOME ADVANTAGE: PAIR YOUR PLAYERS</p>
                             <div className="space-y-3">
