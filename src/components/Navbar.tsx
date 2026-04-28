@@ -79,9 +79,9 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="flex items-center justify-between px-8 py-4 bg-white dark:bg-brand-dark border-b border-slate-100 dark:border-white/10 sticky top-0 z-[100] transition-colors">
-      <Link to="/" className="flex items-center gap-3">
-        <div className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-[#0f172a] dark:bg-[#020617] border border-brand-purple/40 shadow-[0_0_30px_rgba(139,92,246,0.6)] transition-all hover:shadow-[0_0_40px_rgba(139,92,246,0.8)]">
+    <nav className="flex items-center justify-between px-4 md:px-8 py-4 bg-white dark:bg-brand-dark border-b border-slate-100 dark:border-white/10 sticky top-0 z-[100] transition-colors">
+      <Link to="/" className="flex items-center gap-2">
+        <div className="w-10 h-10 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-[#0f172a] dark:bg-[#020617] border border-brand-purple/40 shadow-[0_0_30px_rgba(139,92,246,0.6)] transition-all hover:shadow-[0_0_40px_rgba(139,92,246,0.8)]">
           <img 
             src={CLUB_LOGO}
             alt={CLUB_NAME} 
@@ -100,7 +100,7 @@ export default function Navbar() {
             }}
           />
         </div>
-        <span className="font-black italic tracking-tighter text-2xl md:text-3xl lg:text-4xl text-transparent bg-clip-text bg-brand-gradient">
+        <span className="font-black italic tracking-tighter text-base sm:text-2xl md:text-3xl lg:text-4xl text-transparent bg-clip-text bg-brand-gradient whitespace-nowrap truncate max-w-[140px] sm:max-w-none">
           {CLUB_NAME}
         </span>
       </Link>

@@ -16,7 +16,7 @@ export default function Hero({ player }: HeroProps) {
     <section className="relative min-h-[85vh] md:h-[75vh] md:min-h-[600px] flex flex-col md:flex-row overflow-hidden bg-brand-dark dark:bg-black transition-colors pt-16 md:pt-0">
       {/* Background with blurred stadium feel */}
       <div 
-        className="absolute inset-0 opacity-20 md:opacity-40 bg-cover bg-center"
+        className="absolute inset-0 opacity-30 md:opacity-40 bg-cover bg-center"
         style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=2000&auto=format&fit=crop)' }}
       />
 
@@ -35,10 +35,10 @@ export default function Hero({ player }: HeroProps) {
               #1 RANK • TOP PERFORMER
             </span>
           </div>
-          <h1 className="text-[3rem] xs:text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white leading-none tracking-tighter mb-1 md:mb-2 uppercase break-words hyphens-auto">
+          <h1 className="text-4xl xs:text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white leading-none tracking-tighter mb-1 md:mb-2 uppercase break-words">
             {firstName}
           </h1>
-          <h2 className="text-[3rem] xs:text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white/80 md:text-white/50 md:text-outline leading-none tracking-tighter mb-6 md:mb-8 uppercase break-words hyphens-auto">
+          <h2 className="text-4xl xs:text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white/80 md:text-white/50 md:text-outline leading-none tracking-tighter mb-6 md:mb-8 uppercase break-words">
             {lastName}
           </h2>
           
@@ -54,7 +54,7 @@ export default function Hero({ player }: HeroProps) {
       </div>
 
       {/* Player Image */}
-      <div className="relative z-0 h-[45vh] md:absolute md:right-0 md:bottom-0 md:h-full w-full md:w-[50%] order-1 md:order-2 flex items-end justify-center md:justify-end">
+      <div className="relative z-0 h-[52vh] md:absolute md:right-0 md:bottom-0 md:h-full w-full md:w-[50%] order-1 md:order-2 flex items-end justify-center md:justify-end">
         <motion.img
           initial={{ opacity: 0, scale: 1.05 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -63,8 +63,8 @@ export default function Hero({ player }: HeroProps) {
           alt={player.name}
           className="h-full w-full object-cover object-top md:object-center"
           style={{
-            WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)',
-            maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)'
+            WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 65%, transparent 100%)',
+            maskImage: 'linear-gradient(to bottom, black 0%, black 65%, transparent 100%)'
           }}
         />
       </div>
