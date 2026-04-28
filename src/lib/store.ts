@@ -357,8 +357,9 @@ export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boo
 
 export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending: boolean) => void) {
   const path = 'matches';
-  // Sorting by timestamp descending (newest first)
-  const q = query(collection(db, path), orderBy('timestamp', 'desc'));
+  // Limit to 150 matches to drastically reduce quota usage for 60+ users.
+  // The full match history is only needed for admin operations or heavy stat recalculations.
+  const q = query(collection(db, path), orderBy('timestamp', 'desc'), limit(150));
   return onSnapshot(q, (snapshot) => {
     const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
     callback(matches, snapshot.metadata.hasPendingWrites);
@@ -422,8 +423,12 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[], el
   return updatedPlayer;
 }
 
-export async function recalculateAllStats(players: Player[], allMatches: MatchRecord[]) {
+export async function recalculateAllStats(players: Player[]) {
   const batch = writeBatch(db);
+  // Fetch all matches since the real-time listener is now limited
+  const fullMatchesSnap = await getDocs(query(collection(db, 'matches'), orderBy('timestamp', 'asc')));
+  const allMatches = fullMatchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
+  
   const elos = computeGlobalElo(players, allMatches);
   
   players.forEach(p => {

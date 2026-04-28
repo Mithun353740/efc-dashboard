@@ -416,7 +416,7 @@ export default function Admin() {
             onClick={async () => {
               setIsResyncing(true);
               try {
-                await recalculateAllStats(players, matches);
+                await recalculateAllStats(players);
                 alert('All player stats resynced successfully based on Match History.');
               } catch(e) {
                 alert('Failed to resync stats. If quota is still exceeded, this will fail.');

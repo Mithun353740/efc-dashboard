@@ -269,15 +269,29 @@ export default function Navbar() {
               <div className="mt-4 flex justify-center">
                 <InstallButton />
               </div>
-              {(isAdmin || isPlayer) && (
-                <button 
-                  onClick={handleLogout}
-                  className="mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 text-red-500 rounded-xl text-[10px] font-black tracking-widest hover:bg-red-500/20 transition-all"
-                >
-                  <User size={14} />
-                  LOGOUT {isPlayer ? playerName : ''}
-                </button>
-              )}
+              <div className="mt-4 flex flex-col gap-2 w-full px-4">
+                {isPlayer && (
+                  <button 
+                    onClick={() => {
+                      setIsSettingsOpen(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex items-center justify-center gap-2 py-3 bg-brand-purple/10 text-brand-purple rounded-xl text-[10px] font-black tracking-widest hover:bg-brand-purple/20 transition-all uppercase w-full"
+                  >
+                    <Settings size={14} />
+                    Account Settings
+                  </button>
+                )}
+                {(isAdmin || isPlayer) && (
+                  <button 
+                    onClick={handleLogout}
+                    className="flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 rounded-xl text-[10px] font-black tracking-widest hover:bg-red-500/20 transition-all w-full"
+                  >
+                    <LogOut size={14} />
+                    LOGOUT {isPlayer ? playerName : ''}
+                  </button>
+                )}
+              </div>
               {(!isAdmin && !isPlayer) && (
                 <Link 
                   to="/login"
