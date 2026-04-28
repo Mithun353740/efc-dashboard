@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Bell, User, Moon, Sun, Menu, X, ChevronDown, Settings, LogOut, Shield } from 'lucide-react';
+import { Bell, User, Moon, Sun, Menu, X, ChevronDown, Settings, LogOut, Shield, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
@@ -8,7 +8,7 @@ import PlayerSettingsModal from './PlayerSettingsModal';
 import { useFirebase } from '../FirebaseContext';
 
 export default function Navbar() {
-  const { players } = useFirebase();
+  const { players, systemLocks } = useFirebase();
   const [isDark, setIsDark] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPlayer, setIsPlayer] = useState(false);
@@ -111,6 +111,7 @@ export default function Navbar() {
           { label: 'RANKINGS', path: '/rankings' },
           { label: 'ANALYTICS', path: '/stats' },
           { label: 'TOURNAMENTS', path: '/tournament' },
+          ...(!systemLocks?.clubManager && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
           ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
         ].map((item: any) => (
           item.externalUrl ? (
@@ -128,8 +129,13 @@ export default function Navbar() {
             <Link
               key={item.label}
               to={item.path}
-              className="text-[11px] font-black tracking-widest text-slate-500 hover:text-brand-dark dark:hover:text-brand-purple transition-colors"
+              className={`text-[11px] font-black tracking-widest transition-colors ${
+                item.club
+                  ? 'text-amber-400 hover:text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]'
+                  : 'text-slate-500 hover:text-brand-dark dark:hover:text-brand-purple'
+              }`}
             >
+              {item.club && <Layers size={11} className="inline mr-1 -mt-0.5" />}
               {item.label}
             </Link>
           )
@@ -250,6 +256,7 @@ export default function Navbar() {
                 { label: 'RANKINGS', path: '/rankings' },
                 { label: 'ANALYTICS', path: '/stats' },
                 { label: 'TOURNAMENTS', path: '/tournament' },
+                ...(!systemLocks?.clubManager && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
                 ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
               ].map((item: any) => (
                 item.externalUrl ? (
@@ -269,8 +276,13 @@ export default function Navbar() {
                     key={item.label}
                     to={item.path}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="px-4 py-4 text-xs font-black tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 active:bg-slate-100 dark:active:bg-white/10 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
+                    className={`px-4 py-4 text-xs font-black tracking-widest transition-colors border-b border-slate-100 dark:border-white/5 last:border-0 ${
+                      item.club
+                        ? 'text-amber-400 hover:bg-amber-500/5'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 active:bg-slate-100 dark:active:bg-white/10'
+                    }`}
                   >
+                    {item.club && <Layers size={11} className="inline mr-1.5 -mt-0.5" />}
                     {item.label}
                   </Link>
                 )

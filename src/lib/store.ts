@@ -793,6 +793,267 @@ export async function bootstrapData() {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CLUB ZONE STORE
+// All reads are one-shot (getDocs/getDoc) — NO real-time listeners.
+// This keeps quota impact minimal: data is only fetched when the Club Zone
+// page is actually open. Each visitor pays at most ~3 reads per page load.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { Club, ClubSystemConfig, MarketListing } from '../types';
+
+/** Fetch the club system config (1 read). */
+export async function fetchClubConfig(): Promise<ClubSystemConfig | null> {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'clubConfig'));
+    if (snap.exists()) return snap.data() as ClubSystemConfig;
+  } catch (err) {
+    console.warn('[Club] fetchClubConfig failed:', err);
+  }
+  return null;
+}
+
+/** Persist the club system config (1 write). */
+export async function saveClubConfig(config: ClubSystemConfig): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  try {
+    await setDoc(doc(db, 'settings', 'clubConfig'), config);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, 'settings/clubConfig');
+    throw err;
+  }
+}
+
+/** Fetch all clubs (1 read per club doc — very small collection). */
+export async function fetchClubs(): Promise<Club[]> {
+  try {
+    const snap = await getDocs(collection(db, 'clubs'));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'clubs');
+    return [];
+  }
+}
+
+/**
+ * Save a club and update the owner player's clubId / isClubOwner flags.
+ * If ownerId changed, clears old owner's flags.
+ */
+export async function saveClub(club: Club, previousOwnerId?: string): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  const batch = writeBatch(db);
+
+  // Write club document
+  batch.set(doc(db, 'clubs', club.id), club);
+
+  // If owner changed, clear old owner's flags
+  if (previousOwnerId && previousOwnerId !== club.ownerId) {
+    batch.update(doc(db, 'players', previousOwnerId), {
+      clubId: null, isClubOwner: false, clubName: null,
+      primaryColor: null, secondaryColor: null,
+    });
+  }
+
+  // Set new owner's flags (denormalized for quota-free display)
+  if (club.ownerId) {
+    batch.update(doc(db, 'players', club.ownerId), {
+      clubId: club.id,
+      clubName: club.name,
+      isClubOwner: true,
+      primaryColor: club.primaryColor,
+      secondaryColor: club.secondaryColor,
+    });
+  }
+
+  // Stamp clubId + club name on all squad members
+  club.squadIds?.forEach(pid => {
+    if (pid !== club.ownerId) {
+      batch.update(doc(db, 'players', pid), {
+        clubId: club.id,
+        clubName: club.name,
+        primaryColor: club.primaryColor,
+        secondaryColor: club.secondaryColor,
+      });
+    }
+  });
+
+  try {
+    await batch.commit();
+    await updateLastUpdated();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubs/${club.id}`);
+    throw err;
+  }
+}
+
+/** Delete a club and clean up all player references. */
+export async function deleteClub(id: string): Promise<void> {
+  if (isQuotaExceeded) return;
+  try {
+    const snap = await getDoc(doc(db, 'clubs', id));
+    if (snap.exists()) {
+      const club = snap.data() as Club;
+      const batch = writeBatch(db);
+      // Clear club flags on all members (owner + squad)
+      const allMemberIds = Array.from(new Set([club.ownerId, ...(club.squadIds || [])])).filter(Boolean);
+      allMemberIds.forEach(pid => {
+        batch.update(doc(db, 'players', pid), {
+          clubId: null, isClubOwner: false, clubName: null,
+          primaryColor: null, secondaryColor: null,
+          isListed: false, listingPrice: null,
+        });
+      });
+      batch.delete(doc(db, 'clubs', id));
+      await batch.commit();
+    }
+    await updateLastUpdated();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `clubs/${id}`);
+  }
+}
+
+/** Add a player to a club's squad (1 batch write). */
+export async function addPlayerToClubSquad(club: Club, playerId: string, playerName: string): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  if (club.squadIds.includes(playerId)) return;
+  const batch = writeBatch(db);
+  const newSquad = [...club.squadIds, playerId];
+  batch.update(doc(db, 'clubs', club.id), { squadIds: newSquad });
+  batch.update(doc(db, 'players', playerId), {
+    clubId: club.id, clubName: club.name,
+    primaryColor: club.primaryColor, secondaryColor: club.secondaryColor,
+  });
+  try {
+    await batch.commit();
+    await updateLastUpdated();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubs/${club.id}/squad`);
+    throw err;
+  }
+}
+
+/** Remove a player from a club's squad (1 batch write). */
+export async function removePlayerFromClubSquad(club: Club, playerId: string): Promise<void> {
+  if (isQuotaExceeded) return;
+  const batch = writeBatch(db);
+  const newSquad = club.squadIds.filter(id => id !== playerId);
+  batch.update(doc(db, 'clubs', club.id), { squadIds: newSquad });
+  batch.update(doc(db, 'players', playerId), {
+    clubId: null, clubName: null, primaryColor: null, secondaryColor: null,
+  });
+  try {
+    await batch.commit();
+    await updateLastUpdated();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubs/${club.id}/squad`);
+  }
+}
+
+/** Fetch all active market listings (1 collection read). */
+export async function fetchMarketListings(): Promise<MarketListing[]> {
+  try {
+    const snap = await getDocs(collection(db, 'clubListings'));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketListing));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'clubListings');
+    return [];
+  }
+}
+
+/**
+ * Fetch only the matches that are part of the active club season.
+ * Uses a targeted `where` query — costs 1 read per match doc, never loads
+ * unrelated matches. Called only when the Club Rankings tab is opened.
+ */
+export async function fetchClubSeasonMatches(seasonName: string): Promise<import('../types').MatchRecord[]> {
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'matches'), where('tournament', '==', seasonName))
+    );
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').MatchRecord));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'matches-club-season');
+    return [];
+  }
+}
+
+
+/** List a player on the transfer market (2 writes). */
+export async function listPlayerOnMarket(listing: MarketListing): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'clubListings', listing.id), listing);
+  batch.update(doc(db, 'players', listing.playerId), { isListed: true, listingPrice: listing.price });
+  try {
+    await batch.commit();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubListings/${listing.id}`);
+    throw err;
+  }
+}
+
+/** Remove a player listing from the market (2 writes). */
+export async function delistPlayerFromMarket(listingId: string, playerId: string): Promise<void> {
+  if (isQuotaExceeded) return;
+  const batch = writeBatch(db);
+  batch.delete(doc(db, 'clubListings', listingId));
+  batch.update(doc(db, 'players', playerId), { isListed: false, listingPrice: null });
+  try {
+    await batch.commit();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `clubListings/${listingId}`);
+  }
+}
+
+/**
+ * Purchase a player — atomic transfer of player + budget between clubs.
+ * Uses a single writeBatch: 4 writes total (buyerClub, sellerClub, player, listing).
+ */
+export async function purchasePlayer(
+  listing: MarketListing,
+  buyerClub: Club,
+  sellerClub: Club,
+): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  if (buyerClub.budget < listing.price) throw new Error('Insufficient budget to complete transfer.');
+
+  const batch = writeBatch(db);
+
+  // Buyer: deduct budget, add player to squad
+  batch.update(doc(db, 'clubs', buyerClub.id), {
+    budget: buyerClub.budget - listing.price,
+    squadIds: [...buyerClub.squadIds, listing.playerId],
+  });
+
+  // Seller: add proceeds, remove player from squad
+  batch.update(doc(db, 'clubs', sellerClub.id), {
+    budget: sellerClub.budget + listing.price,
+    squadIds: sellerClub.squadIds.filter(id => id !== listing.playerId),
+  });
+
+  // Update player
+  batch.update(doc(db, 'players', listing.playerId), {
+    clubId: buyerClub.id,
+    clubName: buyerClub.name,
+    primaryColor: buyerClub.primaryColor,
+    secondaryColor: buyerClub.secondaryColor,
+    isListed: false,
+    listingPrice: null,
+  });
+
+  // Delete listing
+  batch.delete(doc(db, 'clubListings', listing.id));
+
+  try {
+    await batch.commit();
+    await updateLastUpdated();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, 'club-purchase');
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Ranking logic (can be used on the client-side array)
 export function sortRankedPlayers(players: Player[]): Player[] {
   return [...players].sort((a, b) => {

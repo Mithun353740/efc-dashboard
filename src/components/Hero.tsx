@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Player } from '../types';
 import { Link } from 'react-router-dom';
+import { Layers } from 'lucide-react';
 
 interface HeroProps {
   player?: Player;
@@ -30,10 +31,25 @@ export default function Hero({ player }: HeroProps) {
           transition={{ duration: 0.6 }}
           className="max-w-2xl"
         >
-          <div className="inline-block bg-brand-gradient text-white px-3 py-1 mb-4 md:mb-6 rounded-md shadow-[0_0_20px_rgba(139,92,246,0.4)] border border-white/20">
-            <span className="text-[10px] md:text-[12px] font-black tracking-[0.3em] uppercase">
-              #1 RANK • TOP PERFORMER
-            </span>
+          <div className="flex flex-wrap items-center gap-2 mb-4 md:mb-6">
+            <div className="inline-block bg-brand-gradient text-white px-3 py-1 rounded-md shadow-[0_0_20px_rgba(139,92,246,0.4)] border border-white/20">
+              <span className="text-[10px] md:text-[12px] font-black tracking-[0.3em] uppercase">
+                #1 RANK • TOP PERFORMER
+              </span>
+            </div>
+            {player.isClubOwner && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-yellow-400/10 text-amber-400 px-3 py-1 rounded-md border border-amber-400/40 shadow-[0_0_16px_rgba(251,191,36,0.35)]"
+              >
+                <Layers size={10} />
+                <span className="text-[10px] md:text-[12px] font-black tracking-[0.25em] uppercase">
+                  CLUB MGR{player.clubName ? ` · ${player.clubName}` : ''}
+                </span>
+              </motion.div>
+            )}
           </div>
           <h1 className="text-4xl xs:text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white leading-none tracking-tighter mb-1 md:mb-2 uppercase break-words">
             {firstName}

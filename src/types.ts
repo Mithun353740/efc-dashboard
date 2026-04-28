@@ -28,6 +28,17 @@ export interface Player {
   uid?: string;
   role?: 'admin' | 'player';
 
+  // ── Club Zone fields (optional — only set when club system is active) ─────
+  clubId?: string;
+  clubName?: string;       // denormalized club name for display
+  isClubOwner?: boolean;   // true if this player manages a club
+  isListed?: boolean;      // true if currently on the transfer market
+  listingPrice?: number;   // asking price on market
+  marketValue?: number;    // admin-set estimated value
+  primaryColor?: string;   // club primary colour (hex)
+  secondaryColor?: string; // club secondary colour (hex)
+  clubStats?: ClubStats;   // isolated club-season stats (never affects global OVR)
+
   /**
    * Pre-computed per-season stats.
    * Key: season name e.g. "2026 Season"
@@ -49,6 +60,69 @@ export interface Player {
    * Monotonic integer. Bump STATS_VERSION in store.ts to force global recompute on logic change.
    */
   statsVersion?: number;
+}
+
+// ─── CLUB ZONE TYPES ──────────────────────────────────────────────────────────
+
+/** Isolated per-club-season stats. Never written to the global OVR calculation. */
+export interface ClubStats {
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsScored: number;
+  goalsConceded: number;
+  points: number;
+  clubOvr: number;  // computed separately from global OVR
+  form: string[];   // last 5: ['W','L','D',...]
+}
+
+/** A QVFC Club entity managed by one of the club owners. */
+export interface Club {
+  id: string;
+  name: string;
+  shortName: string;    // 3-letter code e.g. "QVC"
+  logo?: string;        // base64 or URL (high quality)
+  primaryColor: string;   // hex e.g. "#8b5cf6"
+  secondaryColor: string; // hex e.g. "#f59e0b"
+  ownerId: string;        // Player ID of the club manager
+  ownerName?: string;     // denormalized for display
+  budget: number;         // virtual currency (e.g. 50_000_000)
+  squadIds: string[];     // Player IDs in this club's squad
+  createdAt: number;
+}
+
+/** One slot in the matchday schedule. */
+export interface MatchdaySlot {
+  matchday: number;
+  date: string;  // "YYYY-MM-DD"
+  time: string;  // "HH:MM"
+}
+
+/** Club system global configuration (stored as settings/clubConfig). */
+export interface ClubSystemConfig {
+  season: string;                  // e.g. "QVFC Club Season 2026"
+  startingBudget: number;          // default budget for new clubs
+  transferWindowOpen: boolean;
+  transferWindowCloseDate?: string; // ISO date string
+  currentMatchday: number;
+  totalMatchdays: number;
+  matchdaySchedule: MatchdaySlot[];
+  linkedTournamentId?: string;      // optional link to a tournament
+}
+
+/** A player listing on the transfer market. */
+export interface MarketListing {
+  id: string;
+  playerId: string;
+  playerName: string;
+  playerImage: string;
+  playerOvr: number;
+  fromClubId: string;
+  fromClubName: string;
+  fromClubColor: string;
+  price: number;
+  listedAt: number;
 }
 
 export interface Leader {

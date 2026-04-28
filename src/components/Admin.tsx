@@ -2,11 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
-import { Player, Leader, MatchRecord } from '../types';
-import { cn } from '../lib/utils';
+import { Player, Leader, MatchRecord, Club, ClubSystemConfig } from '../types';
+import { getSeasonInfo, cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
 import { auth, loginAnonymously, db } from '../firebase';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
@@ -14,7 +14,7 @@ import { CLUB_LOGO, CLUB_NAME } from '../constants';
 export default function Admin() {
   const { players, leaders, matches, tournaments, systemLocks, dbError, hasPendingWrites } = useFirebase();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials'>('players');
+  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials' | 'clubs'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   
   React.useEffect(() => {
@@ -448,6 +448,7 @@ export default function Admin() {
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History size={18} />} label="HISTORY" /></div>
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} icon={<Trophy size={18} />} label="TOURNAMENTS" /></div>
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'locks'} onClick={() => setActiveTab('locks')} icon={<ShieldCheck size={18} />} label="LOCKS" /></div>
+            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'clubs'} onClick={() => setActiveTab('clubs')} icon={<Trophy size={18} />} label="CLUBS" /></div>
           </div>
         </div>
 
@@ -1047,8 +1048,36 @@ export default function Admin() {
                       </button>
                     </div>
 
+                    {/* Lock 3: Club Manager */}
+                    <div className="bg-[#0f172a] rounded-xl border border-white/10 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div className="flex items-center gap-4">
+                        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center border", systemLocks?.clubManager ? "bg-red-500/10 border-red-500/20 text-red-500" : "bg-amber-500/10 border-amber-500/20 text-amber-500")}>
+                          <Trophy size={20} />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-lg tracking-tight">Club Manager</h4>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">
+                            Status: {systemLocks?.clubManager ? 'LOCKED — Club Zone hidden from all players' : 'ACTIVE — Club Zone visible to logged-in players'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try { await toggleSystemLock('clubManager', !systemLocks?.clubManager); }
+                          catch (err) { console.error(err); alert('Failed to update lock.'); }
+                        }}
+                        className={cn("px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all whitespace-nowrap", systemLocks?.clubManager ? "bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/25" : "bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/25")}
+                      >
+                        {systemLocks?.clubManager ? 'UNLOCK CLUB ZONE' : 'LOCK CLUB ZONE'}
+                      </button>
+                    </div>
+
                   </div>
                 </div>
+              </motion.div>
+            ) : activeTab === 'clubs' ? (
+              <motion.div key="clubs" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                <ClubsAdminTab players={players} />
               </motion.div>
             ) : null}
             </AnimatePresence>
@@ -1336,3 +1365,488 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
     </div>
   );
 }
+function ClubsAdminTab({ players }: { players: Player[] }) {
+  const currentSeasonName = `QVFC Club Season ${getSeasonInfo(new Date()).name}`;
+  const DEFAULT_CFG: ClubSystemConfig = { season: currentSeasonName, startingBudget: 5000000, transferWindowOpen: false, currentMatchday: 1, totalMatchdays: 10, matchdaySchedule: [] };
+  const [clubs, setClubs] = React.useState<Club[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [msg, setMsg] = React.useState({ text: '', type: '' });
+  const [ownerSearch, setOwnerSearch] = React.useState('');
+  const [showOwnerDrop, setShowOwnerDrop] = React.useState(false);
+  const [form, setForm] = React.useState({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b', ownerId: '', budget: '5000000' });
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [config, setConfig] = React.useState<ClubSystemConfig>(DEFAULT_CFG);
+  const [configSaving, setConfigSaving] = React.useState(false);
+
+  // ── Match management state (lazy-loaded, quota-safe) ──
+  const [subTab, setSubTab] = React.useState<'clubs'|'matches'|'config'>('clubs');
+  const [clubMatches, setClubMatches] = React.useState<MatchRecord[]>([]);
+  const [matchesLoaded, setMatchesLoaded] = React.useState(false);
+  const [matchBusy, setMatchBusy] = React.useState(false);
+  const [matchMsg, setMatchMsg] = React.useState({ text: '', ok: true });
+  const [mForm, setMForm] = React.useState({ p1Id: '', p2Id: '', p1Score: '', p2Score: '' });
+  const [p1Search, setP1Search] = React.useState('');
+  const [p2Search, setP2Search] = React.useState('');
+  const [showP1, setShowP1] = React.useState(false);
+  const [showP2, setShowP2] = React.useState(false);
+  const [editMatchId, setEditMatchId] = React.useState<string|null>(null);
+  const [editS1, setEditS1] = React.useState('');
+  const [editS2, setEditS2] = React.useState('');
+
+  const reload = async () => {
+    setLoading(true);
+    const [cs, cfg] = await Promise.all([fetchClubs(), fetchClubConfig()]);
+    setClubs(cs);
+    if (cfg) setConfig(cfg);
+    setLoading(false);
+  };
+
+  React.useEffect(() => { reload(); }, []);
+
+  const resetForm = () => {
+    setForm({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b', ownerId: '', budget: '5000000' });
+    setEditingId(null); setOwnerSearch(''); setShowOwnerDrop(false);
+  };
+
+  const handleSave = async () => {
+    if (!form.name || !form.shortName) { setMsg({ text: '❌ Name & Short Name required', type: 'error' }); return; }
+    const existing = editingId ? clubs.find(c => c.id === editingId) : null;
+    const club: Club = {
+      id: editingId || (crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)),
+      name: form.name.toUpperCase(),
+      shortName: form.shortName.toUpperCase().slice(0, 3),
+      primaryColor: form.primaryColor,
+      secondaryColor: form.secondaryColor,
+      ownerId: form.ownerId,
+      ownerName: players.find(p => p.id === form.ownerId)?.name,
+      budget: Number(form.budget) || 5000000,
+      squadIds: existing?.squadIds || [],
+      createdAt: existing?.createdAt || Date.now(),
+    };
+    setLoading(true);
+    try {
+      await saveClub(club, existing?.ownerId);
+      setMsg({ text: '✅ Club saved successfully', type: 'success' });
+      resetForm();
+      await reload();
+    } catch (e: any) {
+      setMsg({ text: '❌ ' + e.message, type: 'error' });
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this club? All player club associations will be cleared.')) return;
+    await deleteClub(id);
+    await reload();
+  };
+
+  const handleSaveConfig = async () => {
+    setConfigSaving(true);
+    try {
+      await saveClubConfig(config);
+      setMsg({ text: '✅ Config saved', type: 'success' });
+    } catch (e: any) {
+      setMsg({ text: '❌ ' + e.message, type: 'error' });
+    } finally { setConfigSaving(false); }
+  };
+
+  // lazy-load club season matches only when MATCHES subtab is opened
+  const loadMatches = React.useCallback(async () => {
+    if (!config.season) return;
+    const ms = await fetchClubSeasonMatches(config.season);
+    setClubMatches(ms.sort((a, b) => b.timestamp - a.timestamp));
+    setMatchesLoaded(true);
+  }, [config.season]);
+
+  React.useEffect(() => {
+    if (subTab === 'matches' && !matchesLoaded) loadMatches();
+  }, [subTab, matchesLoaded, loadMatches]);
+
+  const flashMatch = (text: string, ok: boolean) => {
+    setMatchMsg({ text, ok });
+    setTimeout(() => setMatchMsg({ text: '', ok: true }), 3500);
+  };
+
+  const resetMForm = () => {
+    setMForm({ p1Id: '', p2Id: '', p1Score: '', p2Score: '' });
+    setP1Search(''); setP2Search(''); setShowP1(false); setShowP2(false);
+  };
+
+  const handleAddMatch = async () => {
+    const p1 = players.find(p => p.id === mForm.p1Id);
+    const p2 = players.find(p => p.id === mForm.p2Id);
+    if (!p1 || !mForm.p1Score || !mForm.p2Score) { flashMatch('❌ Select both players and scores', false); return; }
+    setMatchBusy(true);
+    try {
+      await addMatch(p1, Number(mForm.p1Score), Number(mForm.p2Score), p2, [], config.season);
+      flashMatch('✅ Match added', true);
+      resetMForm();
+      await loadMatches();
+    } catch (e: any) { flashMatch('❌ ' + e.message, false); }
+    finally { setMatchBusy(false); }
+  };
+
+  const handleEditMatch = async (m: MatchRecord) => {
+    setMatchBusy(true);
+    try {
+      await editMatch(m, Number(editS1), Number(editS2), players, [], m.tournament);
+      setClubMatches(prev => prev.map(x => x.id === m.id ? { ...x, p1Score: Number(editS1), p2Score: Number(editS2) } : x));
+      setEditMatchId(null);
+      flashMatch('✅ Match updated', true);
+    } catch (e: any) { flashMatch('❌ ' + e.message, false); }
+    finally { setMatchBusy(false); }
+  };
+
+  const handleDeleteMatch = async (m: MatchRecord) => {
+    if (!window.confirm('Delete this club match? Player stats will be recalculated.')) return;
+    setMatchBusy(true);
+    try {
+      await deleteMatchFromHistory(m, players, []);
+      setClubMatches(prev => prev.filter(x => x.id !== m.id));
+      flashMatch('✅ Match deleted', true);
+    } catch (e: any) { flashMatch('❌ ' + e.message, false); }
+    finally { setMatchBusy(false); }
+  };
+
+  const p1Player = players.find(p => p.id === mForm.p1Id);
+  const p2Player = players.find(p => p.id === mForm.p2Id);
+  const filtP1 = players.filter(p => p.name.toLowerCase().includes(p1Search.toLowerCase())).slice(0, 6);
+  const filtP2 = players.filter(p => p.name.toLowerCase().includes(p2Search.toLowerCase()) && p.id !== mForm.p1Id).slice(0, 6);
+
+  const ownerPlayer = players.find(p => p.id === form.ownerId);
+  const filteredOwners = players.filter(p => p.name.toLowerCase().includes(ownerSearch.toLowerCase())).slice(0, 6);
+
+  return (
+    <div className="space-y-6">
+      {/* SubTab Nav */}
+      <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-2xl">
+        {(['clubs','matches','config'] as const).map(t => (
+          <button key={t} onClick={() => setSubTab(t)}
+            className={cn('flex-1 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all',
+              subTab === t ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'
+            )}>
+            {t === 'clubs' ? '⚽ CLUBS' : t === 'matches' ? '🗒️ MATCH LOG' : '⚙️ CONFIG'}
+          </button>
+        ))}
+      </div>
+
+      {subTab === 'clubs' && (
+        <div className="space-y-8">
+      {/* Club Form */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-black tracking-tight">{editingId ? 'EDIT CLUB' : 'CREATE CLUB'}</h3>
+          {editingId && <button onClick={resetForm} className="text-[10px] font-black text-slate-400 hover:text-white px-3 py-1 bg-white/5 rounded-full">CANCEL EDIT</button>}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Left col */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Club Name</label>
+              <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="e.g. VORTEX UNITED" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Short Code (3)</label>
+                <input value={form.shortName} maxLength={3} onChange={e => setForm({...form, shortName: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="VOR" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Budget (VCC)</label>
+                <input type="number" value={form.budget} onChange={e => setForm({...form, budget: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Primary Color</label>
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-xl">
+                  <input type="color" value={form.primaryColor} onChange={e => setForm({...form, primaryColor: e.target.value})} className="w-10 h-10 rounded-lg border-0 bg-transparent cursor-pointer" />
+                  <span className="text-xs font-bold text-slate-400">{form.primaryColor}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Secondary Color</label>
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-xl">
+                  <input type="color" value={form.secondaryColor} onChange={e => setForm({...form, secondaryColor: e.target.value})} className="w-10 h-10 rounded-lg border-0 bg-transparent cursor-pointer" />
+                  <span className="text-xs font-bold text-slate-400">{form.secondaryColor}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Right col */}
+          <div className="space-y-4">
+            <div className="space-y-1 relative">
+              <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Club Manager (Owner)</label>
+              <input
+                value={ownerSearch || ownerPlayer?.name || ''}
+                onChange={e => { setOwnerSearch(e.target.value); setForm({...form, ownerId: ''}); setShowOwnerDrop(true); }}
+                onFocus={() => setShowOwnerDrop(true)}
+                className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all"
+                placeholder="Search player..."
+              />
+              <AnimatePresence>
+                {showOwnerDrop && ownerSearch && !form.ownerId && (
+                  <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute z-50 w-full mt-2 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+                    {filteredOwners.map(p => (
+                      <button key={p.id} type="button" onClick={() => { setForm({...form, ownerId: p.id}); setOwnerSearch(''); setShowOwnerDrop(false); }} className="w-full p-3 flex items-center gap-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-0">
+                        <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-black truncate">{p.name}</p>
+                          <p className="text-[8px] text-slate-500">#{p.number}{p.isClubOwner ? ' · Already owns a club' : ''}</p>
+                        </div>
+                        {p.isClubOwner && <span className="text-[7px] font-black text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded shrink-0">OWNER</span>}
+                      </button>
+                    ))}
+                    {filteredOwners.length === 0 && <div className="p-4 text-center text-slate-500 text-xs font-bold">No players found</div>}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            {/* Preview card */}
+            <div className="rounded-xl border p-4 flex items-center gap-4 transition-all" style={{ borderColor: form.primaryColor + '50', background: form.primaryColor + '12' }}>
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-black text-lg shrink-0 shadow-lg" style={{ background: `linear-gradient(135deg, ${form.primaryColor}, ${form.secondaryColor})` }}>
+                {form.shortName || '??'}
+              </div>
+              <div>
+                <p className="font-black text-white">{form.name || 'CLUB NAME'}</p>
+                <p className="text-[9px] text-slate-400 mt-0.5">Manager: {ownerPlayer?.name || 'Unassigned'}</p>
+                <p className="text-[9px] text-slate-400">Budget: VCC {Number(form.budget || 0).toLocaleString()}</p>
+              </div>
+            </div>
+            <button onClick={handleSave} disabled={loading} className="w-full py-4 glossy-btn rounded-xl disabled:opacity-50 uppercase text-xs font-black tracking-widest">
+              {loading ? 'SAVING...' : editingId ? 'UPDATE CLUB' : 'CREATE CLUB'}
+            </button>
+            {msg.text && <p className={cn('text-[10px] font-bold text-center', msg.type === 'success' ? 'text-brand-purple' : 'text-red-500')}>{msg.text}</p>}
+          </div>
+        </div>
+      </div>
+
+      {/* Club List */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+        <h3 className="text-xl font-black tracking-tight mb-6">ALL CLUBS ({clubs.length})</h3>
+        {loading && clubs.length === 0 ? (
+          <p className="text-slate-500 text-xs font-bold animate-pulse">Loading clubs...</p>
+        ) : clubs.length === 0 ? (
+          <p className="text-slate-500 text-xs font-bold">No clubs yet. Create the first one above.</p>
+        ) : (
+          <div className="space-y-3">
+            {clubs.map(club => {
+              const owner = players.find(p => p.id === club.ownerId);
+              return (
+                <div key={club.id} className="bg-[#0f172a] rounded-xl border border-white/10 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: `linear-gradient(135deg, ${club.primaryColor}, ${club.secondaryColor})` }}>
+                    {club.shortName}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-sm text-white truncate">{club.name}</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Manager: {club.ownerName || owner?.name || 'None'} &bull; Squad: {club.squadIds?.length || 0} players &bull; Budget: VCC {(club.budget || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        setEditingId(club.id);
+                        setOwnerSearch('');
+                        setForm({ name: club.name, shortName: club.shortName, primaryColor: club.primaryColor, secondaryColor: club.secondaryColor, ownerId: club.ownerId, budget: String(club.budget) });
+                        setMsg({ text: '', type: '' });
+                      }}
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase"
+                    >EDIT</button>
+                    <button onClick={() => handleDelete(club.id)} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase">DEL</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      </div>
+      )}
+
+      {/* ── MATCHES subtab ── */}
+      {subTab === 'matches' && (
+        <div className="space-y-6">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
+            <h3 className="text-xl font-black tracking-tight mb-1">RECORD CLUB MATCH</h3>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-5">
+              Season: <span className="text-amber-400">{config.season}</span> — auto-tagged, updates global + club rankings
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
+              {/* P1 picker */}
+              <div className="space-y-1 relative">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Player 1</label>
+                <input value={p1Search || p1Player?.name || ''} onFocus={() => setShowP1(true)}
+                  onChange={e => { setP1Search(e.target.value); setMForm({...mForm, p1Id: ''}); setShowP1(true); }}
+                  className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" placeholder="Search player 1..." />
+                <AnimatePresence>
+                  {showP1 && p1Search && !mForm.p1Id && (
+                    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                      className="absolute z-50 w-full mt-1 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+                      {filtP1.map(p => (
+                        <button key={p.id} type="button" onClick={() => { setMForm({...mForm, p1Id: p.id}); setP1Search(''); setShowP1(false); }}
+                          className="w-full p-3 flex items-center gap-3 hover:bg-white/5 border-b border-white/5 last:border-0 text-left">
+                          <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
+                          <div><p className="text-[10px] font-black">{p.name}</p><p className="text-[8px] text-slate-500">OVR {p.ovr}</p></div>
+                        </button>
+                      ))}
+                      {filtP1.length === 0 && <div className="p-3 text-center text-slate-500 text-xs font-bold">Not found</div>}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {p1Player && <div className="flex items-center gap-2 mt-2 p-2 bg-white/5 rounded-lg border border-white/5"><img src={p1Player.image} className="w-7 h-7 rounded-lg object-cover" alt="" /><span className="text-xs font-black text-white">{p1Player.name}</span><span className="text-[9px] text-slate-500 ml-auto">OVR {p1Player.ovr}</span></div>}
+              </div>
+              {/* P2 picker */}
+              <div className="space-y-1 relative">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Player 2</label>
+                <input value={p2Search || p2Player?.name || ''} onFocus={() => setShowP2(true)}
+                  onChange={e => { setP2Search(e.target.value); setMForm({...mForm, p2Id: ''}); setShowP2(true); }}
+                  className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" placeholder="Search player 2..." />
+                <AnimatePresence>
+                  {showP2 && p2Search && !mForm.p2Id && (
+                    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                      className="absolute z-50 w-full mt-1 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+                      {filtP2.map(p => (
+                        <button key={p.id} type="button" onClick={() => { setMForm({...mForm, p2Id: p.id}); setP2Search(''); setShowP2(false); }}
+                          className="w-full p-3 flex items-center gap-3 hover:bg-white/5 border-b border-white/5 last:border-0 text-left">
+                          <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
+                          <div><p className="text-[10px] font-black">{p.name}</p><p className="text-[8px] text-slate-500">OVR {p.ovr}</p></div>
+                        </button>
+                      ))}
+                      {filtP2.length === 0 && <div className="p-3 text-center text-slate-500 text-xs font-bold">Not found</div>}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {p2Player && <div className="flex items-center gap-2 mt-2 p-2 bg-white/5 rounded-lg border border-white/5"><img src={p2Player.image} className="w-7 h-7 rounded-lg object-cover" alt="" /><span className="text-xs font-black text-white">{p2Player.name}</span><span className="text-[9px] text-slate-500 ml-auto">OVR {p2Player.ovr}</span></div>}
+              </div>
+            </div>
+            <div className="flex items-center gap-4 mb-4">
+              <input type="number" min="0" value={mForm.p1Score} onChange={e => setMForm({...mForm, p1Score: e.target.value})}
+                placeholder={p1Player ? p1Player.name.split(' ')[0] : 'P1 Score'}
+                className="flex-1 bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-black text-white text-center focus:border-amber-500 outline-none" />
+              <span className="text-slate-500 font-black text-lg shrink-0">VS</span>
+              <input type="number" min="0" value={mForm.p2Score} onChange={e => setMForm({...mForm, p2Score: e.target.value})}
+                placeholder={p2Player ? p2Player.name.split(' ')[0] : 'P2 Score'}
+                className="flex-1 bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-black text-white text-center focus:border-amber-500 outline-none" />
+            </div>
+            <button onClick={handleAddMatch} disabled={matchBusy || !mForm.p1Id || !mForm.p1Score || !mForm.p2Score}
+              className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl disabled:opacity-50 transition-all uppercase">
+              {matchBusy ? 'SAVING...' : 'RECORD MATCH'}
+            </button>
+            {matchMsg.text && <p className={cn('text-[10px] font-bold text-center mt-3', matchMsg.ok ? 'text-emerald-400' : 'text-red-400')}>{matchMsg.text}</p>}
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-black tracking-tight">MATCH LOG ({clubMatches.length})</h3>
+              <button onClick={() => { setMatchesLoaded(false); }} disabled={matchBusy}
+                className="text-[10px] font-black text-amber-400 hover:text-amber-300 px-3 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20 transition-all">
+                ↻ REFRESH
+              </button>
+            </div>
+            {!matchesLoaded ? (
+              <p className="text-slate-500 text-xs font-bold animate-pulse text-center py-10">Loading matches...</p>
+            ) : clubMatches.length === 0 ? (
+              <p className="text-slate-500 text-xs font-bold text-center py-10">No club-season matches yet. Record the first one above.</p>
+            ) : (
+              <div className="space-y-3">
+                {clubMatches.map(m => (
+                  <div key={m.id} className="bg-[#0f172a] rounded-xl border border-white/10 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">
+                        {new Date(m.timestamp).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })} &bull; {m.tournament}
+                      </span>
+                      {editMatchId === m.id ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-black text-white">{m.p1Name}</span>
+                          <input type="number" value={editS1} onChange={e => setEditS1(e.target.value)} className="w-14 bg-white/10 border border-white/20 p-2 rounded-lg text-xs font-black text-white text-center focus:border-amber-500 outline-none" />
+                          <span className="text-slate-500 font-bold">–</span>
+                          <input type="number" value={editS2} onChange={e => setEditS2(e.target.value)} className="w-14 bg-white/10 border border-white/20 p-2 rounded-lg text-xs font-black text-white text-center focus:border-amber-500 outline-none" />
+                          <span className="text-xs font-black text-white">{m.p2Name}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm font-black flex-wrap">
+                          <span className={m.p1Score > m.p2Score ? 'text-amber-400' : m.p1Score < m.p2Score ? 'text-red-400' : 'text-white'}>{m.p1Name}</span>
+                          <span className="text-white bg-white/10 px-2 py-0.5 rounded text-xs">{m.p1Score}</span>
+                          <span className="text-slate-500 text-xs">–</span>
+                          <span className="text-white bg-white/10 px-2 py-0.5 rounded text-xs">{m.p2Score}</span>
+                          <span className={m.p2Score > m.p1Score ? 'text-amber-400' : m.p2Score < m.p1Score ? 'text-red-400' : 'text-white'}>{m.p2Name}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      {editMatchId === m.id ? (
+                        <>
+                          <button onClick={() => handleEditMatch(m)} disabled={matchBusy} className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black text-[10px] rounded-xl transition-all disabled:opacity-50 uppercase">SAVE</button>
+                          <button onClick={() => setEditMatchId(null)} className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-400 font-black text-[10px] rounded-xl transition-all uppercase">CANCEL</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => { setEditMatchId(m.id); setEditS1(String(m.p1Score)); setEditS2(String(m.p2Score)); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-[10px] rounded-xl transition-all uppercase">EDIT</button>
+                          <button onClick={() => handleDeleteMatch(m)} disabled={matchBusy} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all disabled:opacity-50"><Trash2 size={14} /></button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── CONFIG subtab ── */}
+      {subTab === 'config' && (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+          <h3 className="text-xl font-black tracking-tight mb-2">CLUB SYSTEM CONFIG</h3>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">Season settings, transfer window &amp; matchday schedule</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Season Name</label>
+                <input value={config.season} onChange={e => setConfig({...config, season: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none" placeholder={currentSeasonName} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Starting Budget (VCC)</label>
+                  <input type="number" value={config.startingBudget} onChange={e => setConfig({...config, startingBudget: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Current Matchday</label>
+                  <input type="number" value={config.currentMatchday} onChange={e => setConfig({...config, currentMatchday: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Total Matchdays</label>
+                <input type="number" value={config.totalMatchdays} onChange={e => setConfig({...config, totalMatchdays: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none" />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Transfer Window</label>
+                <button onClick={() => setConfig({...config, transferWindowOpen: !config.transferWindowOpen})}
+                  className={cn('w-full p-4 rounded-xl text-[10px] font-black tracking-widest transition-all border uppercase', config.transferWindowOpen ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20')}>
+                  {config.transferWindowOpen ? '✓ TRANSFER WINDOW OPEN' : 'TRANSFER WINDOW CLOSED'}
+                </button>
+              </div>
+              {config.transferWindowOpen && (
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Window Close Date</label>
+                  <input type="date" value={config.transferWindowCloseDate || ''} onChange={e => setConfig({...config, transferWindowCloseDate: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none" />
+                </div>
+              )}
+              <div className="p-4 bg-[#0f172a] rounded-xl border border-white/5 space-y-1">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Config Summary</p>
+                <p className="text-xs font-bold text-white">{config.season}</p>
+                <p className="text-[10px] text-slate-400">Matchday {config.currentMatchday} / {config.totalMatchdays} &bull; Budget VCC {config.startingBudget.toLocaleString()}</p>
+                <p className="text-[10px] text-slate-400">Transfer Window: <span className={config.transferWindowOpen ? 'text-emerald-400' : 'text-red-400'}>{config.transferWindowOpen ? 'OPEN' : 'CLOSED'}</span></p>
+              </div>
+              <button onClick={handleSaveConfig} disabled={configSaving} className="w-full py-4 glossy-btn rounded-xl disabled:opacity-50 uppercase text-xs font-black tracking-widest">
+                {configSaving ? 'SAVING...' : 'SAVE CONFIG'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+

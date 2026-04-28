@@ -19,6 +19,7 @@ import { NativeTournamentPage } from './components/tournament/NativeTournamentPa
 import AutoUpdater from './components/AutoUpdater';
 import { FirebaseProvider, useFirebase } from './FirebaseContext';
 import { INITIAL_PLAYERS } from './lib/store';
+import ClubManager from './components/ClubManager';
 
 function Home() {
   const { rankedPlayers, dbError } = useFirebase();
@@ -60,6 +61,7 @@ function AppContent() {
           <Route path="/rankings" element={<Rankings />} />
           <Route path="/stats" element={<PlayerStats />} />
           <Route path="/tournament" element={<NativeTournamentPage forcePublic={true} />} />
+          <Route path="/club" element={<ClubManager />} />
         </Routes>
       </main>
       <Footer />
