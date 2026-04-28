@@ -68,7 +68,9 @@ export default function Login() {
         localStorage.setItem('playerLoggedIn', 'true');
         localStorage.setItem('playerId', playerDoc.id);
         localStorage.setItem('playerName', playerData.name);
-        localStorage.setItem('playerImage', playerData.image || '');
+        // NOTE: playerImage intentionally NOT stored in localStorage.
+        // Images can be large enough to exceed the ~5MB localStorage quota.
+        // The image is read from the live Firestore players context instead.
         localStorage.setItem('userType', 'player');
 
         // Check if this player is also an Admin via their role field

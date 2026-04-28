@@ -1,31 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Bell, User, Moon, Sun, Menu, X, ChevronDown, Settings, LogOut, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
 import InstallButton from './InstallButton';
 import PlayerSettingsModal from './PlayerSettingsModal';
+import { useFirebase } from '../FirebaseContext';
 
 export default function Navbar() {
+  const { players } = useFirebase();
   const [isDark, setIsDark] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPlayer, setIsPlayer] = useState(false);
   const [playerName, setPlayerName] = useState('');
-  const [playerImage, setPlayerImage] = useState('');
+  const [loggedInPlayerId, setLoggedInPlayerId] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Close mobile menu on route change
+  // Derive player image from live Firestore data — never localStorage.
+  // This ensures the avatar is always current and never hits the quota limit.
+  const playerImage = useMemo(() => {
+    if (!loggedInPlayerId || !isPlayer) return '';
+    return players.find(p => p.id === loggedInPlayerId)?.image || '';
+  }, [players, loggedInPlayerId, isPlayer]);
+
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
     const saved = localStorage.getItem('darkMode');
-    // Default to dark mode if not explicitly set to false
     const isDarkNow = saved === null ? true : saved === 'true';
     setIsDark(isDarkNow);
     if (isDarkNow) document.documentElement.classList.add('dark');
@@ -36,7 +43,7 @@ export default function Navbar() {
       setIsPlayer(playerLoggedIn);
       if (playerLoggedIn) {
         setPlayerName(localStorage.getItem('playerName') || 'Player');
-        setPlayerImage(localStorage.getItem('playerImage') || '');
+        setLoggedInPlayerId(localStorage.getItem('playerId') || '');
       }
     };
     
@@ -63,9 +70,11 @@ export default function Navbar() {
     localStorage.removeItem('playerLoggedIn');
     localStorage.removeItem('playerId');
     localStorage.removeItem('playerName');
+    localStorage.removeItem('playerImage'); // clean up legacy key if present
     localStorage.removeItem('userType');
     setIsAdmin(false);
     setIsPlayer(false);
+    setLoggedInPlayerId('');
     window.location.href = '/';
   };
 

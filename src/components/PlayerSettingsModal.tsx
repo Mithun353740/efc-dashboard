@@ -102,10 +102,7 @@ export default function PlayerSettingsModal({ isOpen, onClose }: PlayerSettingsM
         uid: uid || undefined,
         device: device || undefined,
       });
-      // Sync localStorage so navbar avatar updates instantly
-      if (image) localStorage.setItem('playerImage', image);
-      // Dispatch storage event so Navbar's checkAuth fires
-      window.dispatchEvent(new Event('storage'));
+      // No localStorage write for image — Navbar reads image from live Firestore context.
       setProfileMsg({ type: 'success', text: '✅ Profile updated successfully!' });
       setTimeout(onClose, 1800);
     } catch (err: any) {

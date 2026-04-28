@@ -9,6 +9,7 @@ import { BracketView } from './BracketView';
 import { StatsTab } from './StatsTab';
 import { OverviewTab } from './OverviewTab';
 import { FantasyStandings } from './FantasyStandings';
+import { MatchDayCountdown } from './MatchDayCountdown';
 import TournamentHistory from '../TournamentHistory';
 import { 
   Trophy, BarChart2, ListOrdered, Settings, ArrowLeft, Archive, 
@@ -34,6 +35,8 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [editStartDate, setEditStartDate] = useState(initialTournament.startingDate || '');
   const [editMaxTeams, setEditMaxTeams] = useState(initialTournament.maxTeams ? String(initialTournament.maxTeams) : '');
+  const [editMatchDayStart, setEditMatchDayStart] = useState(initialTournament.matchDayStart || '');
+  const [editMatchDayEnd, setEditMatchDayEnd] = useState(initialTournament.matchDayEnd || '');
   const [dateSaveMsg, setDateSaveMsg] = useState('');
 
   const handleUpdate = (updated: Tournament) => setTournament(updated);
@@ -55,6 +58,8 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
       maxTeams: editMaxTeams && !isNaN(Number(editMaxTeams)) && Number(editMaxTeams) > 1
         ? Number(editMaxTeams)
         : undefined,
+      matchDayStart: editMatchDayStart || undefined,
+      matchDayEnd: editMatchDayEnd || undefined,
     };
     await saveTournament(updated);
     setTournament(updated);
@@ -169,12 +174,18 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
         {/* Navbar */}
         <header className="h-24 border-b border-[#1e1e32] bg-[#050508]/50 backdrop-blur-xl flex items-center justify-between px-10 sticky top-0 z-[40]">
           <div className="flex items-center gap-4">
-             <div className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] opacity-60">
+            {/* Countdown — only shown on Dashboard tab */}
+            {activeTab === 'dashboard' && (
+              <MatchDayCountdown tournament={tournament} />
+            )}
+            <div className="flex flex-col">
+              <div className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] opacity-60">
                 Tournaments <span className="mx-2 text-slate-700">/</span> {tournament.name}
-             </div>
-             <h2 className="text-2xl font-black text-white uppercase tracking-tighter ml-4">
-               {activeTab === 'dashboard' ? 'Dashboard' : activeTab.replace('scorers', 'Top Scorers').toUpperCase()}
-             </h2>
+              </div>
+              <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
+                {activeTab === 'dashboard' ? 'Dashboard' : activeTab.replace('scorers', 'Top Scorers').toUpperCase()}
+              </h2>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
@@ -231,7 +242,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
                         </div>
                      </div>
 
-                     {/* Starting Date & Max Teams */}
+                     {/* Starting Date, Match Day Window & Max Teams */}
                      <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-[2rem] p-8 space-y-6">
                        <div className="flex items-center gap-3 mb-2">
                          <CalendarDays size={18} className="text-indigo-400" />
@@ -259,6 +270,37 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
                              className="w-full bg-[#050508] border border-[#1e1e32] rounded-xl px-4 py-3 text-white font-bold focus:border-indigo-500 focus:outline-none transition-all"
                            />
                          </div>
+                       </div>
+
+                       {/* Match Day Window */}
+                       <div className="space-y-3">
+                         <label className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-2">
+                           <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                           Match Day Window
+                         </label>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div className="space-y-1">
+                             <label className="text-[9px] font-black uppercase tracking-widest text-slate-600">Starts</label>
+                             <input
+                               type="datetime-local"
+                               value={editMatchDayStart}
+                               onChange={e => setEditMatchDayStart(e.target.value)}
+                               className="w-full bg-[#050508] border border-[#1e1e32] rounded-xl px-4 py-3 text-white font-bold focus:border-amber-500 focus:outline-none transition-all [color-scheme:dark]"
+                             />
+                           </div>
+                           <div className="space-y-1">
+                             <label className="text-[9px] font-black uppercase tracking-widest text-slate-600">Ends</label>
+                             <input
+                               type="datetime-local"
+                               value={editMatchDayEnd}
+                               onChange={e => setEditMatchDayEnd(e.target.value)}
+                               className="w-full bg-[#050508] border border-[#1e1e32] rounded-xl px-4 py-3 text-white font-bold focus:border-amber-500 focus:outline-none transition-all [color-scheme:dark]"
+                             />
+                           </div>
+                         </div>
+                         <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">
+                           Registration closes permanently once match day starts.
+                         </p>
                        </div>
 
                        <div className="flex items-center gap-4">

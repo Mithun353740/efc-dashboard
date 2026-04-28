@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldAlert, AlertTriangle, X } from 'lucide-react';
 import { useFirebase } from '../../FirebaseContext';
@@ -18,7 +18,7 @@ interface NativeTournamentPageProps {
 }
 
 export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPageProps = {}) {
-  const { systemLocks, tournaments } = useFirebase();
+  const { systemLocks, tournaments, players } = useFirebase();
   const isAdmin = forcePublic ? false : localStorage.getItem('adminLoggedIn') === 'true';
   const isLocked = systemLocks?.tournaments && !isAdmin;
 
@@ -27,7 +27,12 @@ export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPa
 
   const loggedInPlayerId = localStorage.getItem('playerId');
   const loggedInPlayerName = localStorage.getItem('playerName') || '';
-  const loggedInPlayerImage = localStorage.getItem('playerImage') || '';
+
+  // Read image from live Firestore context — never localStorage (avoids quota errors)
+  const loggedInPlayerImage = useMemo(
+    () => players.find(p => p.id === loggedInPlayerId)?.image || '',
+    [players, loggedInPlayerId]
+  );
 
   const [view, setView] = useState<View>('list');
   const [activeTab, setActiveTab] = useState<'live' | 'rankings' | 'history'>('live');

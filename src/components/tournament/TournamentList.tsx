@@ -86,13 +86,17 @@ export function TournamentList({
                 ? (t.registeredPlayerIds || []).includes(loggedInPlayerId)
                 : false;
               const isFull = t.maxTeams !== undefined && t.teams.length >= t.maxTeams;
+              // Once match day starts, registration is permanently closed
+              const matchDayStarted = t.matchDayStart
+                ? Date.now() >= new Date(t.matchDayStart).getTime()
+                : false;
               return (
                 <React.Fragment key={t.id}>
                   <TournamentCard
                     tournament={t}
                     onClick={onSelectTournament}
                     isAdmin={isAdmin}
-                    isRegistrationLocked={isRegistrationLocked}
+                    isRegistrationLocked={isRegistrationLocked || matchDayStarted}
                     isRegistered={isRegistered}
                     isFull={isFull && !isRegistered}
                     loggedInPlayerId={loggedInPlayerId}

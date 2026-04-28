@@ -73,4 +73,14 @@ export interface Tournament {
   registeredPlayerIds?: string[];
   /** Max teams allowed via self-registration (undefined = no limit) */
   maxTeams?: number;
+  /**
+   * ISO datetime-local string e.g. "2026-05-10T18:00"
+   * Match day window starts — register button hides, countdown switches to "ends in".
+   */
+  matchDayStart?: string;
+  /**
+   * ISO datetime-local string e.g. "2026-05-10T22:00"
+   * Match day window ends — countdown shows "Match Day Over".
+   */
+  matchDayEnd?: string;
 }

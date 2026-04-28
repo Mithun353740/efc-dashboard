@@ -22,6 +22,8 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
   const [name, setName] = useState('');
   const [season] = useState(getSeasonInfo(new Date()).name);
   const [startingDate, setStartingDate] = useState('');
+  const [matchDayStart, setMatchDayStart] = useState('');
+  const [matchDayEnd, setMatchDayEnd] = useState('');
   const [maxTeams, setMaxTeams] = useState<string>('');
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
 
@@ -84,6 +86,8 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
         fixtures,
         createdAt: Date.now(),
         ...(startingDate ? { startingDate } : {}),
+        ...(matchDayStart ? { matchDayStart } : {}),
+        ...(matchDayEnd ? { matchDayEnd } : {}),
         ...(maxTeams && !isNaN(Number(maxTeams)) && Number(maxTeams) > 0 ? { maxTeams: Number(maxTeams) } : {}),
         registeredPlayerIds: [],
       };
@@ -230,6 +234,33 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
                         max="64"
                         className="w-full bg-[#0a0a12] border border-[#1e1e32] rounded-2xl px-6 py-4 text-white font-bold focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
                       />
+                    </div>
+                  </div>
+
+                  {/* Match Day Window */}
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">
+                      Match Day Window <span className="text-indigo-400">(Optional — can be set later)</span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2">Starts</label>
+                        <input
+                          type="datetime-local"
+                          value={matchDayStart}
+                          onChange={(e) => setMatchDayStart(e.target.value)}
+                          className="w-full bg-[#0a0a12] border border-[#1e1e32] rounded-2xl px-6 py-4 text-white font-bold focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all [color-scheme:dark]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2">Ends</label>
+                        <input
+                          type="datetime-local"
+                          value={matchDayEnd}
+                          onChange={(e) => setMatchDayEnd(e.target.value)}
+                          className="w-full bg-[#0a0a12] border border-[#1e1e32] rounded-2xl px-6 py-4 text-white font-bold focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all [color-scheme:dark]"
+                        />
+                      </div>
                     </div>
                   </div>
 
