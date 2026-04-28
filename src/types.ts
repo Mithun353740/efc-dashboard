@@ -38,6 +38,10 @@ export interface Player {
   primaryColor?: string;   // club primary colour (hex)
   secondaryColor?: string; // club secondary colour (hex)
   clubStats?: ClubStats;   // isolated club-season stats (never affects global OVR)
+  clubContract?: {
+    type: 'matches' | 'days';
+    amount: number; // matches remaining OR expiration timestamp (ms)
+  };
 
   /**
    * Pre-computed per-season stats.
@@ -99,6 +103,41 @@ export interface MatchdaySlot {
   time: string;  // "HH:MM"
 }
 
+export interface ClubTournament {
+  id: string;
+  name: string;      // e.g. "Vortex Winter Cup"
+  season: string;    // e.g. "QVFC Club Season 2026/2027"
+  createdAt: number;
+}
+
+export interface ClubFixtureSubMatch {
+  id: string;        // sub-match ID
+  p1Id: string;      // Home player ID
+  p1Name: string;
+  p2Id: string;      // Away player ID
+  p2Name: string;
+  p1Score: number | null;
+  p2Score: number | null;
+}
+
+export interface ClubFixture {
+  id: string;
+  tournamentId: string;
+  tournamentName: string;
+  homeClubId: string;
+  awayClubId: string;
+  homeClubName: string;
+  awayClubName: string;
+  matchupType: 'home_away' | 'random';
+  lineupSize: number; // e.g., 4 (meaning 4v4)
+  subLimit: number;   // e.g., 2
+  status: 'scheduled' | 'lineups_pending' | 'matchups_pending' | 'active' | 'completed';
+  homeLineupIds: string[]; // players selected by Home owner
+  awayLineupIds: string[]; // players selected by Away owner
+  subMatches: ClubFixtureSubMatch[]; // the actual 1v1 pairings
+  createdAt: number;
+}
+
 /** Club system global configuration (stored as settings/clubConfig). */
 export interface ClubSystemConfig {
   season: string;                  // e.g. "QVFC Club Season 2026"
@@ -109,6 +148,9 @@ export interface ClubSystemConfig {
   totalMatchdays: number;
   matchdaySchedule: MatchdaySlot[];
   linkedTournamentId?: string;      // optional link to a tournament
+  contractsActive: boolean;         // global toggle for contract economy
+  defaultContractType: 'matches' | 'days';
+  defaultContractAmount: number;    // matches or days
 }
 
 /** A player listing on the transfer market. */

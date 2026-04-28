@@ -1053,6 +1053,132 @@ export async function purchasePlayer(
   }
 }
 
+// ─── CLUB TOURNAMENTS & FIXTURES ─────────────────────────────────────────────
+
+export async function fetchClubTournaments(seasonName: string): Promise<import('../types').ClubTournament[]> {
+  try {
+    const snap = await getDocs(query(collection(db, 'clubTournaments'), where('season', '==', seasonName)));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubTournament));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'clubTournaments');
+    return [];
+  }
+}
+
+export async function saveClubTournament(tourney: import('../types').ClubTournament): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  try {
+    await setDoc(doc(db, 'clubTournaments', tourney.id), tourney);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubTournaments/${tourney.id}`);
+    throw err;
+  }
+}
+
+export async function deleteClubTournament(id: string): Promise<void> {
+  if (isQuotaExceeded) return;
+  try {
+    await deleteDoc(doc(db, 'clubTournaments', id));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubTournaments/${id}`);
+    throw err;
+  }
+}
+
+export async function fetchClubFixtures(seasonName: string): Promise<import('../types').ClubFixture[]> {
+  // To optimize reads, we load fixtures for the current season.
+  try {
+    // Note: We might need a composite index if we filter by season, but since clubFixtures is small, 
+    // a basic query or client-side filtering can work. We will fetch all and filter by season config for now.
+    const snap = await getDocs(collection(db, 'clubFixtures'));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubFixture));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'clubFixtures');
+    return [];
+  }
+}
+
+export async function saveClubFixture(fixture: import('../types').ClubFixture): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  try {
+    await setDoc(doc(db, 'clubFixtures', fixture.id), fixture);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubFixtures/${fixture.id}`);
+    throw err;
+  }
+}
+
+export async function deleteClubFixture(id: string): Promise<void> {
+  if (isQuotaExceeded) return;
+  try {
+    await deleteDoc(doc(db, 'clubFixtures', id));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubFixtures/${id}`);
+    throw err;
+  }
+}
+
+/**
+ * Updates a specific sub-match inside a ClubFixture.
+ * If all sub-matches are scored, the fixture is marked as 'completed' and player contracts are deducted.
+ */
+export async function updateFixtureSubMatch(
+  fixtureId: string,
+  subMatchId: string,
+  p1Score: number,
+  p2Score: number,
+  config: import('../types').ClubSystemConfig
+): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  
+  const fixRef = doc(db, 'clubFixtures', fixtureId);
+  const fixSnap = await getDoc(fixRef);
+  if (!fixSnap.exists()) throw new Error('Fixture not found');
+  const fixture = fixSnap.data() as import('../types').ClubFixture;
+
+  const newSubMatches = fixture.subMatches.map(sm => 
+    sm.id === subMatchId ? { ...sm, p1Score, p2Score } : sm
+  );
+  
+  const allCompleted = newSubMatches.every(sm => sm.p1Score !== null);
+  
+  const batch = writeBatch(db);
+  batch.update(fixRef, { 
+    subMatches: newSubMatches, 
+    status: allCompleted ? 'completed' : fixture.status 
+  });
+
+  // If the fixture is completed, deduct matches from contracts for all participants
+  if (allCompleted && config.contractsActive && config.defaultContractType === 'matches') {
+    const allParticipantIds = [...new Set([
+      ...newSubMatches.map(sm => sm.p1Id),
+      ...newSubMatches.map(sm => sm.p2Id)
+    ])];
+    
+    // We need to fetch these players, decrement their contract, and write back
+    // (In a real high-scale app, we'd use a transaction or FieldValue.increment(-1),
+    // but we need to check if the contract reaches 0 to handle free agency).
+    // For now, we will just decrement it via the client's cached player array if passed,
+    // or we can just fetch them here.
+    const playersSnap = await getDocs(query(collection(db, 'players'), where('id', 'in', allParticipantIds)));
+    playersSnap.docs.forEach(docSnap => {
+      const p = docSnap.data() as import('../types').Player;
+      if (p.clubContract && p.clubContract.type === 'matches' && p.clubContract.amount > 0) {
+        batch.update(docSnap.ref, {
+          'clubContract.amount': p.clubContract.amount - 1
+        });
+      }
+    });
+  }
+
+  try {
+    await batch.commit();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubFixtures/${fixtureId}/subMatch`);
+    throw err;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Ranking logic (can be used on the client-side array)
 export function sortRankedPlayers(players: Player[]): Player[] {

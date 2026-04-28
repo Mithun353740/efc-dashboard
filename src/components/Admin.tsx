@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
-import { Player, Leader, MatchRecord, Club, ClubSystemConfig } from '../types';
+import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture } from '../types';
 import { getSeasonInfo, cn } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
 import { auth, loginAnonymously, db } from '../firebase';
@@ -1367,7 +1367,11 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
 }
 function ClubsAdminTab({ players }: { players: Player[] }) {
   const currentSeasonName = `QVFC Club Season ${getSeasonInfo(new Date()).name}`;
-  const DEFAULT_CFG: ClubSystemConfig = { season: currentSeasonName, startingBudget: 5000000, transferWindowOpen: false, currentMatchday: 1, totalMatchdays: 10, matchdaySchedule: [] };
+  const DEFAULT_CFG: ClubSystemConfig = { 
+    season: currentSeasonName, startingBudget: 5000000, transferWindowOpen: false, 
+    currentMatchday: 1, totalMatchdays: 10, matchdaySchedule: [],
+    contractsActive: true, defaultContractType: 'matches', defaultContractAmount: 5 
+  };
   const [clubs, setClubs] = React.useState<Club[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [msg, setMsg] = React.useState({ text: '', type: '' });
@@ -1378,8 +1382,22 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const [config, setConfig] = React.useState<ClubSystemConfig>(DEFAULT_CFG);
   const [configSaving, setConfigSaving] = React.useState(false);
 
-  // ── Match management state (lazy-loaded, quota-safe) ──
-  const [subTab, setSubTab] = React.useState<'clubs'|'matches'|'config'>('clubs');
+  // ── Match & Engine state (lazy-loaded, quota-safe) ──
+  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'config'>('clubs');
+
+  // Tournaments state
+  const [tournaments, setTournaments] = React.useState<ClubTournament[]>([]);
+  const [tLoaded, setTLoaded] = React.useState(false);
+  const [tFormName, setTFormName] = React.useState('');
+
+  // Fixtures state
+  const [fixtures, setFixtures] = React.useState<ClubFixture[]>([]);
+  const [fLoaded, setFLoaded] = React.useState(false);
+  const [fForm, setFForm] = React.useState({ 
+    tournamentId: '', homeClubId: '', awayClubId: '', 
+    matchupType: 'home_away' as 'home_away'|'random', 
+    lineupSize: '4', subLimit: '2' 
+  });
   const [clubMatches, setClubMatches] = React.useState<MatchRecord[]>([]);
   const [matchesLoaded, setMatchesLoaded] = React.useState(false);
   const [matchBusy, setMatchBusy] = React.useState(false);
@@ -1390,6 +1408,10 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const [showP1, setShowP1] = React.useState(false);
   const [showP2, setShowP2] = React.useState(false);
   const [editMatchId, setEditMatchId] = React.useState<string|null>(null);
+
+  // Sub-match scoring state
+  const [scoringSubMatch, setScoringSubMatch] = React.useState<{ fixtureId: string, subMatchId: string } | null>(null);
+  const [smScores, setSmScores] = React.useState({ s1: '', s2: '' });
   const [editS1, setEditS1] = React.useState('');
   const [editS2, setEditS2] = React.useState('');
 
@@ -1459,9 +1481,26 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     setMatchesLoaded(true);
   }, [config.season]);
 
+  const loadTournaments = React.useCallback(async () => {
+    if (!config.season) return;
+    const ts = await fetchClubTournaments(config.season);
+    setTournaments(ts.sort((a, b) => b.createdAt - a.createdAt));
+    setTLoaded(true);
+  }, [config.season]);
+
+  const loadFixtures = React.useCallback(async () => {
+    if (!config.season) return;
+    // Client side filter by season to save complex composite indexes right now
+    const fs = await fetchClubFixtures(config.season);
+    setFixtures(fs.sort((a, b) => b.createdAt - a.createdAt));
+    setFLoaded(true);
+  }, [config.season]);
+
   React.useEffect(() => {
     if (subTab === 'matches' && !matchesLoaded) loadMatches();
-  }, [subTab, matchesLoaded, loadMatches]);
+    if (subTab === 'tournaments' && !tLoaded) loadTournaments();
+    if (subTab === 'fixtures' && !fLoaded) loadFixtures();
+  }, [subTab, matchesLoaded, tLoaded, fLoaded, loadMatches, loadTournaments, loadFixtures]);
 
   const flashMatch = (text: string, ok: boolean) => {
     setMatchMsg({ text, ok });
@@ -1509,6 +1548,110 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     finally { setMatchBusy(false); }
   };
 
+  const handleAddTournament = async () => {
+    if (!tFormName) return;
+    setMatchBusy(true);
+    try {
+      const nt: ClubTournament = {
+        id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
+        name: tFormName.toUpperCase(),
+        season: config.season,
+        createdAt: Date.now()
+      };
+      await saveClubTournament(nt);
+      setTournaments([nt, ...tournaments]);
+      setTFormName('');
+      flashMatch('✅ Tournament created', true);
+    } catch (e: any) { flashMatch('❌ ' + e.message, false); }
+    finally { setMatchBusy(false); }
+  };
+
+  const handleDelTournament = async (id: string) => {
+    if (!window.confirm('Delete this tournament?')) return;
+    setMatchBusy(true);
+    try {
+      await deleteClubTournament(id);
+      setTournaments(tournaments.filter(t => t.id !== id));
+      flashMatch('✅ Deleted', true);
+    } catch (e: any) { flashMatch('❌ ' + e.message, false); }
+    finally { setMatchBusy(false); }
+  };
+
+  const handleAddFixture = async () => {
+    const t = tournaments.find(x => x.id === fForm.tournamentId);
+    const hc = clubs.find(c => c.id === fForm.homeClubId);
+    const ac = clubs.find(c => c.id === fForm.awayClubId);
+    if (!t || !hc || !ac || hc.id === ac.id) { flashMatch('❌ Invalid selection', false); return; }
+    
+    setMatchBusy(true);
+    try {
+      const nf: ClubFixture = {
+        id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
+        tournamentId: t.id, tournamentName: t.name,
+        homeClubId: hc.id, homeClubName: hc.name,
+        awayClubId: ac.id, awayClubName: ac.name,
+        matchupType: fForm.matchupType,
+        lineupSize: Number(fForm.lineupSize) || 4,
+        subLimit: Number(fForm.subLimit) || 2,
+        status: 'scheduled',
+        homeLineupIds: [], awayLineupIds: [], subMatches: [],
+        createdAt: Date.now()
+      };
+      await saveClubFixture(nf);
+      setFixtures([nf, ...fixtures]);
+      flashMatch('✅ Fixture Scheduled', true);
+    } catch (e: any) { flashMatch('❌ ' + e.message, false); }
+    finally { setMatchBusy(false); }
+  };
+
+  const handleDelFixture = async (id: string) => {
+    if (!window.confirm('Delete this fixture?')) return;
+    setMatchBusy(true);
+    try {
+      await deleteClubFixture(id);
+      setFixtures(fixtures.filter(f => f.id !== id));
+      flashMatch('✅ Deleted', true);
+    } catch (e: any) { flashMatch('❌ ' + e.message, false); }
+    finally { setMatchBusy(false); }
+  };
+
+  const handleScoreSubMatch = async (f: ClubFixture, sm: import('../types').ClubFixtureSubMatch) => {
+    const s1 = Number(smScores.s1);
+    const s2 = Number(smScores.s2);
+    if (isNaN(s1) || isNaN(s2) || smScores.s1 === '' || smScores.s2 === '') {
+      flashMatch('❌ Invalid scores', false);
+      return;
+    }
+    
+    setMatchBusy(true);
+    try {
+      await updateFixtureSubMatch(f.id, sm.id, s1, s2, config);
+      
+      const p1 = players.find(p => p.id === sm.p1Id);
+      const p2 = players.find(p => p.id === sm.p2Id);
+      if (p1) {
+        await addMatch(p1, s1, s2, p2, [], f.tournamentName || config.season, p2?.name || 'Unknown');
+      }
+
+      const nf = { ...f };
+      const nsm = nf.subMatches.find(x => x.id === sm.id);
+      if (nsm) {
+        nsm.p1Score = s1;
+        nsm.p2Score = s2;
+      }
+      nf.status = nf.subMatches.every(x => x.p1Score !== null) ? 'completed' : nf.status;
+      setFixtures(prev => prev.map(x => x.id === f.id ? nf : x));
+      setScoringSubMatch(null);
+      setSmScores({ s1: '', s2: '' });
+      flashMatch('✅ Sub-Match Scored', true);
+    } catch (e: any) {
+      flashMatch('❌ ' + e.message, false);
+    }
+    finally {
+      setMatchBusy(false);
+    }
+  };
+
   const p1Player = players.find(p => p.id === mForm.p1Id);
   const p2Player = players.find(p => p.id === mForm.p2Id);
   const filtP1 = players.filter(p => p.name.toLowerCase().includes(p1Search.toLowerCase())).slice(0, 6);
@@ -1520,13 +1663,13 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   return (
     <div className="space-y-6">
       {/* SubTab Nav */}
-      <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-2xl">
-        {(['clubs','matches','config'] as const).map(t => (
+      <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-2xl flex-wrap">
+        {(['clubs','tournaments','fixtures','matches','config'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)}
-            className={cn('flex-1 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all',
-              subTab === t ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'
+            className={cn('flex-1 min-w-[100px] py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all',
+              subTab === t ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
             )}>
-            {t === 'clubs' ? '⚽ CLUBS' : t === 'matches' ? '🗒️ MATCH LOG' : '⚙️ CONFIG'}
+            {t === 'clubs' ? '⚽ CLUBS' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : '⚙️ CONFIG'}
           </button>
         ))}
       </div>
@@ -1659,7 +1802,165 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
           </div>
         )}
       </div>
-      </div>
+        </div>
+      )}
+
+      {/* ── TOURNAMENTS subtab ── */}
+      {subTab === 'tournaments' && (
+        <div className="space-y-6">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
+            <h3 className="text-xl font-black tracking-tight mb-1">CREATE CLUB TOURNAMENT</h3>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-5">
+              Season: <span className="text-amber-400">{config.season}</span>
+            </p>
+            <div className="flex gap-4">
+              <input value={tFormName} onChange={e => setTFormName(e.target.value)} placeholder="e.g. VORTEX WINTER CUP"
+                className="flex-1 bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none uppercase" />
+              <button onClick={handleAddTournament} disabled={matchBusy || !tFormName}
+                className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl disabled:opacity-50 transition-all uppercase">
+                {matchBusy ? 'CREATING...' : 'CREATE'}
+              </button>
+            </div>
+            {matchMsg.text && <p className={cn('text-[10px] font-bold mt-3', matchMsg.ok ? 'text-emerald-400' : 'text-red-400')}>{matchMsg.text}</p>}
+          </div>
+          
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
+            <h3 className="text-xl font-black tracking-tight mb-6">ACTIVE TOURNAMENTS ({tournaments.length})</h3>
+            {!tLoaded ? <p className="text-slate-500 text-xs font-bold animate-pulse">Loading...</p> : tournaments.length === 0 ? <p className="text-slate-500 text-xs font-bold">No club tournaments created for this season.</p> : (
+              <div className="space-y-3">
+                {tournaments.map(t => (
+                  <div key={t.id} className="bg-[#0f172a] rounded-xl border border-white/10 p-4 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-black text-sm text-white uppercase">{t.name}</p>
+                      <p className="text-[9px] text-slate-500 uppercase tracking-widest">{new Date(t.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <button onClick={() => handleDelTournament(t.id)} disabled={matchBusy} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all disabled:opacity-50"><Trash2 size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── FIXTURES subtab ── */}
+      {subTab === 'fixtures' && (
+        <div className="space-y-6">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
+            <h3 className="text-xl font-black tracking-tight mb-1">SCHEDULE CLUB FIXTURE</h3>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-5">
+              Season: <span className="text-amber-400">{config.season}</span>
+            </p>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Tournament</label>
+                <select value={fForm.tournamentId} onChange={e => setFForm({...fForm, tournamentId: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none">
+                  <option value="" className="text-black">Select Tournament...</option>
+                  {tournaments.map(t => <option key={t.id} value={t.id} className="text-black">{t.name}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Home Club</label>
+                  <select value={fForm.homeClubId} onChange={e => setFForm({...fForm, homeClubId: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none">
+                    <option value="" className="text-black">Select Home...</option>
+                    {clubs.map(c => <option key={c.id} value={c.id} className="text-black">{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Away Club</label>
+                  <select value={fForm.awayClubId} onChange={e => setFForm({...fForm, awayClubId: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none">
+                    <option value="" className="text-black">Select Away...</option>
+                    {clubs.map(c => <option key={c.id} value={c.id} className="text-black">{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Matchup Logic</label>
+                  <select value={fForm.matchupType} onChange={e => setFForm({...fForm, matchupType: e.target.value as 'home_away'|'random'})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none">
+                    <option value="home_away" className="text-black">Home Advantage (Manual)</option>
+                    <option value="random" className="text-black">Neutral (Random)</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Lineup Size</label>
+                  <input type="number" min="1" value={fForm.lineupSize} onChange={e => setFForm({...fForm, lineupSize: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Sub Limit</label>
+                  <input type="number" min="0" value={fForm.subLimit} onChange={e => setFForm({...fForm, subLimit: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
+                </div>
+              </div>
+              <button onClick={handleAddFixture} disabled={matchBusy || !fForm.tournamentId || !fForm.homeClubId || !fForm.awayClubId}
+                className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl disabled:opacity-50 transition-all uppercase mt-2">
+                {matchBusy ? 'SCHEDULING...' : 'SCHEDULE FIXTURE'}
+              </button>
+              {matchMsg.text && <p className={cn('text-[10px] font-bold mt-3 text-center', matchMsg.ok ? 'text-emerald-400' : 'text-red-400')}>{matchMsg.text}</p>}
+            </div>
+          </div>
+          
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
+            <h3 className="text-xl font-black tracking-tight mb-6">SCHEDULED FIXTURES ({fixtures.length})</h3>
+            {!fLoaded ? <p className="text-slate-500 text-xs font-bold animate-pulse">Loading...</p> : fixtures.length === 0 ? <p className="text-slate-500 text-xs font-bold">No fixtures scheduled.</p> : (
+              <div className="space-y-3">
+                {fixtures.map(f => (
+                  <div key={f.id} className="bg-[#0f172a] rounded-xl border border-white/10 p-4 flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-1">{f.tournamentName}</p>
+                        <div className="flex items-center gap-3 text-sm font-black text-white">
+                          <span className="truncate">{f.homeClubName}</span>
+                          <span className="text-slate-500 text-[10px] px-2 py-0.5 bg-white/5 rounded">VS</span>
+                          <span className="truncate">{f.awayClubName}</span>
+                        </div>
+                        <p className="text-[9px] text-slate-500 mt-2 uppercase tracking-widest">
+                          {f.matchupType === 'home_away' ? 'HOME ADVANTAGE' : 'RANDOM'} &bull; {f.lineupSize}v{f.lineupSize} &bull; {f.subLimit} SUBS &bull; 
+                          <span className={cn('ml-2', f.status === 'scheduled' ? 'text-amber-400' : f.status === 'completed' ? 'text-emerald-400' : 'text-blue-400')}>
+                            {f.status.replace('_', ' ')}
+                          </span>
+                        </p>
+                      </div>
+                      <button onClick={() => handleDelFixture(f.id)} disabled={matchBusy} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all disabled:opacity-50 h-fit"><Trash2 size={14} /></button>
+                    </div>
+
+                    {/* Sub-Matches */}
+                    {(f.status === 'active' || f.status === 'completed') && (
+                      <div className="pt-3 border-t border-white/5 space-y-2">
+                        <p className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Matchups</p>
+                        {f.subMatches.map((sm, i) => (
+                          <div key={sm.id} className="flex items-center justify-between gap-2 p-2 bg-white/5 rounded-lg">
+                            <span className="text-[10px] font-bold text-white flex-1 truncate text-right">{sm.p1Name}</span>
+                            
+                            {sm.p1Score !== null && sm.p2Score !== null ? (
+                              <div className="flex items-center gap-2 px-2">
+                                <span className="text-xs font-black text-amber-400 w-4 text-center">{sm.p1Score}</span>
+                                <span className="text-[8px] text-slate-500">-</span>
+                                <span className="text-xs font-black text-amber-400 w-4 text-center">{sm.p2Score}</span>
+                              </div>
+                            ) : scoringSubMatch?.subMatchId === sm.id ? (
+                              <div className="flex items-center gap-1">
+                                <input type="number" min="0" value={smScores.s1} onChange={e => setSmScores({...smScores, s1: e.target.value})} className="w-8 p-1 bg-black text-white text-xs font-black text-center rounded border border-white/10 outline-none focus:border-amber-500" />
+                                <span className="text-[8px] text-slate-500">-</span>
+                                <input type="number" min="0" value={smScores.s2} onChange={e => setSmScores({...smScores, s2: e.target.value})} className="w-8 p-1 bg-black text-white text-xs font-black text-center rounded border border-white/10 outline-none focus:border-amber-500" />
+                                <button onClick={() => handleScoreSubMatch(f, sm)} disabled={matchBusy} className="ml-2 px-2 py-1 bg-amber-500 text-black text-[9px] font-black rounded uppercase">Save</button>
+                                <button onClick={() => setScoringSubMatch(null)} className="px-2 py-1 bg-white/10 text-slate-400 hover:text-white text-[9px] font-black rounded uppercase">Cancel</button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setScoringSubMatch({ fixtureId: f.id, subMatchId: sm.id })} className="px-3 py-1 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-[9px] font-black rounded uppercase">Record</button>
+                            )}
+                            
+                            <span className="text-[10px] font-bold text-white flex-1 truncate">{sm.p2Name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── MATCHES subtab ── */}
@@ -1827,6 +2128,32 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                   {config.transferWindowOpen ? '✓ TRANSFER WINDOW OPEN' : 'TRANSFER WINDOW CLOSED'}
                 </button>
               </div>
+              
+              <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Contracts Economy</label>
+                  <button onClick={() => setConfig({...config, contractsActive: !config.contractsActive})}
+                    className={cn('text-[9px] font-black tracking-widest px-3 py-1 rounded uppercase', config.contractsActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400')}>
+                    {config.contractsActive ? 'ACTIVE' : 'DISABLED'}
+                  </button>
+                </div>
+                {config.contractsActive && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Default Type</label>
+                      <select value={config.defaultContractType} onChange={e => setConfig({...config, defaultContractType: e.target.value as 'matches'|'days'})} className="w-full bg-[#0f172a] border border-white/10 p-3 rounded-lg text-xs font-bold text-white focus:border-brand-purple outline-none">
+                        <option value="matches" className="text-black">Matches</option>
+                        <option value="days" className="text-black">Days</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Default Amount</label>
+                      <input type="number" min="1" value={config.defaultContractAmount} onChange={e => setConfig({...config, defaultContractAmount: Number(e.target.value)})} className="w-full bg-[#0f172a] border border-white/10 p-3 rounded-lg text-xs font-bold focus:border-brand-purple outline-none" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {config.transferWindowOpen && (
                 <div className="space-y-1">
                   <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Window Close Date</label>
@@ -1837,6 +2164,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Config Summary</p>
                 <p className="text-xs font-bold text-white">{config.season}</p>
                 <p className="text-[10px] text-slate-400">Matchday {config.currentMatchday} / {config.totalMatchdays} &bull; Budget VCC {config.startingBudget.toLocaleString()}</p>
+                <p className="text-[10px] text-slate-400">Contracts: <span className={config.contractsActive ? 'text-emerald-400' : 'text-red-400'}>{config.contractsActive ? `${config.defaultContractAmount} ${config.defaultContractType}` : 'OFF'}</span></p>
                 <p className="text-[10px] text-slate-400">Transfer Window: <span className={config.transferWindowOpen ? 'text-emerald-400' : 'text-red-400'}>{config.transferWindowOpen ? 'OPEN' : 'CLOSED'}</span></p>
               </div>
               <button onClick={handleSaveConfig} disabled={configSaving} className="w-full py-4 glossy-btn rounded-xl disabled:opacity-50 uppercase text-xs font-black tracking-widest">
