@@ -252,7 +252,7 @@ export default function ClubManager() {
   const [config, setConfig] = useState<ClubSystemConfig | null>(null);
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'market' | 'rankings' | 'fixtures' | 'auction'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'market' | 'rankings' | 'tournaments' | 'auction'>('overview');
   const [msg, setMsg] = useState({ text: '', type: '' });
 
   const playerId = localStorage.getItem('playerId') || '';
@@ -295,7 +295,7 @@ export default function ClubManager() {
     { id: 'market', label: 'MARKET', icon: <ShoppingCart size={14} /> },
     { id: 'auction', label: 'AUCTION', icon: <Hammer size={14} /> },
     { id: 'rankings', label: 'RANKINGS', icon: <Trophy size={14} /> },
-    { id: 'fixtures', label: 'FIXTURES', icon: <Calendar size={14} /> },
+    { id: 'tournaments', label: 'TOURNAMENTS', icon: <Trophy size={14} /> },
   ] as const;
 
   return (
@@ -402,9 +402,9 @@ export default function ClubManager() {
                 </div>
               </motion.div>
             )}
-            {activeTab === 'fixtures' && (
-              <motion.div key="fixtures" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
-                <FixturesTab config={config} clubs={clubs} myClub={myClub} squad={squad} players={players} setMsg={setMsg} />
+            {activeTab === 'tournaments' && (
+              <motion.div key="tournaments" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+                <TournamentsTab config={config} clubs={clubs} myClub={myClub} squad={squad} players={players} setMsg={setMsg} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -727,12 +727,13 @@ function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; player
 }
 
 
-// ─── Fixtures Tab ─────────────────────────────────────────────────────────────
+// ─── Tournaments Hub ─────────────────────────────────────────────────────────
 
-function FixturesTab({ config, clubs, myClub, squad, players, setMsg }: { config: ClubSystemConfig | null; clubs: Club[]; myClub?: Club; squad: Player[]; players: Player[]; setMsg: (m: any) => void }) {
+function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { config: ClubSystemConfig | null; clubs: Club[]; myClub?: Club; squad: Player[]; players: Player[]; setMsg: (m: any) => void }) {
   const [tournaments, setTournaments] = useState<ClubTournament[]>([]);
   const [fixtures, setFixtures] = useState<ClubFixture[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTId, setSelectedTId] = useState<string | null>(null);
 
   // Lineup submission state
   const [selFixtureId, setSelFixtureId] = useState<string|null>(null);
@@ -821,231 +822,253 @@ function FixturesTab({ config, clubs, myClub, squad, players, setMsg }: { config
     setSubmitting(false);
   };
 
-  const handleSubmitMatchups = async (f: ClubFixture) => {
-    if (!myClub) return;
-    setSubmitting(true);
-    try {
-      const nf = { ...f };
-      // Map the selections to subMatches
-      nf.subMatches = f.awayLineupIds.map(aId => {
-        const hId = matchupSelection[aId];
-        return {
-          id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
-          p1Id: hId, p1Name: players.find(p => p.id === hId)?.name || 'Unknown',
-          p2Id: aId, p2Name: players.find(p => p.id === aId)?.name || 'Unknown',
-          p1Score: null, p2Score: null
-        };
-      });
-      nf.status = 'active';
-
-      await saveClubFixture(nf);
-      setFixtures(prev => prev.map(x => x.id === f.id ? nf : x));
-      setSelFixtureId(null);
-      setMsg({ text: '✅ Matchups locked. Fixture is Live.', type: 'success' });
-    } catch (e: any) {
-      setMsg({ text: '❌ ' + e.message, type: 'error' });
-    }
-    setSubmitting(false);
-  };
-
   if (loading) {
-    return <div className="text-center py-20 text-amber-500 font-black tracking-widest text-xs animate-pulse">LOADING FIXTURES...</div>;
+    return <div className="text-center py-20 text-amber-500 font-black tracking-widest text-xs animate-pulse">LOADING TOURNAMENTS...</div>;
   }
 
-  return (
-    <div className="space-y-12">
-      {activeTourneyIds.length === 0 ? (
-        <div className="text-center py-20 bg-white/5 border border-white/10 rounded-2xl">
-          <Calendar size={48} className="text-slate-500 mx-auto mb-4" />
-          <h3 className="text-xl font-black text-white tracking-widest uppercase">No Fixtures Scheduled</h3>
-          <p className="text-xs text-slate-400 font-bold mt-2">Waiting for the Admin to schedule matches for this season.</p>
+  // 1. SELECTOR VIEW
+  if (!selectedTId) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-black text-white tracking-widest uppercase italic">ACTIVE TOURNAMENTS</h3>
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">{tournaments.length} EVENTS LIVE</span>
         </div>
-      ) : activeTourneyIds.map(tId => {
-        const tourney = tournaments.find(t => t.id === tId);
-        const tFix = fixtures.filter(f => f.tournamentId === tId);
-        if (!tourney || tFix.length === 0) return null;
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {tournaments.length === 0 ? (
+            <div className="col-span-full py-20 text-center bg-white/5 border border-white/10 rounded-[2rem]">
+              <Trophy size={48} className="text-slate-600 mx-auto mb-4" />
+              <p className="text-slate-500 font-black uppercase text-xs">No active tournaments this season.</p>
+            </div>
+          ) : tournaments.map(t => (
+            <button key={t.id} onClick={() => setSelectedTId(t.id)}
+              className="group relative h-64 rounded-[2rem] overflow-hidden border border-white/10 transition-all hover:scale-[1.02] hover:border-amber-500/50">
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10" />
+              <div className="absolute inset-0 bg-amber-500/5 opacity-0 group-hover:opacity-100 transition-all" />
+              
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Trophy size={80} className="text-white/5 group-hover:text-amber-500/10 transition-all duration-700 group-hover:scale-125" />
+              </div>
 
-        return (
-          <div key={tId} className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h3 className="text-xl font-black text-white tracking-widest uppercase flex items-center gap-3">
-                <Trophy className="text-amber-500" size={20} />
-                {tourney.name}
-              </h3>
-              {tourney.status !== 'active' && (
-                <div className={cn("px-4 py-2 rounded-xl border flex items-center gap-3",
-                  tourney.status === 'paused' ? 'bg-amber-500/10 border-amber-500/30 text-amber-500' :
-                  tourney.status === 'postponed' ? 'bg-red-500/10 border-red-500/30 text-red-500' :
-                  'bg-slate-500/10 border-slate-500/30 text-slate-500'
+              <div className="absolute bottom-0 inset-x-0 p-8 z-20 text-left">
+                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded mb-3 inline-block",
+                  t.status === 'active' ? 'bg-emerald-500 text-black' : 'bg-amber-500 text-black'
                 )}>
-                  <AlertCircle size={16} />
-                  <div>
-                    <p className="text-[10px] font-black uppercase leading-tight">{tourney.status}</p>
-                    {tourney.statusReason && <p className="text-[9px] font-bold opacity-70">{tourney.statusReason}</p>}
+                  {t.status}
+                </span>
+                <h4 className="text-2xl font-black text-white uppercase italic leading-none truncate">{t.name}</h4>
+                <div className="flex items-center gap-4 mt-3">
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                    <Calendar size={10} /> {new Date(t.createdAt).toLocaleDateString()}
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-amber-500">
+                    <Zap size={10} /> VIEW HUB
                   </div>
                 </div>
-              )}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 2. DETAIL VIEW
+  const tourney = tournaments.find(t => t.id === selectedTId);
+  const tFix = fixtures.filter(f => f.tournamentId === selectedTId);
+  if (!tourney) { setSelectedTId(null); return null; }
+
+  return (
+    <div className="space-y-8">
+      {/* Detail Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <button onClick={() => setSelectedTId(null)} className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <h3 className="text-3xl font-black text-white tracking-tighter uppercase italic">{tourney.name}</h3>
+              <span className={cn("text-[10px] font-black uppercase px-2 py-0.5 rounded",
+                tourney.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+              )}>{tourney.status}</span>
             </div>
+            <p className="text-[10px] font-black text-slate-500 tracking-[0.3em] uppercase">TOURNAMENT HUB &bull; {tFix.length} FIXTURES</p>
+          </div>
+        </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {tFix.map(f => {
-                const isHome = myClub?.id === f.homeClubId;
-                const isAway = myClub?.id === f.awayClubId;
-                const isParticipant = isHome || isAway;
-                const myLineup = isHome ? f.homeLineupIds : f.awayLineupIds;
-                const oppLineup = isHome ? f.awayLineupIds : f.homeLineupIds;
-                const iHaveSubmitted = myLineup.length === f.lineupSize;
-                const oppHasSubmitted = oppLineup.length === f.lineupSize;
-
-                return (
-                  <div key={f.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col">
-                    {/* Header */}
-                    <div className="p-4 border-b border-white/5 flex items-center justify-between" style={{ background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.1), transparent)' }}>
-                      <span className={cn("text-[9px] font-black tracking-widest px-2 py-1 rounded uppercase",
-                        f.status === 'scheduled' ? 'bg-amber-500/20 text-amber-400' :
-                        f.status === 'lineups_pending' ? 'bg-blue-500/20 text-blue-400' :
-                        f.status === 'matchups_pending' ? 'bg-purple-500/20 text-purple-400' :
-                        f.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
-                        'bg-slate-500/20 text-slate-400'
-                      )}>
-                        {f.status.replace('_', ' ')}
-                      </span>
-                      <span className="text-[9px] font-black text-slate-500 tracking-widest uppercase">{f.matchupType === 'home_away' ? 'HOME ADVANTAGE' : 'NEUTRAL / RANDOM'} &bull; {f.lineupSize}V{f.lineupSize}</span>
-                    </div>
-
-                    {/* Teams */}
-                    <div className="p-6 flex items-center justify-between gap-4">
-                      {/* Home */}
-                      <div className="flex-1 text-center">
-                        <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-white font-black text-sm mb-2"
-                          style={{ background: `linear-gradient(135deg, ${clubs.find(c => c.id === f.homeClubId)?.primaryColor || '#000'}, ${clubs.find(c => c.id === f.homeClubId)?.secondaryColor || '#000'})` }}>
-                          {clubs.find(c => c.id === f.homeClubId)?.shortName}
-                        </div>
-                        <p className={cn("text-xs font-black uppercase", isHome ? 'text-amber-400' : 'text-white')}>{f.homeClubName}</p>
-                      </div>
-
-                      <div className="text-xl font-black text-slate-500">VS</div>
-
-                      {/* Away */}
-                      <div className="flex-1 text-center">
-                        <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-white font-black text-sm mb-2"
-                          style={{ background: `linear-gradient(135deg, ${clubs.find(c => c.id === f.awayClubId)?.primaryColor || '#000'}, ${clubs.find(c => c.id === f.awayClubId)?.secondaryColor || '#000'})` }}>
-                          {clubs.find(c => c.id === f.awayClubId)?.shortName}
-                        </div>
-                        <p className={cn("text-xs font-black uppercase", isAway ? 'text-amber-400' : 'text-white')}>{f.awayClubName}</p>
-                      </div>
-                    </div>
-
-                    {/* Action Area */}
-                    <div className="p-4 bg-black/40 border-t border-white/5 flex-1 flex flex-col justify-end">
-                      {isParticipant && (f.status === 'scheduled' || f.status === 'lineups_pending') && !iHaveSubmitted ? (
-                        tourney.status !== 'active' ? (
-                          <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-center">
-                            <Lock size={16} className="text-slate-500 mx-auto mb-2" />
-                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Locked: Tournament {tourney.status}</p>
-                          </div>
-                        ) : selFixtureId === f.id ? (
-                          <div className="space-y-4">
-                            <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest text-center">Select {f.lineupSize} Players</p>
-                            <div className="flex flex-wrap gap-2 justify-center">
-                              {squad.map(p => {
-                                const sel = lineupSelection.includes(p.id);
-                                return (
-                                  <button key={p.id} onClick={() => handleSelectLineup(p.id, f.lineupSize)}
-                                    className={cn("px-3 py-1.5 rounded text-[10px] font-black tracking-widest uppercase transition-all",
-                                      sel ? 'bg-amber-500 text-black' : 'bg-white/10 text-slate-400 hover:bg-white/20'
-                                    )}>
-                                    {p.name.split(' ')[0]} {sel && '✓'}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            <div className="flex gap-2">
-                              <button onClick={() => setSelFixtureId(null)} className="flex-1 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-[10px] font-black tracking-widest uppercase text-slate-400">CANCEL</button>
-                              <button onClick={() => handleSubmitLineup(f)} disabled={lineupSelection.length !== f.lineupSize || submitting} className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 rounded-lg text-[10px] font-black tracking-widest uppercase text-black">SUBMIT</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button onClick={() => { setSelFixtureId(f.id); setLineupSelection([]); }} className="w-full py-3 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-400 font-black text-[10px] tracking-widest rounded-xl transition-all uppercase">
-                            SUBMIT LINEUP
-                          </button>
-                        )
-                      ) : isParticipant && f.status === 'matchups_pending' && isHome ? (
-                        tourney.status !== 'active' ? (
-                          <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-center">
-                            <Lock size={16} className="text-slate-500 mx-auto mb-2" />
-                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Locked: Tournament {tourney.status}</p>
-                          </div>
-                        ) : selFixtureId === f.id ? (
-                          <div className="space-y-4">
-                            <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest text-center">HOME ADVANTAGE: PAIR YOUR PLAYERS</p>
-                            <div className="space-y-3">
-                              {f.awayLineupIds.map(aId => {
-                                const aName = players.find(p => p.id === aId)?.name.split(' ')[0] || 'Unknown';
-                                const selectedHId = matchupSelection[aId];
-                                return (
-                                  <div key={aId} className="flex items-center gap-3 justify-between bg-white/5 p-2 rounded-xl">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase w-16 truncate text-right">{aName}</span>
-                                    <span className="text-[10px] font-black text-slate-600">VS</span>
-                                    <select value={selectedHId || ''} onChange={e => setMatchupSelection({...matchupSelection, [aId]: e.target.value})} 
-                                      className="flex-1 bg-white/10 border-0 p-2 rounded text-[10px] font-black text-white focus:ring-1 ring-amber-500 outline-none uppercase">
-                                      <option value="" disabled className="text-black">Select Home Player</option>
-                                      {f.homeLineupIds.map(hId => {
-                                        // only allow if not assigned to someone else
-                                        const assignedTo = Object.keys(matchupSelection).find(k => matchupSelection[k] === hId);
-                                        const disabled = assignedTo && assignedTo !== aId;
-                                        return <option key={hId} value={hId} disabled={!!disabled} className="text-black">
-                                          {players.find(p => p.id === hId)?.name.split(' ')[0]} {disabled ? '(Assigned)' : ''}
-                                        </option>;
-                                      })}
-                                    </select>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            <div className="flex gap-2 mt-2">
-                              <button onClick={() => setSelFixtureId(null)} className="flex-1 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-[10px] font-black tracking-widest uppercase text-slate-400">CANCEL</button>
-                              <button onClick={() => handleSubmitMatchups(f)} disabled={Object.keys(matchupSelection).length !== f.awayLineupIds.length || submitting} className="flex-1 py-2 bg-purple-500 hover:bg-purple-400 disabled:opacity-50 rounded-lg text-[10px] font-black tracking-widest uppercase text-white shadow-lg shadow-purple-500/20">LOCK MATCHUPS</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button onClick={() => { setSelFixtureId(f.id); setMatchupSelection({}); }} className="w-full py-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 text-purple-400 font-black text-[10px] tracking-widest rounded-xl transition-all uppercase shadow-lg shadow-purple-500/10">
-                            USE HOME ADVANTAGE
-                          </button>
-                        )
-                      ) : (
-                        <div className="text-center">
-                          {f.status === 'active' ? (
-                            <div className="space-y-2">
-                              <p className="text-[10px] font-black text-emerald-400 tracking-widest uppercase">Matches Live</p>
-                              {f.subMatches.map((sm, i) => (
-                                <div key={sm.id} className="flex items-center justify-between text-[9px] font-black text-slate-400 bg-black/40 px-2 py-1 rounded">
-                                  <span className={cn("truncate w-1/3 text-right", isHome ? "text-amber-400" : "")}>{sm.p1Name.split(' ')[0]}</span>
-                                  <span className="text-slate-600">VS</span>
-                                  <span className={cn("truncate w-1/3 text-left", isAway ? "text-amber-400" : "")}>{sm.p2Name.split(' ')[0]}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : f.status === 'completed' ? (
-                            <p className="text-[10px] font-black text-slate-500 tracking-widest uppercase">Fixture Completed</p>
-                          ) : f.status === 'matchups_pending' && isAway ? (
-                            <p className="text-[10px] font-black text-purple-400 tracking-widest uppercase">Home team pairing lineups...</p>
-                          ) : iHaveSubmitted ? (
-                            <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Lineup Submitted. Waiting for opponent.</p>
-                          ) : (
-                            <p className="text-[10px] font-black text-slate-600 tracking-widest uppercase">Waiting for owners.</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                );
-              })}
+        {tourney.status !== 'active' && (
+          <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-3 text-amber-500">
+            <AlertCircle size={18} />
+            <div>
+              <p className="text-[10px] font-black uppercase">PAUSED BY FEDERATION</p>
+              {tourney.statusReason && <p className="text-[9px] font-bold opacity-70">{tourney.statusReason}</p>}
             </div>
           </div>
-        );
-      })}
+        )}
+      </div>
+
+      {/* Fixtures Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {tFix.length === 0 ? (
+          <div className="col-span-full py-20 text-center bg-white/5 border border-white/10 rounded-[2rem]">
+            <Calendar size={32} className="text-slate-600 mx-auto mb-4" />
+            <p className="text-slate-500 font-black uppercase text-xs">No fixtures scheduled for this tournament yet.</p>
+          </div>
+        ) : tFix.map(f => {
+          const isHome = myClub?.id === f.homeClubId;
+          const isAway = myClub?.id === f.awayClubId;
+          const isParticipant = isHome || isAway;
+          const myLineup = isHome ? f.homeLineupIds : f.awayLineupIds;
+          const oppLineup = isHome ? f.awayLineupIds : f.homeLineupIds;
+          const iHaveSubmitted = myLineup.length === f.lineupSize;
+          const oppHasSubmitted = oppLineup.length === f.lineupSize;
+
+          return (
+            <div key={f.id} className="bg-[#0f172a] border border-white/10 rounded-[2rem] overflow-hidden flex flex-col hover:border-white/20 transition-all">
+              {/* Header */}
+              <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                <span className={cn("text-[9px] font-black tracking-widest px-2 py-1 rounded uppercase",
+                  f.status === 'scheduled' ? 'bg-amber-500/20 text-amber-400' :
+                  f.status === 'lineups_pending' ? 'bg-blue-500/20 text-blue-400' :
+                  f.status === 'matchups_pending' ? 'bg-purple-500/20 text-purple-400' :
+                  f.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
+                  'bg-slate-500/20 text-slate-400'
+                )}>
+                  {f.status.replace('_', ' ')}
+                </span>
+                <span className="text-[9px] font-black text-slate-500 tracking-widest uppercase">{f.matchupType === 'home_away' ? 'HOME ADVANTAGE' : 'NEUTRAL'} &bull; {f.lineupSize}V{f.lineupSize}</span>
+              </div>
+
+              {/* Teams */}
+              <div className="p-8 flex items-center justify-between gap-4">
+                <div className="flex-1 text-center">
+                  <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-white font-black text-xl mb-3 shadow-2xl"
+                    style={{ background: `linear-gradient(135deg, ${clubs.find(c => c.id === f.homeClubId)?.primaryColor || '#000'}, ${clubs.find(c => c.id === f.homeClubId)?.secondaryColor || '#000'})` }}>
+                    {clubs.find(c => c.id === f.homeClubId)?.shortName}
+                  </div>
+                  <p className="text-[11px] font-black text-white uppercase truncate">{f.homeClubName}</p>
+                </div>
+
+                <div className="flex flex-col items-center gap-2">
+                  <div className="text-3xl font-black text-white italic tracking-tighter">VS</div>
+                  {f.status === 'completed' && (
+                    <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full">
+                      <span className="text-xs font-black text-white">{f.subMatches.reduce((a, m) => a + (m.p1Score || 0), 0)}</span>
+                      <span className="text-slate-600">-</span>
+                      <span className="text-xs font-black text-white">{f.subMatches.reduce((a, m) => a + (m.p2Score || 0), 0)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 text-center">
+                  <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-white font-black text-xl mb-3 shadow-2xl"
+                    style={{ background: `linear-gradient(135deg, ${clubs.find(c => c.id === f.awayClubId)?.primaryColor || '#000'}, ${clubs.find(c => c.id === f.awayClubId)?.secondaryColor || '#000'})` }}>
+                    {clubs.find(c => c.id === f.awayClubId)?.shortName}
+                  </div>
+                  <p className="text-[11px] font-black text-white uppercase truncate">{f.awayClubName}</p>
+                </div>
+              </div>
+
+              {/* Action Area */}
+              <div className="p-6 bg-black/40 border-t border-white/5 flex-1 flex flex-col justify-end">
+                {isParticipant && (f.status === 'scheduled' || f.status === 'lineups_pending') && !iHaveSubmitted ? (
+                  tourney.status !== 'active' ? (
+                    <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-center">
+                      <Lock size={18} className="text-slate-500 mx-auto mb-2" />
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tournament {tourney.status}</p>
+                    </div>
+                  ) : selFixtureId === f.id ? (
+                    <div className="space-y-4">
+                      <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest text-center">SELECT {f.lineupSize} SQUAD MEMBERS</p>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {squad.map(p => {
+                          const sel = lineupSelection.includes(p.id);
+                          return (
+                            <button key={p.id} onClick={() => handleSelectLineup(p.id, f.lineupSize)}
+                              className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all border",
+                                sel ? 'bg-amber-500 border-amber-500 text-black' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                              )}>
+                              {p.name.split(' ')[0]} {sel && '✓'}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setSelFixtureId(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black tracking-widest uppercase text-slate-400 transition-all">CANCEL</button>
+                        <button onClick={() => handleSubmitLineup(f)} disabled={lineupSelection.length !== f.lineupSize || submitting} className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 rounded-xl text-[10px] font-black tracking-widest uppercase text-black transition-all shadow-lg shadow-amber-500/20">SUBMIT</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setSelFixtureId(f.id); setLineupSelection([]); }} className="w-full py-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 font-black text-[10px] tracking-widest rounded-2xl transition-all uppercase">
+                      PREPARE SQUAD LINEUP
+                    </button>
+                  )
+                ) : isParticipant && f.status === 'matchups_pending' && isHome ? (
+                  tourney.status !== 'active' ? (
+                    <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-center">
+                      <Lock size={18} className="text-slate-500 mx-auto mb-2" />
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tournament {tourney.status}</p>
+                    </div>
+                  ) : selFixtureId === f.id ? (
+                    <div className="space-y-4">
+                      <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest text-center">HOME ADVANTAGE: PAIR MATCHUPS</p>
+                      <div className="space-y-3">
+                        {f.awayLineupIds.map(aId => {
+                          const aName = players.find(p => p.id === aId)?.name || 'Unknown';
+                          const selectedHId = matchupSelection[aId];
+                          return (
+                            <div key={aId} className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl border border-white/5">
+                              <span className="text-[10px] font-black text-slate-400 uppercase w-20 truncate text-right">{aName.split(' ')[0]}</span>
+                              <span className="text-[10px] font-black text-slate-600">VS</span>
+                              <select value={selectedHId || ''} onChange={e => setMatchupSelection({...matchupSelection, [aId]: e.target.value})} 
+                                className="flex-1 bg-white/10 border-0 p-2 rounded-xl text-[10px] font-black text-white focus:ring-1 ring-amber-500 outline-none uppercase">
+                                <option value="" disabled className="text-black">Select Home Player</option>
+                                {f.homeLineupIds.map(hId => {
+                                  const assignedTo = Object.keys(matchupSelection).find(k => matchupSelection[k] === hId);
+                                  const disabled = assignedTo && assignedTo !== aId;
+                                  return <option key={hId} value={hId} disabled={!!disabled} className="text-black">
+                                    {players.find(p => p.id === hId)?.name.split(' ')[0]} {disabled ? '(Assigned)' : ''}
+                                  </option>;
+                                })}
+                              </select>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setSelFixtureId(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black tracking-widest uppercase text-slate-400 transition-all">CANCEL</button>
+                        <button onClick={() => handleSubmitMatchups(f)} disabled={Object.keys(matchupSelection).length !== f.awayLineupIds.length || submitting} className="flex-1 py-3 bg-purple-500 hover:bg-purple-400 disabled:opacity-50 rounded-xl text-[10px] font-black tracking-widest uppercase text-white transition-all shadow-lg shadow-purple-500/20">LOCK FIXTURE</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setSelFixtureId(f.id); setMatchupSelection({}); }} className="w-full py-4 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 font-black text-[10px] tracking-widest rounded-2xl transition-all uppercase">
+                      MANAGE HOME ADVANTAGE
+                    </button>
+                  )
+                ) : (
+                  <div className="text-center">
+                    {f.status === 'active' ? (
+                      <p className="text-[10px] font-black text-emerald-400 tracking-[0.2em] uppercase flex items-center justify-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> FIXTURE LIVE
+                      </p>
+                    ) : f.status === 'completed' ? (
+                      <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] uppercase">FIXTURE ARCHIVED</p>
+                    ) : f.status === 'matchups_pending' && isAway ? (
+                      <p className="text-[10px] font-black text-purple-400 tracking-widest uppercase">Home team pairing lineups...</p>
+                    ) : iHaveSubmitted ? (
+                      <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Lineup Submitted. Waiting for opponent.</p>
+                    ) : (
+                      <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] uppercase italic">WAITING FOR OWNERS...</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
