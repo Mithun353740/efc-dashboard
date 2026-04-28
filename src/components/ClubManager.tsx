@@ -18,6 +18,14 @@ function fmtBudget(n: number) {
   return String(n);
 }
 
+function calcLevel(player?: Player) {
+  if (!player) return 1;
+  const xp = (player.win * 500) + (player.goalsScored * 50);
+  const lvl = Math.floor(xp / 1000) + 1;
+  const progress = (xp % 1000) / 10; // 0-100%
+  return { lvl, progress };
+}
+
 function ovrColor(ovr: number) {
   if (ovr >= 85) return '#f59e0b';
   if (ovr >= 75) return '#8b5cf6';
@@ -297,9 +305,9 @@ export default function ClubManager() {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">LVL</span>
-            <div className="px-2 py-0.5 bg-amber-500 text-black text-[10px] font-black rounded">41</div>
+            <div className="px-2 py-0.5 bg-amber-500 text-black text-[10px] font-black rounded">{calcLevel(myPlayer).lvl}</div>
             <div className="w-24 h-1 bg-white/10 rounded-full overflow-hidden hidden sm:block">
-              <div className="w-[80%] h-full bg-amber-500" />
+              <div className="h-full bg-amber-500" style={{ width: `${calcLevel(myPlayer).progress}%` }} />
             </div>
           </div>
           <div className="flex items-center gap-2 text-amber-500">
@@ -312,14 +320,14 @@ export default function ClubManager() {
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
             <Users size={12} className="text-slate-500" />
-            <span className="text-[10px] font-black text-white uppercase">99/100</span>
+            <span className="text-[10px] font-black text-white uppercase">{squad.length}/25</span>
           </div>
           <div className="flex items-center gap-3 pl-4 border-l border-white/10">
             <div className="text-right hidden xs:block">
               <p className="text-[10px] font-black text-white leading-none uppercase">{myPlayer?.name || 'MANAGER'}</p>
               <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">{myClub?.name || 'UNASSIGNED'}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-amber-500 text-black flex items-center justify-center font-black text-xs">100</div>
+            <div className="w-8 h-8 rounded-lg bg-amber-500 text-black flex items-center justify-center font-black text-xs">{myPlayer?.ovr || '??'}</div>
           </div>
         </div>
       </div>
