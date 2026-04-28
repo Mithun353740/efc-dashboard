@@ -124,80 +124,114 @@ function ClubStatBar({ label, val, icon }: { label: string; val: string | number
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ myClub, squad, allClubs, config }: { myClub: Club; squad: Player[]; allClubs: Club[]; config: ClubSystemConfig | null }) {
-  const gd = squad.reduce((a, p) => a + p.goalsScored - p.goalsConceded, 0);
-  const totalWins = squad.reduce((a, p) => a + p.win, 0);
   const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
-
+  
   return (
-    <div className="space-y-8">
-      {/* Club hero card */}
-      <div className="relative rounded-3xl overflow-hidden p-8 flex flex-col md:flex-row items-center gap-8"
-        style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}30 0%, #0f172a 50%, ${myClub.secondaryColor}20 100%)`, border: `1px solid ${myClub.primaryColor}40` }}>
-        <div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(ellipse at top-left, ${myClub.primaryColor}, transparent 60%)` }} />
-
-        <div className="w-28 h-28 rounded-2xl flex items-center justify-center text-white font-black text-4xl shadow-2xl shrink-0 z-10"
-          style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}, ${myClub.secondaryColor})` }}>
-          {myClub.shortName}
-        </div>
-
-        <div className="z-10 text-center md:text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black tracking-widest mb-3" style={{ background: myClub.primaryColor + '20', color: myClub.primaryColor, border: `1px solid ${myClub.primaryColor}40` }}>
-            <Layers size={10} /> CLUB MANAGER
+    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-[160px]">
+      {/* PLAY MATCH / NEXT FIXTURE (Large) */}
+      <div className="md:col-span-2 lg:col-span-2 row-span-2 relative group overflow-hidden rounded-[2rem] bg-[#0f172a] border border-white/10 p-8 flex flex-col justify-between transition-all hover:scale-[1.01] hover:border-amber-500/50">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-transparent" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <p className="text-[10px] font-black tracking-[0.3em] text-amber-500 uppercase">NEXT MATCH</p>
           </div>
-          <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase">{myClub.name}</h2>
-          <p className="text-slate-400 text-sm font-bold mt-1">{config?.season || 'Club Season'} &bull; {myClub.squadIds.length} Players</p>
+          <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic leading-none">PLAY MATCH</h2>
+          <p className="text-slate-400 font-bold text-xs mt-2 uppercase tracking-widest">{config?.season || 'Active Season'}</p>
         </div>
-
-        <div className="z-10 ml-auto text-right hidden md:block">
-          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Club Budget</p>
-          <p className="text-3xl font-black" style={{ color: myClub.primaryColor }}>VCC {fmtBudget(myClub.budget)}</p>
-        </div>
-      </div>
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <ClubStatBar label="Squad Size" val={squad.length} icon={<Users size={16} />} />
-        <ClubStatBar label="Avg OVR" val={avgOvr} icon={<Star size={16} />} />
-        <ClubStatBar label="Total Wins" val={totalWins} icon={<Trophy size={16} />} />
-        <ClubStatBar label="Goal Diff" val={gd >= 0 ? `+${gd}` : gd} icon={<TrendingUp size={16} />} />
-      </div>
-
-      {/* Squad FIFA cards */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <h3 className="text-sm font-black tracking-widest text-slate-300 uppercase mb-6 flex items-center gap-2">
-          <Shield size={16} className="text-brand-purple" /> SQUAD ({squad.length})
-        </h3>
-        {squad.length === 0 ? (
-          <p className="text-slate-500 text-xs font-bold text-center py-12">No players in squad yet. Admin assigns players to clubs.</p>
-        ) : (
-          <div className="flex flex-wrap gap-4 justify-start">
-            {squad.map(p => (
-              <FifaCard key={p.id} player={p} club={myClub} size="md" />
-            ))}
+        
+        <div className="relative z-10 flex items-center justify-between gap-4">
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-2xl"
+              style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}, ${myClub.secondaryColor})` }}>
+              {myClub.shortName}
+            </div>
+            <p className="text-[10px] font-black text-white uppercase">{myClub.shortName}</p>
           </div>
-        )}
+          <div className="text-2xl font-black text-slate-700 uppercase italic">VS</div>
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-500 font-black text-xl">
+              ?
+            </div>
+            <p className="text-[10px] font-black text-slate-500 uppercase">TBD</p>
+          </div>
+        </div>
       </div>
 
-      {/* Form guide */}
-      {squad.length > 0 && (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="text-sm font-black tracking-widest text-slate-300 uppercase mb-4">SQUAD FORM GUIDE</h3>
-          <div className="space-y-2">
-            {squad.map(p => (
-              <div key={p.id} className="flex items-center gap-4 p-3 bg-white/5 rounded-xl">
-                <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
-                <p className="text-xs font-black text-white flex-1 truncate">{p.name}</p>
-                <span className="text-[10px] font-bold text-slate-400 w-12 text-center">OVR {p.ovr}</span>
-                <div className="flex gap-1">
-                  {(p.form || []).slice(-5).map((r, i) => (
-                    <span key={i} className={`w-5 h-5 rounded flex items-center justify-center text-[8px] font-black ${r === 'W' ? 'bg-emerald-500/20 text-emerald-400' : r === 'L' ? 'bg-red-500/20 text-red-400' : 'bg-slate-500/20 text-slate-400'}`}>{r}</span>
-                  ))}
-                </div>
+      {/* MINI STANDINGS (Square) */}
+      <div className="row-span-2 bg-[#0f172a] border border-white/10 rounded-[2rem] p-6 flex flex-col hover:border-amber-500/50 transition-all">
+        <div className="flex items-center gap-2 mb-4">
+          <Trophy size={14} className="text-amber-500" />
+          <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">STANDINGS</p>
+        </div>
+        <div className="flex-1 space-y-3">
+          {[1,2,3,4,5].map(i => (
+            <div key={i} className={`flex items-center justify-between p-2 rounded-xl border border-transparent ${i === 1 ? 'bg-amber-500/10 border-amber-500/20' : ''}`}>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-black text-slate-500">0{i}</span>
+                <div className="w-5 h-5 rounded bg-white/5" />
+                <div className="w-16 h-1.5 bg-white/5 rounded-full" />
               </div>
-            ))}
+              <span className="text-[10px] font-black text-white">0</span>
+            </div>
+          ))}
+        </div>
+        <button className="mt-4 w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black text-slate-400 transition-all uppercase tracking-widest">FULL TABLE</button>
+      </div>
+
+      {/* TRANSFER HUB (Tall) */}
+      <div className="row-span-3 bg-[#0f172a] border border-white/10 rounded-[2rem] p-8 relative overflow-hidden group flex flex-col justify-between hover:border-amber-500/50 transition-all">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black" />
+        {squad[0] && (
+          <img src={squad[0].image} className="absolute inset-0 w-full h-full object-cover object-top opacity-30 grayscale group-hover:grayscale-0 transition-all duration-700" alt="" />
+        )}
+        <div className="relative z-10">
+          <p className="text-[10px] font-black tracking-widest text-amber-500 uppercase mb-1">MARKET</p>
+          <h3 className="text-3xl font-black text-white leading-none uppercase italic">TRANSFER<br/>HUB</h3>
+        </div>
+        <div className="relative z-10">
+          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">AVAILABLE FUNDS</p>
+          <p className="text-xl font-black text-amber-500 leading-none">VCC {fmtBudget(myClub.budget)}</p>
+        </div>
+      </div>
+
+      {/* CLUB FINANCE (Square) */}
+      <div className="bg-[#0f172a] border border-white/10 rounded-[2rem] p-6 flex flex-col justify-between hover:border-amber-500/50 transition-all">
+        <div className="flex items-center gap-2">
+          <DollarSign size={14} className="text-emerald-400" />
+          <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">FINANCES</p>
+        </div>
+        <div>
+          <p className="text-xl font-black text-white leading-none italic uppercase">VCC {fmtBudget(myClub.budget)}</p>
+          <p className="text-[9px] font-black text-emerald-400 mt-1 uppercase">+15% GROWTH</p>
+        </div>
+      </div>
+
+      {/* SQUAD OVR (Square) */}
+      <div className="bg-[#0f172a] border border-white/10 rounded-[2rem] p-6 flex flex-col justify-between hover:border-amber-500/50 transition-all">
+        <div className="flex items-center gap-2">
+          <Users size={14} className="text-brand-purple" />
+          <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">AVG OVR</p>
+        </div>
+        <div>
+          <p className="text-3xl font-black text-white leading-none italic uppercase">{avgOvr}</p>
+          <div className="flex gap-1 mt-2">
+            {[1,2,3,4,5].map(i => <div key={i} className={`h-1 flex-1 rounded-full ${i < 4 ? 'bg-brand-purple' : 'bg-white/5'}`} />)}
           </div>
         </div>
-      )}
+      </div>
+
+      {/* SOCIAL MEDIA / NOTIFICATIONS (Wide) */}
+      <div className="md:col-span-2 lg:col-span-2 bg-[#0f172a] border border-white/10 rounded-[2rem] p-6 flex items-center gap-6 hover:border-amber-500/50 transition-all">
+        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
+          <Zap size={24} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase mb-1">NOTIFICATIONS</p>
+          <p className="text-xs font-bold text-white truncate">The transfer window is now OPEN. Check the hub for new listings.</p>
+        </div>
+        <button className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black text-white transition-all uppercase tracking-widest shrink-0">VIEW ALL</button>
+      </div>
     </div>
   );
 }
@@ -258,39 +292,56 @@ export default function ClubManager() {
 
   return (
     <div className="min-h-screen bg-[#020617] text-white">
-      {/* Page header */}
-      <div className="relative overflow-hidden border-b border-white/5">
-        <div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(ellipse at top, #f59e0b30, transparent 60%)' }} />
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 relative z-10">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-yellow-400 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/30">
-              <Layers size={28} className="text-black" />
+      {/* FIFA TOP STATUS BAR */}
+      <div className="bg-black/60 backdrop-blur-md border-b border-white/5 py-2 px-4 md:px-8 flex items-center justify-between sticky top-0 z-[100]">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">LVL</span>
+            <div className="px-2 py-0.5 bg-amber-500 text-black text-[10px] font-black rounded">41</div>
+            <div className="w-24 h-1 bg-white/10 rounded-full overflow-hidden hidden sm:block">
+              <div className="w-[80%] h-full bg-amber-500" />
             </div>
-            <div>
-              <p className="text-[10px] font-black text-amber-400 tracking-[0.3em] uppercase mb-1">Quantum Vortex FC</p>
-              <h1 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase italic">Club Zone</h1>
-            </div>
-            {myClub && (
-              <div className="ml-auto hidden md:flex items-center gap-3 px-4 py-2 rounded-xl border" style={{ borderColor: myClub.primaryColor + '40', background: myClub.primaryColor + '15' }}>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-black text-xs" style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}, ${myClub.secondaryColor})` }}>{myClub.shortName}</div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-500 uppercase">My Club</p>
-                  <p className="text-xs font-black text-white">{myClub.name}</p>
-                </div>
-              </div>
-            )}
           </div>
+          <div className="flex items-center gap-2 text-amber-500">
+            <DollarSign size={14} />
+            <span className="text-[11px] font-black uppercase tracking-widest">{fmtBudget(myClub?.budget || 0)}</span>
+            <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] font-black text-white">+</div>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+            <Users size={12} className="text-slate-500" />
+            <span className="text-[10px] font-black text-white uppercase">99/100</span>
+          </div>
+          <div className="flex items-center gap-3 pl-4 border-l border-white/10">
+            <div className="text-right hidden xs:block">
+              <p className="text-[10px] font-black text-white leading-none uppercase">{myPlayer?.name || 'MANAGER'}</p>
+              <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">{myClub?.name || 'UNASSIGNED'}</p>
+            </div>
+            <div className="w-8 h-8 rounded-lg bg-amber-500 text-black flex items-center justify-center font-black text-xs">100</div>
+          </div>
+        </div>
+      </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+      {/* Page content */}
+      <div className="max-w-6xl mx-auto px-4 md:px-8 py-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+          <div>
+            <p className="text-[10px] font-black text-amber-500 tracking-[0.4em] uppercase mb-2">CLUB MANAGEMENT SYSTEM</p>
+            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase italic leading-none">CLUB ZONE</h1>
+          </div>
+          
+          {/* Tabs - Pill style */}
+          <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-[1.5rem] w-fit">
             {tabs.map(t => (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black tracking-widest whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-black tracking-widest whitespace-nowrap transition-all ${
                   activeTab === t.id
-                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/30'
-                    : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white border border-white/10'
+                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
               >
                 {t.icon}{t.label}
