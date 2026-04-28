@@ -232,8 +232,9 @@ export default function ClubManager() {
 
   useEffect(() => { load(); }, []);
 
-  // Locked
-  if (systemLocks?.clubManager) return <LockedScreen />;
+  // Locked (Bypass for admins)
+  const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+  if (systemLocks?.clubManager && !isAdmin) return <LockedScreen />;
 
   // Not logged in
   if (!isPlayer) return (
