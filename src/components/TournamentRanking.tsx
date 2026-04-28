@@ -1,117 +1,91 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
-import { computePlayerStats, sortRankedPlayers } from '../lib/store';
-import { cn, getSeasonInfo } from '../lib/utils';
-import { Trophy, ChevronDown, Calendar, Filter, History } from 'lucide-react';
+import { sortRankedPlayers } from '../lib/store';
+import { cn, getSeasonInfo, resolveCanonicalTournamentName } from '../lib/utils';
+import { Player } from '../types';
+import { Trophy, ChevronDown, Calendar, History } from 'lucide-react';
 
 export default function TournamentRanking() {
   const { rankedPlayers, matches, tournaments } = useFirebase();
   
-  // 1. Determine Current Season & Available Seasons
   const currentSeason = useMemo(() => getSeasonInfo(new Date()).name, []);
-  
+
+  // Build available seasons from pre-computed player stats (full history) + matches feed
   const availableSeasons = useMemo(() => {
     const seasons = new Set<string>();
-    // Pull from tournaments collection
+    rankedPlayers.forEach(p => {
+      if (p.seasonStats) Object.keys(p.seasonStats).forEach(s => seasons.add(s));
+      if (p.tournamentStats) Object.keys(p.tournamentStats).forEach(k => seasons.add(k.split('__')[0]));
+    });
     tournaments.forEach(t => { 
-      if (t.season) {
-        seasons.add(t.season); 
-      } else if (t.createdAt) {
-        seasons.add(getSeasonInfo(new Date(t.createdAt)).name);
-      }
+      if (t.season) seasons.add(t.season);
+      else if (t.createdAt) seasons.add(getSeasonInfo(new Date(t.createdAt)).name);
     });
-    // Pull from match history as fallback/legacy
-    matches.forEach(m => {
-      seasons.add(getSeasonInfo(new Date(m.timestamp)).name);
-    });
-    // Ensure current is there
+    matches.forEach(m => seasons.add(getSeasonInfo(new Date(m.timestamp)).name));
     seasons.add(currentSeason);
     return Array.from(seasons).sort().reverse();
-  }, [matches, tournaments, currentSeason]);
+  }, [rankedPlayers, matches, tournaments, currentSeason]);
 
   const [selectedSeason, setSelectedSeason] = useState(currentSeason);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectionStep, setSelectionStep] = useState<'season' | 'tournament'>('season');
 
-  // 2. Get Tournaments for the selected season
+  // Build tournament list for the selected season from pre-computed keys + Firestore tournaments
   const seasonTournaments = useMemo(() => {
     const names = new Set<string>();
-    // Defaults for every season as requested
-    names.add("QVFC ELITE LEAGUE CUP DIVISION 1");
-    names.add("QVFC ELITE LEAGUE CUP DIVISION 2");
-
-    // Add tournaments from Firestore that belong to this season
-    tournaments.forEach(t => {
-      if (t.season === selectedSeason) names.add(t.name);
-    });
-
-    // Fallback: matches with this tournament name in this season
-    matches.forEach(m => {
-      if (m.tournament && m.tournament !== 'Friendly') {
-        if (getSeasonInfo(new Date(m.timestamp)).name === selectedSeason) {
-          // Normalize via the legacy map (will be applied once it's defined in render,
-          // so we add both the raw name and resolved name for display)
-          const raw = m.tournament.toUpperCase();
-          const legacyMap: Record<string, string> = {
-            'QVFC ELITE LEAGUE CUP': 'QVFC ELITE LEAGUE CUP DIVISION 1',
-            'QVFC ELITE LEAGUE CUP DIV 1': 'QVFC ELITE LEAGUE CUP DIVISION 1',
-            'QVFC ELITE LEAGUE CUP DIV 2': 'QVFC ELITE LEAGUE CUP DIVISION 2',
-          };
-          names.add(legacyMap[raw] || raw);
-        }
+    names.add('QVFC ELITE LEAGUE CUP DIVISION 1');
+    names.add('QVFC ELITE LEAGUE CUP DIVISION 2');
+    // From pre-computed tournamentStats keys
+    rankedPlayers.forEach(p => {
+      if (p.tournamentStats) {
+        Object.keys(p.tournamentStats).forEach(key => {
+          const [season, ...rest] = key.split('__');
+          if (season === selectedSeason && rest.length) names.add(rest.join('__'));
+        });
       }
     });
-
+    // From Firestore tournaments collection
+    tournaments.forEach(t => {
+      if (t.season === selectedSeason) names.add(resolveCanonicalTournamentName(t.name));
+    });
     return Array.from(names).sort();
-  }, [tournaments, matches, selectedSeason]);
+  }, [rankedPlayers, tournaments, selectedSeason]);
 
-  const [selectedTournament, setSelectedTournament] = useState(seasonTournaments[0] || "QVFC ELITE LEAGUE CUP DIVISION 1");
+  const [selectedTournament, setSelectedTournament] = useState(
+    seasonTournaments[0] || 'QVFC ELITE LEAGUE CUP DIVISION 1'
+  );
 
-  // Sync selected tournament when season changes
   useEffect(() => {
     if (!seasonTournaments.includes(selectedTournament)) {
       setSelectedTournament(seasonTournaments[0]);
     }
   }, [selectedSeason, seasonTournaments]);
 
-  // Legacy name mapping: maps old tournament names to their canonical current name
-  const LEGACY_NAME_MAP: Record<string, string> = {
-    'qvfc elite league cup': 'QVFC ELITE LEAGUE CUP DIVISION 1',
-    'qvfc elite league cup division 1': 'QVFC ELITE LEAGUE CUP DIVISION 1',
-    'qvfc elite league cup div 1': 'QVFC ELITE LEAGUE CUP DIVISION 1',
-    'qvfc elite league cup division 2': 'QVFC ELITE LEAGUE CUP DIVISION 2',
-    'qvfc elite league cup div 2': 'QVFC ELITE LEAGUE CUP DIVISION 2',
-  };
-
-  const resolveCanonicalName = (name: string): string => {
-    return LEGACY_NAME_MAP[name.toLowerCase()] || name.toUpperCase();
-  };
-
-  // 3. Compute Standings
-  const { elos } = useFirebase();
+  // Read from pre-computed tournamentStats — zero match reads required
   const standings = useMemo(() => {
-    // Filter matches: compare canonical (resolved) tournament names case-insensitively
-    let tournamentMatches = matches.filter(m => {
-      if (!m.tournament) return false;
-      return resolveCanonicalName(m.tournament) === resolveCanonicalName(selectedTournament);
-    });
-    
-    // Filter matches by season as well (to handle same tournament name across seasons)
-    tournamentMatches = tournamentMatches.filter(m => {
-      return getSeasonInfo(new Date(m.timestamp)).name === selectedSeason;
-    });
+    const canonical = resolveCanonicalTournamentName(selectedTournament);
+    const key = `${selectedSeason}__${canonical}`;
 
-    const unsortedTournamentPlayers = rankedPlayers
+    const tournamentPlayers: Player[] = rankedPlayers
       .map(player => {
-        const stats = computePlayerStats(player, tournamentMatches, elos[player.id] || 1200);
-        stats.ovr = player.ovr;
-        return stats;
+        const s = player.tournamentStats?.[key];
+        if (!s || (s.win === 0 && s.loss === 0 && s.draw === 0)) return null;
+        return {
+          ...player,
+          win: s.win,
+          loss: s.loss,
+          draw: s.draw,
+          goalsScored: s.goalsScored,
+          goalsConceded: s.goalsConceded,
+          form: s.form,
+          ovr: player.ovr,
+        } as Player;
       })
-      .filter(p => p.win > 0 || p.loss > 0 || p.draw > 0);
-      
-    return sortRankedPlayers(unsortedTournamentPlayers);
-  }, [rankedPlayers, matches, selectedTournament, selectedSeason, elos]);
+      .filter(Boolean) as Player[];
+
+    return sortRankedPlayers(tournamentPlayers);
+  }, [rankedPlayers, selectedSeason, selectedTournament]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] flex flex-col items-center p-4 md:p-8 transition-colors">

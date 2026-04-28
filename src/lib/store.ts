@@ -1,5 +1,6 @@
-import { Player, Leader, MatchRecord, Tournament } from '../types';
+import { Player, PartialPlayerStats, Leader, MatchRecord, Tournament } from '../types';
 import { db, auth } from '../firebase';
+import { resolveCanonicalTournamentName, getSeasonInfo } from './utils';
 import { 
   collection, 
   doc, 
@@ -13,8 +14,16 @@ import {
   writeBatch,
   limit,
   getDocFromServer,
-  serverTimestamp
+  serverTimestamp,
+  where
 } from 'firebase/firestore';
+
+/**
+ * Bump this number whenever the stat computation logic changes.
+ * All Player documents with a lower statsVersion will be flagged
+ * as stale and can be resynced by the admin via the Resync button.
+ */
+export const STATS_VERSION = 2;
 
 export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>) => void) {
   const docRef = doc(db, 'settings', 'locks');
@@ -355,17 +364,42 @@ export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boo
   });
 }
 
+/**
+ * Real-time match listener.
+ * The listener is used ONLY for the admin match history view.
+ * Public users never subscribe to matches — they read pre-computed stats
+ * from the Player documents instead. Limit keeps the listener cheap.
+ */
 export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending: boolean) => void) {
   const path = 'matches';
-  // Limit to 150 matches to drastically reduce quota usage for 60+ users.
-  // The full match history is only needed for admin operations or heavy stat recalculations.
-  const q = query(collection(db, path), orderBy('timestamp', 'desc'), limit(150));
+  const q = query(collection(db, path), orderBy('timestamp', 'desc'), limit(200));
   return onSnapshot(q, (snapshot) => {
     const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
     callback(matches, snapshot.metadata.hasPendingWrites);
   }, (error) => {
     handleFirestoreError(error, OperationType.GET, path);
   });
+}
+
+/**
+ * Fetches ALL matches for a specific player from Firestore.
+ * Uses two queries (p1Id and p2Id) since Firestore doesn't support OR on different fields.
+ * Called during stat computation — only the admin pays this cost on each write.
+ */
+async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]> {
+  const [snap1, snap2] = await Promise.all([
+    getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId))),
+    getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId))),
+  ]);
+  const seen = new Set<string>();
+  const results: MatchRecord[] = [];
+  [...snap1.docs, ...snap2.docs].forEach(d => {
+    if (!seen.has(d.id)) {
+      seen.add(d.id);
+      results.push({ id: d.id, ...d.data() } as MatchRecord);
+    }
+  });
+  return results.sort((a, b) => a.timestamp - b.timestamp);
 }
 
 export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void) {
@@ -379,58 +413,98 @@ export function subscribeToTournaments(callback: (tournaments: Tournament[], has
   });
 }
 
-// Write operations
-export function computePlayerStats(player: Player, allMatches: MatchRecord[], elo: number): Player {
-  let win = 0, loss = 0, draw = 0, goalsScored = 0, goalsConceded = 0;
-  
-  const playerMatches = allMatches
-    .filter(m => m.p1Id === player.id || m.p2Id === player.id)
-    .sort((a, b) => a.timestamp - b.timestamp);
+// ─────────────────────────────────────────────────────────────────────────────
+// CORE STAT COMPUTATION ENGINE
+// Pure function — no side effects.
+// Produces global stats, seasonStats, and tournamentStats from raw matches.
+// ─────────────────────────────────────────────────────────────────────────────
 
+function buildPartialStats(playerMatches: MatchRecord[], playerId: string): PartialPlayerStats {
+  let win = 0, loss = 0, draw = 0, goalsScored = 0, goalsConceded = 0;
   playerMatches.forEach(m => {
-    const isP1 = m.p1Id === player.id;
+    const isP1 = m.p1Id === playerId;
     const myScore = isP1 ? Number(m.p1Score) : Number(m.p2Score);
     const oppScore = isP1 ? Number(m.p2Score) : Number(m.p1Score);
-    
     goalsScored += myScore;
     goalsConceded += oppScore;
-    
     if (myScore > oppScore) win++;
     else if (myScore < oppScore) loss++;
     else draw++;
   });
-
-  const form = playerMatches.slice(-5).map(m => {
-    const isP1 = m.p1Id === player.id;
+  const form = [...playerMatches].slice(-5).map(m => {
+    const isP1 = m.p1Id === playerId;
     const myScore = isP1 ? Number(m.p1Score) : Number(m.p2Score);
     const oppScore = isP1 ? Number(m.p2Score) : Number(m.p1Score);
     return myScore > oppScore ? 'W' : myScore < oppScore ? 'L' : 'D';
   });
+  return { win, loss, draw, goalsScored, goalsConceded, form };
+}
 
+export function computePlayerStats(player: Player, allMatches: MatchRecord[], elo: number): Player {
+  // ── 1. Filter to this player's matches (sorted asc for correct form order) ──
+  const playerMatches = allMatches
+    .filter(m => m.p1Id === player.id || m.p2Id === player.id)
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  // ── 2. Global all-time stats ──────────────────────────────────────────────
+  const global = buildPartialStats(playerMatches, player.id);
+
+  // ── 3. Per-season stats ───────────────────────────────────────────────────
+  const seasonGroups: Record<string, MatchRecord[]> = {};
+  playerMatches.forEach(m => {
+    const season = getSeasonInfo(new Date(m.timestamp)).name;
+    if (!seasonGroups[season]) seasonGroups[season] = [];
+    seasonGroups[season].push(m);
+  });
+  const seasonStats: Record<string, PartialPlayerStats> = {};
+  Object.entries(seasonGroups).forEach(([season, matches]) => {
+    seasonStats[season] = buildPartialStats(matches, player.id);
+  });
+
+  // ── 4. Per-tournament stats (keyed by `season__canonicalTournament`) ───────
+  const tournamentGroups: Record<string, MatchRecord[]> = {};
+  playerMatches.forEach(m => {
+    if (!m.tournament || m.tournament === 'Friendly') return;
+    const season = getSeasonInfo(new Date(m.timestamp)).name;
+    const canonical = resolveCanonicalTournamentName(m.tournament);
+    const key = `${season}__${canonical}`;
+    if (!tournamentGroups[key]) tournamentGroups[key] = [];
+    tournamentGroups[key].push(m);
+  });
+  const tournamentStats: Record<string, PartialPlayerStats> = {};
+  Object.entries(tournamentGroups).forEach(([key, matches]) => {
+    tournamentStats[key] = buildPartialStats(matches, player.id);
+  });
+
+  // ── 5. Assemble final Player document ─────────────────────────────────────
   const updatedPlayer: Player = {
     ...player,
-    win,
-    loss,
-    draw,
-    goalsScored,
-    goalsConceded,
-    form,
+    win: global.win,
+    loss: global.loss,
+    draw: global.draw,
+    goalsScored: global.goalsScored,
+    goalsConceded: global.goalsConceded,
+    form: global.form,
+    seasonStats,
+    tournamentStats,
+    statsLastUpdated: Date.now(),
+    statsVersion: STATS_VERSION,
   };
 
-  // Use the provided ELO for the final OVR calculation
   updatedPlayer.ovr = calculateOvrHybrid(updatedPlayer, elo);
-  
   return updatedPlayer;
 }
 
+/**
+ * Admin-triggered full resync.
+ * Fetches ALL matches from Firestore, recomputes every player from scratch,
+ * and writes all Player documents atomically.
+ */
 export async function recalculateAllStats(players: Player[]) {
   const batch = writeBatch(db);
-  // Fetch all matches since the real-time listener is now limited
   const fullMatchesSnap = await getDocs(query(collection(db, 'matches'), orderBy('timestamp', 'asc')));
-  const allMatches = fullMatchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
-  
+  const allMatches = fullMatchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
   const elos = computeGlobalElo(players, allMatches);
-  
   players.forEach(p => {
     const updatedPlayer = computePlayerStats(p, allMatches, elos[p.id] || 1200);
     batch.set(doc(db, 'players', p.id), updatedPlayer);
@@ -460,12 +534,27 @@ export async function savePlayer(player: Player) {
   }
 }
 
-export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2: Player | undefined, allMatches: MatchRecord[], tournament?: string, p2NameOverride?: string) {
+/**
+ * Adds a match and atomically recomputes stats for affected players.
+ * Fetches FULL match history per-player from Firestore — not from the
+ * capped real-time listener — guaranteeing correctness regardless of
+ * how many total matches exist.
+ */
+export async function addMatch(
+  p1: Player,
+  p1Score: number,
+  p2Score: number,
+  p2: Player | undefined,
+  _legacyMatches: MatchRecord[], // kept for API compatibility, not used
+  tournament?: string,
+  p2NameOverride?: string
+) {
   if (isQuotaExceeded) {
     throw new Error("SYSTEM LOCKED: Cannot add match while Quota is exceeded.");
   }
   const batch = writeBatch(db);
-  
+
+  // 1. Write the new match document first
   const matchRef = doc(collection(db, 'matches'));
   const matchRecord: MatchRecord = {
     id: matchRef.id,
@@ -479,28 +568,51 @@ export async function addMatch(p1: Player, p1Score: number, p2Score: number, p2:
     tournament: tournament || 'Friendly',
   };
   batch.set(matchRef, matchRecord);
-  
-  const updatedMatches = [...allMatches, matchRecord];
-  const elos = computeGlobalElo([p1, ...(p2 ? [p2] : [])], updatedMatches);
 
-  const updatedP1 = computePlayerStats(p1, updatedMatches, elos[p1.id] || 1200);
+  // 2. Fetch full match history for each affected player from Firestore
+  const [p1Matches, p2Matches] = await Promise.all([
+    fetchAllMatchesForPlayer(p1.id),
+    p2 ? fetchAllMatchesForPlayer(p2.id) : Promise.resolve([] as MatchRecord[]),
+  ]);
+
+  // Include the new match (not yet committed, but we know its contents)
+  const p1AllMatches = [...p1Matches, matchRecord];
+  const p2AllMatches = p2 ? [...p2Matches, matchRecord] : [];
+
+  // 3. Compute ELO from merged full history for these two players
+  const allForElo = [...new Map([...p1Matches, ...(p2 ? p2Matches : [])].map(m => [m.id, m])).values(), matchRecord]
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const elos = computeGlobalElo([p1, ...(p2 ? [p2] : [])], allForElo);
+
+  // 4. Recompute full Player documents and batch write
+  const updatedP1 = computePlayerStats(p1, p1AllMatches, elos[p1.id] || 1200);
   batch.set(doc(db, 'players', p1.id), updatedP1);
 
   if (p2) {
-    const updatedP2 = computePlayerStats(p2, updatedMatches, elos[p2.id] || 1200);
+    const updatedP2 = computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200);
     batch.set(doc(db, 'players', p2.id), updatedP2);
   }
 
   try {
     await batch.commit();
-    // Signal all public users their cache is now stale
     await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-update');
   }
 }
 
-export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2Score: number, players: Player[], allMatches: MatchRecord[], newTournament?: string) {
+/**
+ * Edits a match score/tournament and atomically recomputes affected players.
+ * Always fetches the full match history from Firestore.
+ */
+export async function editMatch(
+  oldMatch: MatchRecord,
+  newP1Score: number,
+  newP2Score: number,
+  players: Player[],
+  _legacyMatches: MatchRecord[], // kept for API compatibility, not used
+  newTournament?: string
+) {
   if (isQuotaExceeded) return;
   const batch = writeBatch(db);
 
@@ -510,64 +622,89 @@ export async function editMatch(oldMatch: MatchRecord, newP1Score: number, newP2
     p2Score: newP2Score,
     tournament: newTournament || oldMatch.tournament || 'Friendly',
   };
-  
+
   batch.update(doc(db, 'matches', oldMatch.id), {
     p1Score: newP1Score,
     p2Score: newP2Score,
     tournament: updatedMatchRecord.tournament,
   });
 
-  const updatedMatches = allMatches.map(m => m.id === oldMatch.id ? updatedMatchRecord : m);
-  const elos = computeGlobalElo(players, updatedMatches);
-
   const p1 = players.find(p => p.id === oldMatch.p1Id);
-  if (p1) {
-    const updatedP1 = computePlayerStats(p1, updatedMatches, elos[p1.id] || 1200);
-    batch.set(doc(db, 'players', p1.id), updatedP1);
-  }
+  const p2 = oldMatch.p2Id ? players.find(p => p.id === oldMatch.p2Id) : undefined;
 
-  if (oldMatch.p2Id) {
-    const p2 = players.find(p => p.id === oldMatch.p2Id);
-    if (p2) {
-      const updatedP2 = computePlayerStats(p2, updatedMatches, elos[p2.id] || 1200);
-      batch.set(doc(db, 'players', p2.id), updatedP2);
-    }
+  const [p1Matches, p2Matches] = await Promise.all([
+    p1 ? fetchAllMatchesForPlayer(p1.id) : Promise.resolve([] as MatchRecord[]),
+    p2 ? fetchAllMatchesForPlayer(p2.id) : Promise.resolve([] as MatchRecord[]),
+  ]);
+
+  // Replace the edited match in the fetched history
+  const replaceEdited = (list: MatchRecord[]) =>
+    list.map(m => m.id === oldMatch.id ? updatedMatchRecord : m);
+
+  const p1AllMatches = replaceEdited(p1Matches);
+  const p2AllMatches = replaceEdited(p2Matches);
+
+  const allForElo = [...new Map([...p1Matches, ...(p2 ? p2Matches : [])].map(m => [m.id, m])).values()]
+    .map(m => m.id === oldMatch.id ? updatedMatchRecord : m)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const affectedPlayers = [p1, ...(p2 ? [p2] : [])].filter(Boolean) as Player[];
+  const elos = computeGlobalElo(affectedPlayers, allForElo);
+
+  if (p1) {
+    batch.set(doc(db, 'players', p1.id), computePlayerStats(p1, p1AllMatches, elos[p1.id] || 1200));
+  }
+  if (p2) {
+    batch.set(doc(db, 'players', p2.id), computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200));
   }
 
   try {
     await batch.commit();
-    // Signal all public users their cache is now stale
     await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-edit');
   }
 }
-export async function deleteMatchFromHistory(matchRecord: MatchRecord, players: Player[], allMatches: MatchRecord[]) {
+/**
+ * Deletes a match and atomically recomputes affected players.
+ * Always fetches the full match history from Firestore.
+ */
+export async function deleteMatchFromHistory(
+  matchRecord: MatchRecord,
+  players: Player[],
+  _legacyMatches: MatchRecord[] // kept for API compatibility, not used
+) {
   if (isQuotaExceeded) return;
   const batch = writeBatch(db);
-
   batch.delete(doc(db, 'matches', matchRecord.id));
 
-  const updatedMatches = allMatches.filter(m => m.id !== matchRecord.id);
-  const elos = computeGlobalElo(players, updatedMatches);
-
   const p1 = players.find(p => p.id === matchRecord.p1Id);
-  if (p1) {
-    const updatedP1 = computePlayerStats(p1, updatedMatches, elos[p1.id] || 1200);
-    batch.set(doc(db, 'players', p1.id), updatedP1);
-  }
+  const p2 = matchRecord.p2Id ? players.find(p => p.id === matchRecord.p2Id) : undefined;
 
-  if (matchRecord.p2Id) {
-    const p2 = players.find(p => p.id === matchRecord.p2Id);
-    if (p2) {
-      const updatedP2 = computePlayerStats(p2, updatedMatches, elos[p2.id] || 1200);
-      batch.set(doc(db, 'players', p2.id), updatedP2);
-    }
+  const [p1Matches, p2Matches] = await Promise.all([
+    p1 ? fetchAllMatchesForPlayer(p1.id) : Promise.resolve([] as MatchRecord[]),
+    p2 ? fetchAllMatchesForPlayer(p2.id) : Promise.resolve([] as MatchRecord[]),
+  ]);
+
+  // Exclude the deleted match
+  const withoutDeleted = (list: MatchRecord[]) => list.filter(m => m.id !== matchRecord.id);
+  const p1AllMatches = withoutDeleted(p1Matches);
+  const p2AllMatches = withoutDeleted(p2Matches);
+
+  const allForElo = [...new Map([...p1Matches, ...(p2 ? p2Matches : [])].map(m => [m.id, m])).values()]
+    .filter(m => m.id !== matchRecord.id)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const affectedPlayers = [p1, ...(p2 ? [p2] : [])].filter(Boolean) as Player[];
+  const elos = computeGlobalElo(affectedPlayers, allForElo);
+
+  if (p1) {
+    batch.set(doc(db, 'players', p1.id), computePlayerStats(p1, p1AllMatches, elos[p1.id] || 1200));
+  }
+  if (p2) {
+    batch.set(doc(db, 'players', p2.id), computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200));
   }
 
   try {
     await batch.commit();
-    // Signal all public users their cache is now stale
     await updateLastUpdated();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, 'batch-match-delete');

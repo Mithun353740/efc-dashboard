@@ -10,7 +10,6 @@ import {
   sortRankedPlayers,
   testFirestoreConnection,
   computeGlobalElo,
-  calculateOvrHybrid,
   addMatch,
   fetchPlayers,
   fetchLeaders,
@@ -207,15 +206,22 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { playersRef.current = players; }, [players]);
   useEffect(() => { matchesRef.current = matches; }, [matches]);
 
-  const elos = React.useMemo(() => computeGlobalElo(players, matches), [players, matches]);
-  const enrichedPlayers = players.map(p => ({
-    ...p,
-    ovr: calculateOvrHybrid(p, elos[p.id])
-  }));
+  // ─────────────────────────────────────────────────────────────────────────────
+  // DERIVED STATE
+  // OVR is trusted from the stored Player document (computed from full match history
+  // during admin writes). We do NOT recompute from the capped 200-match feed.
+  //
+  // `elos` is still computed for the admin match-add flow (addMatch uses it for
+  // the two affected players) but is NOT used to override stored ovr values.
+  // ─────────────────────────────────────────────────────────────────────────────
 
+  // Lightweight ELO map from the limited feed — used only for admin match-add UI
+  const elos = React.useMemo(() => computeGlobalElo(players, matches), [players, matches]);
+
+  // Players are served as-is from Firestore — ovr is already correct
   const enrichedLeaders = leaders.map(l => {
     if (l.playerId) {
-      const p = enrichedPlayers.find(player => player.id === l.playerId);
+      const p = players.find(player => player.id === l.playerId);
       if (p) return { ...l, name: p.name, image: p.image };
     }
     return l;
@@ -224,8 +230,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const isLoading = isLoadingPlayers || isLoadingLeaders || isLoadingMatches || !isMinLoadTimePassed;
 
   const value = {
-    players: enrichedPlayers,
-    rankedPlayers: sortRankedPlayers(enrichedPlayers),
+    players,
+    rankedPlayers: sortRankedPlayers(players),
     leaders: enrichedLeaders,
     matches,
     tournaments,

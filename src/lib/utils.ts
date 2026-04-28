@@ -1,6 +1,32 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TOURNAMENT NAME NORMALISATION
+// Maps historical / legacy tournament names to their single canonical form.
+// All stat keys in seasonStats / tournamentStats use the canonical name so
+// data written at different points in time is always merged correctly.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const LEGACY_NAME_MAP: Record<string, string> = {
+  'qvfc elite league cup': 'QVFC ELITE LEAGUE CUP DIVISION 1',
+  'qvfc elite league cup div 1': 'QVFC ELITE LEAGUE CUP DIVISION 1',
+  'qvfc elite league cup division 1': 'QVFC ELITE LEAGUE CUP DIVISION 1',
+  'qvfc elite league cup div 2': 'QVFC ELITE LEAGUE CUP DIVISION 2',
+  'qvfc elite league cup division 2': 'QVFC ELITE LEAGUE CUP DIVISION 2',
+  'vortex champions cup': 'VORTEX CHAMPIONS CUP',
+  'vortex domestic cup': 'VORTEX DOMESTIC CUP',
+};
+
+/**
+ * Returns the canonical (normalised, upper-cased) name for a tournament.
+ * Uses the legacy map so old match records are folded into the correct bucket.
+ */
+export function resolveCanonicalTournamentName(name: string): string {
+  const lower = name.trim().toLowerCase();
+  return LEGACY_NAME_MAP[lower] ?? name.trim().toUpperCase();
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

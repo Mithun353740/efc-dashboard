@@ -2,43 +2,53 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import { cn, getSeasonInfo } from '../lib/utils';
-import { INITIAL_PLAYERS, computePlayerStats, sortRankedPlayers } from '../lib/store';
+import { INITIAL_PLAYERS, sortRankedPlayers } from '../lib/store';
+import { Player } from '../types';
 import { Trophy, ChevronDown, Filter } from 'lucide-react';
 
 export default function Rankings() {
-  const { rankedPlayers, matches, elos } = useFirebase();
+  const { rankedPlayers, matches } = useFirebase();
   const [selectedSeason, setSelectedSeason] = useState('All Time');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  // Build available seasons list from the limited real-time match feed + current season
   const availableSeasons = useMemo(() => {
     const seasons = new Set<string>();
-    matches.forEach(m => {
-      seasons.add(getSeasonInfo(new Date(m.timestamp)).name);
+    // Pull known seasons from player seasonStats (covers full history)
+    rankedPlayers.forEach(p => {
+      if (p.seasonStats) Object.keys(p.seasonStats).forEach(s => seasons.add(s));
     });
-    // Ensure current season
+    // Also pull from recent matches feed as a fallback
+    matches.forEach(m => seasons.add(getSeasonInfo(new Date(m.timestamp)).name));
     seasons.add(getSeasonInfo(new Date()).name);
     return Array.from(seasons).sort().reverse();
-  }, [matches]);
+  }, [rankedPlayers, matches]);
 
   const activePlayers = useMemo(() => {
     if (rankedPlayers.length === 0) return INITIAL_PLAYERS;
-    
     if (selectedSeason === 'All Time') return rankedPlayers;
 
-    // Filter matches by season
-    const seasonMatches = matches.filter(m => {
-      return getSeasonInfo(new Date(m.timestamp)).name === selectedSeason;
-    });
-
-    // Compute new stats
-    const seasonPlayers = rankedPlayers.map(player => {
-      const stats = computePlayerStats(player, seasonMatches, elos[player.id] || 1200);
-      stats.ovr = player.ovr; // Keep global OVR
-      return stats;
-    }).filter(p => p.win > 0 || p.loss > 0 || p.draw > 0);
+    // Read from pre-computed seasonStats — zero match reads required
+    const seasonPlayers: Player[] = rankedPlayers
+      .map(player => {
+        const s = player.seasonStats?.[selectedSeason];
+        if (!s || (s.win === 0 && s.loss === 0 && s.draw === 0)) return null;
+        return {
+          ...player,
+          win: s.win,
+          loss: s.loss,
+          draw: s.draw,
+          goalsScored: s.goalsScored,
+          goalsConceded: s.goalsConceded,
+          form: s.form,
+          // Keep global OVR — season OVR is not separately tracked
+          ovr: player.ovr,
+        } as Player;
+      })
+      .filter(Boolean) as Player[];
 
     return sortRankedPlayers(seasonPlayers);
-  }, [rankedPlayers, matches, selectedSeason, elos]);
+  }, [rankedPlayers, selectedSeason]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark py-20 px-4 md:px-8 transition-colors">

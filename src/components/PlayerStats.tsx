@@ -2,14 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, ChevronRight, Trophy, Target, Zap, Filter, ChevronDown, Info, X, Activity, Flame, Shield } from 'lucide-react';
 import { useFirebase } from '../FirebaseContext';
-import { cn, getSeasonInfo } from '../lib/utils';
+import { cn, getSeasonInfo, resolveCanonicalTournamentName } from '../lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
 import { Player } from '../types';
-import { computePlayerStats } from '../lib/store';
 
 export default function PlayerStats() {
-  const { rankedPlayers: players, matches, tournaments, elos } = useFirebase();
+  const { rankedPlayers: players, matches, tournaments } = useFirebase();
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [search, setSearch] = useState('');
   const [searchParams] = useSearchParams();
@@ -18,67 +17,73 @@ export default function PlayerStats() {
   const [selectedTournament, setSelectedTournament] = useState('All Tournaments');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isOvrModalOpen, setIsOvrModalOpen] = useState(false);
-
   const [isMobileStatsView, setIsMobileStatsView] = useState(false);
 
   useEffect(() => {
     if (playerIdParam) {
       const p = players.find(player => player.id === playerIdParam);
-      if (p) {
-        setSelectedPlayer(p);
-        setIsMobileStatsView(true);
-      }
+      if (p) { setSelectedPlayer(p); setIsMobileStatsView(true); }
     } else if (players.length > 0 && !selectedPlayer) {
-      // Don't auto-set on mobile so they can see the roster first
-      if (window.innerWidth > 1024) {
-        setSelectedPlayer(players[0]);
-      }
+      if (window.innerWidth > 1024) setSelectedPlayer(players[0]);
     } else if (selectedPlayer) {
       const stillExists = players.find(p => p.id === selectedPlayer.id);
       if (stillExists) setSelectedPlayer(stillExists);
     }
   }, [players, playerIdParam, selectedPlayer]);
 
+  // Available seasons — pulled from pre-computed keys (full history) + recent matches
   const availableSeasons = useMemo(() => {
     const seasons = new Set<string>();
-    matches.forEach(m => {
-      seasons.add(getSeasonInfo(new Date(m.timestamp)).name);
+    players.forEach(p => {
+      if (p.seasonStats) Object.keys(p.seasonStats).forEach(s => seasons.add(s));
     });
-    // Ensure current season
+    matches.forEach(m => seasons.add(getSeasonInfo(new Date(m.timestamp)).name));
     seasons.add(getSeasonInfo(new Date()).name);
     return Array.from(seasons).sort().reverse();
-  }, [matches]);
+  }, [players, matches]);
 
   const availableTournaments = useMemo(() => {
-    const core = ["QVFC Elite League Cup Division 1", "QVFC Elite League Cup Division 2", "Vortex Champions Cup", "Vortex Domestic Cup"];
-    const dynamic = tournaments.map(t => t.name);
-    return Array.from(new Set([...core, ...dynamic]));
-  }, [tournaments]);
-
-  const computedPlayer = useMemo(() => {
-    if (!selectedPlayer) return null;
-    if (selectedSeason === 'All Time' && selectedTournament === 'All Tournaments') return selectedPlayer;
-
-    let filteredMatches = matches;
-    
-    if (selectedSeason !== 'All Time') {
-      filteredMatches = filteredMatches.filter(m => {
-        return getSeasonInfo(new Date(m.timestamp)).name === selectedSeason;
+    const core = ['QVFC ELITE LEAGUE CUP DIVISION 1', 'QVFC ELITE LEAGUE CUP DIVISION 2', 'VORTEX CHAMPIONS CUP', 'VORTEX DOMESTIC CUP'];
+    const dynamic = tournaments.map(t => resolveCanonicalTournamentName(t.name));
+    // Also pull from pre-computed keys for the selected season
+    const fromStats: string[] = [];
+    if (selectedSeason !== 'All Time' && selectedPlayer) {
+      Object.keys(selectedPlayer.tournamentStats || {}).forEach(key => {
+        const [season, ...rest] = key.split('__');
+        if (season === selectedSeason && rest.length) fromStats.push(rest.join('__'));
       });
     }
+    return Array.from(new Set([...core, ...dynamic, ...fromStats]));
+  }, [tournaments, selectedSeason, selectedPlayer]);
 
-    if (selectedTournament !== 'All Tournaments') {
-      filteredMatches = filteredMatches.filter(m => (m.tournament || 'Friendly') === selectedTournament);
+  // Compute the displayed player stats — reads from pre-computed fields when available
+  const computedPlayer = useMemo(() => {
+    if (!selectedPlayer) return null;
+    // All-time view: use stored global stats directly
+    if (selectedSeason === 'All Time' && selectedTournament === 'All Tournaments') {
+      return selectedPlayer;
     }
-
-    const computedStats = computePlayerStats(selectedPlayer, filteredMatches, elos[selectedPlayer.id] || 1200);
-    
-    // FORCE GIT SYNC: Ensure universal OVR is maintained across all filters
-    // to prevent player's OVR from dropping in sub-tournaments
-    computedStats.ovr = selectedPlayer.ovr;
-
-    return computedStats;
-  }, [selectedPlayer, selectedSeason, selectedTournament, matches, elos]);
+    // Tournament-specific view: read from pre-computed tournamentStats
+    if (selectedSeason !== 'All Time' && selectedTournament !== 'All Tournaments') {
+      const canonical = resolveCanonicalTournamentName(selectedTournament);
+      const key = `${selectedSeason}__${canonical}`;
+      const s = selectedPlayer.tournamentStats?.[key];
+      if (s) {
+        return { ...selectedPlayer, ...s, ovr: selectedPlayer.ovr };
+      }
+      // No data — return zeroed player
+      return { ...selectedPlayer, win: 0, loss: 0, draw: 0, goalsScored: 0, goalsConceded: 0, form: [] };
+    }
+    // Season-only view: read from pre-computed seasonStats
+    if (selectedSeason !== 'All Time') {
+      const s = selectedPlayer.seasonStats?.[selectedSeason];
+      if (s) {
+        return { ...selectedPlayer, ...s, ovr: selectedPlayer.ovr };
+      }
+      return { ...selectedPlayer, win: 0, loss: 0, draw: 0, goalsScored: 0, goalsConceded: 0, form: [] };
+    }
+    return selectedPlayer;
+  }, [selectedPlayer, selectedSeason, selectedTournament]);
 
   const chartData = computedPlayer ? [
     { name: 'WINS', value: computedPlayer.win, color: '#22c55e' },

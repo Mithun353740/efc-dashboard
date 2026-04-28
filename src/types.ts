@@ -1,3 +1,16 @@
+/**
+ * A subset of player stats used for season/tournament breakdowns.
+ * Stored directly on the Player document — no match reads needed by the frontend.
+ */
+export interface PartialPlayerStats {
+  win: number;
+  loss: number;
+  draw: number;
+  goalsScored: number;
+  goalsConceded: number;
+  form: string[]; // last 5 results ['W','L','D',...]
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -14,6 +27,28 @@ export interface Player {
   device?: string;
   uid?: string;
   role?: 'admin' | 'player';
+
+  /**
+   * Pre-computed per-season stats.
+   * Key: season name e.g. "2026 Season"
+   */
+  seasonStats?: Record<string, PartialPlayerStats>;
+
+  /**
+   * Pre-computed per-tournament stats (scoped to a season).
+   * Key: `${seasonName}__${canonicalTournamentName}` e.g. "2026 Season__QVFC ELITE LEAGUE CUP DIVISION 1"
+   */
+  tournamentStats?: Record<string, PartialPlayerStats>;
+
+  /**
+   * Unix ms timestamp of last stat computation. Used for cache validation.
+   */
+  statsLastUpdated?: number;
+
+  /**
+   * Monotonic integer. Bump STATS_VERSION in store.ts to force global recompute on logic change.
+   */
+  statsVersion?: number;
 }
 
 export interface Leader {
