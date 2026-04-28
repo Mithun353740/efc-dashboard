@@ -97,21 +97,14 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     testFirestoreConnection();
 
     // ─────────────────────────────────────────────────────────────────────────
-    // UNIVERSAL REAL-TIME SUBSCRIPTIONS
+    // OPTIMIZED SUBSCRIPTIONS
     // ─────────────────────────────────────────────────────────────────────────
-    // We rely on Firebase's native enableMultiTabIndexedDbPersistence()
-    // and onSnapshot() resume tokens. 
-    // - Initial load: 0 reads (served from local IndexedDB cache)
-    // - Updates: 1 read per changed document (Delta sync)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    unsubPlayers = subscribeToPlayers((data, pending) => {
-      if (!mounted) return;
-      setPlayers(data);
-      setHasPendingWrites(pending);
-      setIsLoadingPlayers(false);
+    // 1. System Locks — Always needed (tiny doc)
+    const unsubLocks = subscribeToSystemLocks((locks) => {
+      if (mounted) setSystemLocks(locks);
     });
 
+    // 2. Leaders — Always needed for Home Page (small collection)
     unsubLeaders = subscribeToLeaders((data, pending) => {
       if (!mounted) return;
       setLeaders(data);
@@ -119,22 +112,35 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingLeaders(false);
     });
 
-    unsubMatches = subscribeToMatches((data, pending) => {
-      if (!mounted) return;
-      setMatches(data);
-      setHasPendingWrites(pending);
+    // 3. Conditional Heavy Data (Matches, Players, Tournaments)
+    // Only subscribe to the full firehose if user is Admin.
+    // Otherwise, we load data on-demand in the components.
+    if (isAdmin) {
+      unsubPlayers = subscribeToPlayers((data, pending) => {
+        if (!mounted) return;
+        setPlayers(data);
+        setIsLoadingPlayers(false);
+      });
+
+      unsubMatches = subscribeToMatches((data, pending) => {
+        if (!mounted) return;
+        setMatches(data);
+        setIsLoadingMatches(false);
+      });
+
+      unsubTournaments = subscribeToTournaments((data, pending) => {
+        if (!mounted) return;
+        setTournaments(data);
+      });
+    } else {
+      // For Guests/Players: Fetch Tournaments once (cheaper than subscription)
+      fetchTournaments().then(data => {
+        if (mounted) setTournaments(data);
+      });
+      // Set loaders to false since we aren't subscribing
+      setIsLoadingPlayers(false);
       setIsLoadingMatches(false);
-    });
-
-    unsubTournaments = subscribeToTournaments((data, pending) => {
-      if (!mounted) return;
-      setTournaments(data);
-      setHasPendingWrites(pending);
-    });
-
-    const unsubLocks = subscribeToSystemLocks((locks) => {
-      if (mounted) setSystemLocks(locks);
-    });
+    }
 
     // Merge cleanups
     const origUnsub = unsubPlayers;
