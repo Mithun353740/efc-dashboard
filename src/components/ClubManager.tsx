@@ -12,6 +12,10 @@ import { Link } from 'react-router-dom';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+function cn(...classes: (string | boolean | undefined)[]) {
+  return classes.filter(Boolean).join(' ');
+}
+
 function fmtBudget(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
@@ -36,7 +40,7 @@ function ovrColor(ovr: number) {
 // ─── FIFA Player Card ─────────────────────────────────────────────────────────
 
 function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; size?: 'sm' | 'md' | 'lg' }) {
-  const dims = size === 'lg' ? 'w-44 h-60' : size === 'md' ? 'w-36 h-48' : 'w-28 h-36';
+  const dims = size === 'lg' ? 'w-36 h-48 md:w-44 md:h-60' : size === 'md' ? 'w-28 h-36 md:w-36 md:h-48' : 'w-24 h-32 md:w-28 md:h-36';
   const pri = club?.primaryColor || '#8b5cf6';
   const sec = club?.secondaryColor || '#f59e0b';
   const total = player.win + player.loss + player.draw;
@@ -47,28 +51,28 @@ function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; 
     <motion.div
       whileHover={{ scale: 1.05, y: -4 }}
       transition={{ type: 'spring', stiffness: 300 }}
-      className={`${dims} relative rounded-2xl overflow-hidden cursor-pointer shrink-0`}
+      className={`${dims} relative rounded-xl md:rounded-2xl overflow-hidden cursor-pointer shrink-0`}
       style={{ background: `linear-gradient(155deg, ${pri}22 0%, #0f172a 60%, ${sec}15 100%)`, border: `1px solid ${pri}40` }}
     >
       {/* Glow */}
       <div className="absolute inset-0 opacity-30" style={{ background: `radial-gradient(ellipse at top, ${pri}60, transparent 70%)` }} />
 
       {/* OVR badge */}
-      <div className="absolute top-2 left-2 z-20">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs text-white shadow-lg" style={{ background: ovrColor(player.ovr) }}>
+      <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 z-20">
+        <div className="w-6 h-6 md:w-8 md:h-8 rounded md:rounded-lg flex items-center justify-center font-black text-[9px] md:text-xs text-white shadow-lg" style={{ background: ovrColor(player.ovr) }}>
           {player.ovr}
         </div>
       </div>
 
       {/* Club short name */}
       {club && (
-        <div className="absolute top-2 right-2 z-20 text-[8px] font-black tracking-widest px-1.5 py-0.5 rounded" style={{ background: pri + '30', color: pri, border: `1px solid ${pri}50` }}>
+        <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 z-20 text-[6px] md:text-[8px] font-black tracking-widest px-1 md:px-1.5 py-0.5 rounded" style={{ background: pri + '30', color: pri, border: `1px solid ${pri}50` }}>
           {club.shortName}
         </div>
       )}
 
       {/* Player image */}
-      <div className="absolute inset-x-0 top-6 bottom-10 flex items-end justify-center">
+      <div className="absolute inset-x-0 top-5 bottom-8 md:top-6 md:bottom-10 flex items-end justify-center">
         <img
           src={player.image}
           alt={player.name}
@@ -78,17 +82,17 @@ function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; 
       </div>
 
       {/* Name + stats */}
-      <div className="absolute bottom-0 inset-x-0 p-2 z-20" style={{ background: `linear-gradient(to top, ${pri}90, transparent)` }}>
-        <p className="text-white font-black text-[9px] leading-none truncate uppercase tracking-wide">{player.name.split(' ')[0]}</p>
-        <div className="flex gap-2 mt-1">
-          <span className="text-[7px] font-bold text-white/70">{winPct}%W</span>
-          <span className="text-[7px] font-bold" style={{ color: gd >= 0 ? '#4ade80' : '#f87171' }}>GD{gd >= 0 ? '+' : ''}{gd}</span>
+      <div className="absolute bottom-0 inset-x-0 p-1.5 md:p-2 z-20" style={{ background: `linear-gradient(to top, ${pri}90, transparent)` }}>
+        <p className="text-white font-black text-[7px] md:text-[9px] leading-none truncate uppercase tracking-wide">{player.name.split(' ')[0]}</p>
+        <div className="flex gap-1.5 md:gap-2 mt-0.5 md:mt-1">
+          <span className="text-[6px] md:text-[7px] font-bold text-white/70">{winPct}%W</span>
+          <span className="text-[6px] md:text-[7px] font-bold" style={{ color: gd >= 0 ? '#4ade80' : '#f87171' }}>GD{gd >= 0 ? '+' : ''}{gd}</span>
         </div>
       </div>
 
       {/* Listed badge */}
       {player.isListed && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 bg-amber-500 text-black text-[7px] font-black px-2 py-0.5 rounded-full rotate-[-15deg] shadow-lg">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 bg-amber-500 text-black text-[6px] md:text-[7px] font-black px-1.5 md:px-2 py-0.5 rounded-full rotate-[-15deg] shadow-lg">
           FOR SALE
         </div>
       )}
@@ -135,94 +139,94 @@ function OverviewTab({ myClub, squad, allClubs, config }: { myClub: Club; squad:
   const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
   
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-[160px]">
+    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 md:auto-rows-[160px]">
       {/* PLAY MATCH / NEXT FIXTURE (Large) */}
-      <div className="md:col-span-2 lg:col-span-2 row-span-2 relative group overflow-hidden rounded-[2rem] bg-[#0f172a] border border-white/10 p-8 flex flex-col justify-between transition-all hover:scale-[1.01] hover:border-amber-500/50">
+      <div className="md:col-span-2 lg:col-span-2 row-span-2 relative group overflow-hidden rounded-[1.5rem] md:rounded-[2rem] bg-[#0f172a] border border-white/10 p-6 md:p-8 flex flex-col justify-between transition-all hover:scale-[1.01] hover:border-amber-500/50">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-transparent" />
         <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <p className="text-[10px] font-black tracking-[0.3em] text-amber-500 uppercase">NEXT MATCH</p>
+          <div className="flex items-center gap-2 mb-3 md:mb-4">
+            <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-amber-500 animate-pulse" />
+            <p className="text-[9px] md:text-[10px] font-black tracking-[0.3em] text-amber-500 uppercase">NEXT MATCH</p>
           </div>
-          <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic leading-none">PLAY MATCH</h2>
-          <p className="text-slate-400 font-bold text-xs mt-2 uppercase tracking-widest">{config?.season || 'Active Season'}</p>
+          <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase italic leading-none">PLAY MATCH</h2>
+          <p className="text-slate-400 font-bold text-[10px] md:text-xs mt-2 uppercase tracking-widest">{config?.season || 'Active Season'}</p>
         </div>
         
-        <div className="relative z-10 flex items-center justify-between gap-4">
+        <div className="relative z-10 flex items-center justify-between gap-4 mt-6 md:mt-0">
           <div className="flex flex-col items-center gap-2">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-2xl"
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center text-white font-black text-sm md:text-xl shadow-2xl"
               style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}, ${myClub.secondaryColor})` }}>
               {myClub.shortName}
             </div>
-            <p className="text-[10px] font-black text-white uppercase">{myClub.shortName}</p>
+            <p className="text-[8px] md:text-[10px] font-black text-white uppercase">{myClub.shortName}</p>
           </div>
-          <div className="text-2xl font-black text-slate-700 uppercase italic">VS</div>
+          <div className="text-xl md:text-2xl font-black text-slate-700 uppercase italic">VS</div>
           <div className="flex flex-col items-center gap-2">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-500 font-black text-xl">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-500 font-black text-sm md:text-xl">
               ?
             </div>
-            <p className="text-[10px] font-black text-slate-500 uppercase">TBD</p>
+            <p className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase">TBD</p>
           </div>
         </div>
       </div>
 
       {/* MINI STANDINGS (Square) */}
-      <div className="row-span-2 bg-[#0f172a] border border-white/10 rounded-[2rem] p-6 flex flex-col hover:border-amber-500/50 transition-all">
+      <div className="row-span-2 bg-[#0f172a] border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 flex flex-col hover:border-amber-500/50 transition-all">
         <div className="flex items-center gap-2 mb-4">
           <Trophy size={14} className="text-amber-500" />
-          <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">STANDINGS</p>
+          <p className="text-[9px] md:text-[10px] font-black tracking-widest text-slate-500 uppercase">STANDINGS</p>
         </div>
-        <div className="flex-1 space-y-3">
+        <div className="flex-1 space-y-2 md:space-y-3">
           {[1,2,3,4,5].map(i => (
             <div key={i} className={`flex items-center justify-between p-2 rounded-xl border border-transparent ${i === 1 ? 'bg-amber-500/10 border-amber-500/20' : ''}`}>
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] font-black text-slate-500">0{i}</span>
-                <div className="w-5 h-5 rounded bg-white/5" />
-                <div className="w-16 h-1.5 bg-white/5 rounded-full" />
+              <div className="flex items-center gap-2 md:gap-3">
+                <span className="text-[9px] md:text-[10px] font-black text-slate-500">0{i}</span>
+                <div className="w-4 h-4 md:w-5 md:h-5 rounded bg-white/5" />
+                <div className="w-12 md:w-16 h-1 md:h-1.5 bg-white/5 rounded-full" />
               </div>
-              <span className="text-[10px] font-black text-white">0</span>
+              <span className="text-[9px] md:text-[10px] font-black text-white">0</span>
             </div>
           ))}
         </div>
-        <button className="mt-4 w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black text-slate-400 transition-all uppercase tracking-widest">FULL TABLE</button>
+        <button className="mt-4 w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[8px] md:text-[9px] font-black text-slate-400 transition-all uppercase tracking-widest">FULL TABLE</button>
       </div>
 
       {/* TRANSFER HUB (Tall) */}
-      <div className="row-span-3 bg-[#0f172a] border border-white/10 rounded-[2rem] p-8 relative overflow-hidden group flex flex-col justify-between hover:border-amber-500/50 transition-all">
+      <div className="row-span-2 md:row-span-3 bg-[#0f172a] border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 relative overflow-hidden group flex flex-col justify-between hover:border-amber-500/50 transition-all min-h-[200px] md:min-h-0">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black" />
         {squad[0] && (
           <img src={squad[0].image} className="absolute inset-0 w-full h-full object-cover object-top opacity-30 grayscale group-hover:grayscale-0 transition-all duration-700" alt="" />
         )}
         <div className="relative z-10">
-          <p className="text-[10px] font-black tracking-widest text-amber-500 uppercase mb-1">MARKET</p>
-          <h3 className="text-3xl font-black text-white leading-none uppercase italic">TRANSFER<br/>HUB</h3>
+          <p className="text-[9px] md:text-[10px] font-black tracking-widest text-amber-500 uppercase mb-1">MARKET</p>
+          <h3 className="text-2xl md:text-3xl font-black text-white leading-none uppercase italic">TRANSFER<br/>HUB</h3>
         </div>
         <div className="relative z-10">
-          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">AVAILABLE FUNDS</p>
-          <p className="text-xl font-black text-amber-500 leading-none">VCC {fmtBudget(myClub.budget)}</p>
+          <p className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">AVAILABLE FUNDS</p>
+          <p className="text-lg md:text-xl font-black text-amber-500 leading-none">VCC {fmtBudget(myClub.budget)}</p>
         </div>
       </div>
 
       {/* CLUB FINANCE (Square) */}
-      <div className="bg-[#0f172a] border border-white/10 rounded-[2rem] p-6 flex flex-col justify-between hover:border-amber-500/50 transition-all">
+      <div className="bg-[#0f172a] border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 flex flex-col justify-between hover:border-amber-500/50 transition-all min-h-[120px] md:min-h-0">
         <div className="flex items-center gap-2">
           <DollarSign size={14} className="text-emerald-400" />
-          <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">FINANCES</p>
+          <p className="text-[9px] md:text-[10px] font-black tracking-widest text-slate-500 uppercase">FINANCES</p>
         </div>
         <div>
-          <p className="text-xl font-black text-white leading-none italic uppercase">VCC {fmtBudget(myClub.budget)}</p>
-          <p className="text-[9px] font-black text-emerald-400 mt-1 uppercase">+15% GROWTH</p>
+          <p className="text-lg md:text-xl font-black text-white leading-none italic uppercase">VCC {fmtBudget(myClub.budget)}</p>
+          <p className="text-[8px] md:text-[9px] font-black text-emerald-400 mt-1 uppercase">+15% GROWTH</p>
         </div>
       </div>
 
       {/* SQUAD OVR (Square) */}
-      <div className="bg-[#0f172a] border border-white/10 rounded-[2rem] p-6 flex flex-col justify-between hover:border-amber-500/50 transition-all">
+      <div className="bg-[#0f172a] border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 flex flex-col justify-between hover:border-amber-500/50 transition-all min-h-[120px] md:min-h-0">
         <div className="flex items-center gap-2">
           <Users size={14} className="text-brand-purple" />
-          <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">AVG OVR</p>
+          <p className="text-[9px] md:text-[10px] font-black tracking-widest text-slate-500 uppercase">AVG OVR</p>
         </div>
         <div>
-          <p className="text-3xl font-black text-white leading-none italic uppercase">{avgOvr}</p>
+          <p className="text-2xl md:text-3xl font-black text-white leading-none italic uppercase">{avgOvr}</p>
           <div className="flex gap-1 mt-2">
             {[1,2,3,4,5].map(i => <div key={i} className={`h-1 flex-1 rounded-full ${i < 4 ? 'bg-brand-purple' : 'bg-white/5'}`} />)}
           </div>
@@ -230,15 +234,15 @@ function OverviewTab({ myClub, squad, allClubs, config }: { myClub: Club; squad:
       </div>
 
       {/* SOCIAL MEDIA / NOTIFICATIONS (Wide) */}
-      <div className="md:col-span-2 lg:col-span-2 bg-[#0f172a] border border-white/10 rounded-[2rem] p-6 flex items-center gap-6 hover:border-amber-500/50 transition-all">
-        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
-          <Zap size={24} />
+      <div className="md:col-span-2 lg:col-span-2 bg-[#0f172a] border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 flex items-center gap-4 md:gap-6 hover:border-amber-500/50 transition-all">
+        <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
+          <Zap size={20} className="md:w-6 md:h-6" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase mb-1">NOTIFICATIONS</p>
-          <p className="text-xs font-bold text-white truncate">The transfer window is now OPEN. Check the hub for new listings.</p>
+          <p className="text-[9px] md:text-[10px] font-black tracking-widest text-slate-500 uppercase mb-0.5 md:mb-1">NOTIFICATIONS</p>
+          <p className="text-[10px] md:text-xs font-bold text-white truncate">The transfer window is now OPEN.</p>
         </div>
-        <button className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black text-white transition-all uppercase tracking-widest shrink-0">VIEW ALL</button>
+        <button className="px-3 md:px-4 py-1.5 md:py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[8px] md:text-[9px] font-black text-white transition-all uppercase tracking-widest shrink-0">VIEW</button>
       </div>
     </div>
   );
@@ -299,62 +303,70 @@ export default function ClubManager() {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white">
-      {/* FIFA TOP STATUS BAR */}
+    <div className="min-h-screen bg-[#020617] text-white selection:bg-amber-500/30 pb-10">
+      {/* FIFA TOP STATUS BAR - Fully Responsive */}
       <div className="bg-black/60 backdrop-blur-md border-b border-white/5 py-2 px-4 md:px-8 flex items-center justify-between sticky top-0 z-[100]">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 md:gap-6">
+          {/* Level Info */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">LVL</span>
-            <div className="px-2 py-0.5 bg-amber-500 text-black text-[10px] font-black rounded">{calcLevel(myPlayer).lvl}</div>
-            <div className="w-24 h-1 bg-white/10 rounded-full overflow-hidden hidden sm:block">
+            <span className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">LVL</span>
+            <div className="px-1.5 md:px-2 py-0.5 bg-amber-500 text-black text-[9px] md:text-[10px] font-black rounded">{calcLevel(myPlayer).lvl}</div>
+            <div className="w-16 md:w-24 h-1 bg-white/10 rounded-full overflow-hidden hidden xs:block">
               <div className="h-full bg-amber-500" style={{ width: `${calcLevel(myPlayer).progress}%` }} />
             </div>
           </div>
-          <div className="flex items-center gap-2 text-amber-500">
-            <DollarSign size={14} />
-            <span className="text-[11px] font-black uppercase tracking-widest">{fmtBudget(myClub?.budget || 0)}</span>
-            <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] font-black text-white">+</div>
+          {/* Budget */}
+          <div className="flex items-center gap-1.5 md:gap-2 text-amber-500">
+            <DollarSign size={12} className="md:w-[14px]" />
+            <span className="text-[10px] md:text-[11px] font-black uppercase tracking-widest">{fmtBudget(myClub?.budget || 0)}</span>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+        <div className="flex items-center gap-3 md:gap-4">
+          {/* Squad Count (Hidden on mobile peek) */}
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
             <Users size={12} className="text-slate-500" />
             <span className="text-[10px] font-black text-white uppercase">{squad.length}/25</span>
           </div>
-          <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-            <div className="text-right hidden xs:block">
-              <p className="text-[10px] font-black text-white leading-none uppercase">{myPlayer?.name || 'MANAGER'}</p>
-              <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">{myClub?.name || 'UNASSIGNED'}</p>
+          {/* User Peek */}
+          <div className="flex items-center gap-2 md:gap-3 pl-3 md:pl-4 border-l border-white/10">
+            <div className="text-right hidden sm:block">
+              <p className="text-[10px] font-black text-white leading-none uppercase truncate max-w-[80px]">{myPlayer?.name || 'MANAGER'}</p>
+              <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5 truncate max-w-[80px]">{myClub?.name || 'UNASSIGNED'}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-amber-500 text-black flex items-center justify-center font-black text-xs">{myPlayer?.ovr || '??'}</div>
+            <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-amber-500 text-black flex items-center justify-center font-black text-[10px] md:text-xs">
+              {myPlayer?.overall || '??'}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Page content */}
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-          <div>
-            <p className="text-[10px] font-black text-amber-500 tracking-[0.4em] uppercase mb-2">CLUB MANAGEMENT SYSTEM</p>
-            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase italic leading-none">CLUB ZONE</h1>
+      {/* Main Container */}
+      <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-6 md:py-10">
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-8 md:mb-12">
+          <div className="text-center xl:text-left">
+            <p className="text-[9px] md:text-[10px] font-black text-amber-500 tracking-[0.4em] uppercase mb-2">CLUB MANAGEMENT SYSTEM</p>
+            <h1 className="text-4xl md:text-5xl xl:text-6xl font-black text-white tracking-tighter uppercase italic leading-none">CLUB ZONE</h1>
           </div>
           
-          {/* Tabs - Pill style */}
-          <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-[1.5rem] w-fit">
-            {tabs.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-black tracking-widest whitespace-nowrap transition-all ${
-                  activeTab === t.id
-                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {t.icon}{t.label}
-              </button>
-            ))}
+          {/* Tabs - Responsive Scrollable Container */}
+          <div className="w-full xl:w-auto overflow-x-auto no-scrollbar py-2">
+            <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-[1.5rem] md:rounded-full w-max mx-auto xl:mx-0">
+              {tabs.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 md:px-6 py-2.5 md:py-3.5 rounded-full text-[9px] md:text-[11px] font-black tracking-widest whitespace-nowrap transition-all",
+                    activeTab === t.id
+                      ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20 scale-105'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  )}
+                >
+                  {t.icon}<span className="md:inline">{t.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -477,26 +489,28 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
   };
 
   return (
-    <div className="space-y-8">
-      <div className={`rounded-2xl p-5 flex items-center gap-4 border ${windowOpen ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${windowOpen ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}><DollarSign size={20} /></div>
-        <div>
-          <p className="font-black text-white text-sm">Transfer Window {windowOpen ? 'OPEN' : 'CLOSED'}</p>
-          <p className="text-[10px] font-bold text-slate-400">{windowOpen ? (config?.transferWindowCloseDate ? `Closes ${new Date(config.transferWindowCloseDate).toLocaleDateString()}` : 'Window active — buy & sell freely') : 'No transfers allowed while window is closed.'}</p>
+    <div className="space-y-6 md:space-y-8">
+      <div className={`rounded-[1.5rem] md:rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-4 border ${windowOpen ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+        <div className="flex items-center gap-4">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${windowOpen ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}><DollarSign size={20} /></div>
+          <div>
+            <p className="font-black text-white text-sm">Transfer Window {windowOpen ? 'OPEN' : 'CLOSED'}</p>
+            <p className="text-[10px] font-bold text-slate-400">{windowOpen ? (config?.transferWindowCloseDate ? `Closes ${new Date(config.transferWindowCloseDate).toLocaleDateString()}` : 'Window active') : 'No transfers allowed.'}</p>
+          </div>
         </div>
-        {myClub && <div className="ml-auto text-right hidden md:block"><p className="text-[9px] font-black text-slate-500 uppercase">My Budget</p><p className="text-2xl font-black text-amber-400">VCC {fmtBudget(myClub.budget)}</p></div>}
+        {myClub && <div className="md:ml-auto text-left md:text-right border-t md:border-t-0 border-white/5 pt-3 md:pt-0"><p className="text-[9px] font-black text-slate-500 uppercase">My Budget</p><p className="text-xl md:text-2xl font-black text-amber-400">VCC {fmtBudget(myClub.budget)}</p></div>}
       </div>
 
       {isOwner && windowOpen && mySquad.length > 0 && (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="text-sm font-black tracking-widest text-slate-300 uppercase mb-4 flex items-center gap-2"><Zap size={14} className="text-amber-400" /> LIST A PLAYER</h3>
-          <div className="flex flex-col md:flex-row gap-4">
-            <select value={listingPlayerId} onChange={e => setListingPlayerId(e.target.value)} className="flex-1 bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none">
+        <div className="bg-white/5 border border-white/10 rounded-[1.5rem] md:rounded-2xl p-5 md:p-6">
+          <h3 className="text-[10px] md:text-sm font-black tracking-widest text-slate-300 uppercase mb-4 flex items-center gap-2"><Zap size={14} className="text-amber-400" /> LIST A PLAYER</h3>
+          <div className="flex flex-col xl:flex-row gap-3 md:gap-4">
+            <select value={listingPlayerId} onChange={e => setListingPlayerId(e.target.value)} className="flex-1 bg-white/5 border border-white/10 p-3 md:p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none">
               <option value="">Select player to list...</option>
               {mySquad.map(p => <option key={p.id} value={p.id} className="bg-[#0f172a]">{p.name} — OVR {p.ovr}</option>)}
             </select>
-            <input type="number" value={listPrice} onChange={e => setListPrice(e.target.value)} placeholder="Price (VCC)" className="flex-1 bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
-            <button onClick={handleList} disabled={busy || !listingPlayerId || !listPrice} className="px-6 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl disabled:opacity-50 transition-all whitespace-nowrap">{busy ? 'LISTING...' : 'LIST PLAYER'}</button>
+            <input type="number" value={listPrice} onChange={e => setListPrice(e.target.value)} placeholder="Price (VCC)" className="flex-1 bg-white/5 border border-white/10 p-3 md:p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
+            <button onClick={handleList} disabled={busy || !listingPlayerId || !listPrice} className="px-6 py-3 md:py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl disabled:opacity-50 transition-all whitespace-nowrap">{busy ? 'LISTING...' : 'LIST PLAYER'}</button>
           </div>
         </div>
       )}
@@ -634,12 +648,16 @@ function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; player
           {loading && <div className="text-[10px] font-black text-amber-400 animate-pulse tracking-widest">LOADING...</div>}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="overflow-x-auto no-scrollbar">
+          <table className="w-full min-w-[600px] md:min-w-0">
             <thead>
               <tr className="border-b border-white/5">
                 {['#','Club','P','W','D','L','GF','GA','GD','PTS','FORM','OVR'].map(h => (
-                  <th key={h} className="px-3 py-3 text-[9px] font-black text-slate-500 tracking-widest uppercase text-center first:text-left">{h}</th>
+                  <th key={h} className={cn(
+                    "px-2 md:px-3 py-3 text-[8px] md:text-[9px] font-black text-slate-500 tracking-widest uppercase text-center first:text-left",
+                    (h === 'GF' || h === 'GA' || h === 'OVR') ? 'hidden lg:table-cell' : '',
+                    (h === 'D' || h === 'L') ? 'hidden sm:table-cell' : ''
+                  )}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -673,23 +691,29 @@ function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; player
                       )}
                     </div>
                   </td>
-                  {[row.played, row.w, row.d, row.l, row.gf, row.ga].map((v, ci) => (
-                    <td key={ci} className="px-3 py-4 text-xs font-bold text-slate-300 text-center">{v}</td>
+                  {[row.played, row.w].map((v, ci) => (
+                    <td key={ci} className="px-2 md:px-3 py-4 text-[10px] md:text-xs font-bold text-slate-300 text-center">{v}</td>
                   ))}
-                  <td className="px-3 py-4 text-xs font-bold text-center"
+                  {[row.d, row.l].map((v, ci) => (
+                    <td key={ci} className="hidden sm:table-cell px-2 md:px-3 py-4 text-[10px] md:text-xs font-bold text-slate-300 text-center">{v}</td>
+                  ))}
+                  {[row.gf, row.ga].map((v, ci) => (
+                    <td key={ci} className="hidden lg:table-cell px-2 md:px-3 py-4 text-[10px] md:text-xs font-bold text-slate-300 text-center">{v}</td>
+                  ))}
+                  <td className="px-2 md:px-3 py-4 text-[10px] md:text-xs font-bold text-center"
                     style={{ color: row.gd > 0 ? '#4ade80' : row.gd < 0 ? '#f87171' : '#94a3b8' }}>
                     {row.gd > 0 ? `+${row.gd}` : row.gd}
                   </td>
-                  <td className="px-3 py-4 text-center">
-                    <span className="text-sm font-black text-white bg-white/10 px-2.5 py-1 rounded-lg">{row.pts}</span>
+                  <td className="px-2 md:px-3 py-4 text-center">
+                    <span className="text-xs md:text-sm font-black text-white bg-white/10 px-2 md:px-2.5 py-1 rounded-lg">{row.pts}</span>
                   </td>
                   {/* Form pills */}
-                  <td className="px-3 py-4">
+                  <td className="px-2 md:px-3 py-4">
                     <div className="flex gap-0.5 justify-center">
                       {row.form.length === 0
                         ? <span className="text-[8px] text-slate-600 font-bold">—</span>
                         : row.form.map((r, fi) => (
-                          <span key={fi} className={`w-4 h-4 rounded text-[7px] font-black flex items-center justify-center
+                          <span key={fi} className={`w-3 h-3 md:w-4 md:h-4 rounded text-[6px] md:text-[7px] font-black flex items-center justify-center
                             ${r === 'W' ? 'bg-emerald-500/30 text-emerald-400' : r === 'L' ? 'bg-red-500/30 text-red-400' : 'bg-slate-500/20 text-slate-400'}`}>
                             {r}
                           </span>
@@ -697,8 +721,8 @@ function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; player
                       }
                     </div>
                   </td>
-                  <td className="px-3 py-4 text-center">
-                    <span className="text-xs font-black px-2 py-0.5 rounded-lg"
+                  <td className="hidden lg:table-cell px-2 md:px-3 py-4 text-center">
+                    <span className="text-[10px] md:text-xs font-black px-1.5 md:px-2 py-0.5 rounded-lg"
                       style={{ background: ovrColor(row.avgOvr) + '30', color: ovrColor(row.avgOvr) }}>
                       {row.avgOvr}
                     </span>
@@ -829,40 +853,40 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
   // 1. SELECTOR VIEW
   if (!selectedTId) {
     return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-black text-white tracking-widest uppercase italic">ACTIVE TOURNAMENTS</h3>
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">{tournaments.length} EVENTS LIVE</span>
+      <div className="space-y-6 md:space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h3 className="text-lg md:text-xl font-black text-white tracking-widest uppercase italic">ACTIVE TOURNAMENTS</h3>
+          <span className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">{tournaments.length} EVENTS LIVE</span>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {tournaments.length === 0 ? (
-            <div className="col-span-full py-20 text-center bg-white/5 border border-white/10 rounded-[2rem]">
+            <div className="col-span-full py-16 md:py-20 text-center bg-white/5 border border-white/10 rounded-[1.5rem] md:rounded-[2rem]">
               <Trophy size={48} className="text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-500 font-black uppercase text-xs">No active tournaments this season.</p>
+              <p className="text-slate-500 font-black uppercase text-[10px] md:text-xs">No active tournaments this season.</p>
             </div>
           ) : tournaments.map(t => (
             <button key={t.id} onClick={() => setSelectedTId(t.id)}
-              className="group relative h-64 rounded-[2rem] overflow-hidden border border-white/10 transition-all hover:scale-[1.02] hover:border-amber-500/50">
+              className="group relative h-56 md:h-64 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden border border-white/10 transition-all hover:scale-[1.02] hover:border-amber-500/50">
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10" />
               <div className="absolute inset-0 bg-amber-500/5 opacity-0 group-hover:opacity-100 transition-all" />
               
               <div className="absolute inset-0 flex items-center justify-center">
-                <Trophy size={80} className="text-white/5 group-hover:text-amber-500/10 transition-all duration-700 group-hover:scale-125" />
+                <Trophy size={60} className="md:w-20 md:h-20 text-white/5 group-hover:text-amber-500/10 transition-all duration-700 group-hover:scale-125" />
               </div>
 
-              <div className="absolute bottom-0 inset-x-0 p-8 z-20 text-left">
-                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded mb-3 inline-block",
+              <div className="absolute bottom-0 inset-x-0 p-6 md:p-8 z-20 text-left">
+                <span className={cn("text-[8px] md:text-[9px] font-black uppercase px-2 py-0.5 rounded mb-2 md:mb-3 inline-block",
                   t.status === 'active' ? 'bg-emerald-500 text-black' : 'bg-amber-500 text-black'
                 )}>
                   {t.status}
                 </span>
-                <h4 className="text-2xl font-black text-white uppercase italic leading-none truncate">{t.name}</h4>
-                <div className="flex items-center gap-4 mt-3">
-                  <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                <h4 className="text-xl md:text-2xl font-black text-white uppercase italic leading-none truncate">{t.name}</h4>
+                <div className="flex items-center gap-4 mt-2 md:mt-3">
+                  <div className="flex items-center gap-1 text-[9px] md:text-[10px] font-bold text-slate-400">
                     <Calendar size={10} /> {new Date(t.createdAt).toLocaleDateString()}
                   </div>
-                  <div className="flex items-center gap-1 text-[10px] font-bold text-amber-500">
+                  <div className="flex items-center gap-1 text-[9px] md:text-[10px] font-bold text-amber-500">
                     <Zap size={10} /> VIEW HUB
                   </div>
                 </div>
@@ -942,32 +966,32 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
               </div>
 
               {/* Teams */}
-              <div className="p-8 flex items-center justify-between gap-4">
+              <div className="p-6 md:p-8 flex items-center justify-between gap-2 md:gap-4">
                 <div className="flex-1 text-center">
-                  <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-white font-black text-xl mb-3 shadow-2xl"
+                  <div className="w-16 h-16 md:w-20 md:h-20 mx-auto rounded-xl md:rounded-2xl flex items-center justify-center text-white font-black text-sm md:text-xl mb-2 md:mb-3 shadow-2xl"
                     style={{ background: `linear-gradient(135deg, ${clubs.find(c => c.id === f.homeClubId)?.primaryColor || '#000'}, ${clubs.find(c => c.id === f.homeClubId)?.secondaryColor || '#000'})` }}>
                     {clubs.find(c => c.id === f.homeClubId)?.shortName}
                   </div>
-                  <p className="text-[11px] font-black text-white uppercase truncate">{f.homeClubName}</p>
+                  <p className="text-[9px] md:text-[11px] font-black text-white uppercase truncate">{f.homeClubName}</p>
                 </div>
 
-                <div className="flex flex-col items-center gap-2">
-                  <div className="text-3xl font-black text-white italic tracking-tighter">VS</div>
+                <div className="flex flex-col items-center gap-1 md:gap-2">
+                  <div className="text-xl md:text-3xl font-black text-white italic tracking-tighter">VS</div>
                   {f.status === 'completed' && (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full">
-                      <span className="text-xs font-black text-white">{f.subMatches.reduce((a, m) => a + (m.p1Score || 0), 0)}</span>
+                    <div className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 bg-white/5 rounded-full">
+                      <span className="text-[10px] md:text-xs font-black text-white">{f.subMatches.reduce((a, m) => a + (m.p1Score || 0), 0)}</span>
                       <span className="text-slate-600">-</span>
-                      <span className="text-xs font-black text-white">{f.subMatches.reduce((a, m) => a + (m.p2Score || 0), 0)}</span>
+                      <span className="text-[10px] md:text-xs font-black text-white">{f.subMatches.reduce((a, m) => a + (m.p2Score || 0), 0)}</span>
                     </div>
                   )}
                 </div>
 
                 <div className="flex-1 text-center">
-                  <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-white font-black text-xl mb-3 shadow-2xl"
+                  <div className="w-16 h-16 md:w-20 md:h-20 mx-auto rounded-xl md:rounded-2xl flex items-center justify-center text-white font-black text-sm md:text-xl mb-2 md:mb-3 shadow-2xl"
                     style={{ background: `linear-gradient(135deg, ${clubs.find(c => c.id === f.awayClubId)?.primaryColor || '#000'}, ${clubs.find(c => c.id === f.awayClubId)?.secondaryColor || '#000'})` }}>
                     {clubs.find(c => c.id === f.awayClubId)?.shortName}
                   </div>
-                  <p className="text-[11px] font-black text-white uppercase truncate">{f.awayClubName}</p>
+                  <p className="text-[9px] md:text-[11px] font-black text-white uppercase truncate">{f.awayClubName}</p>
                 </div>
               </div>
 
