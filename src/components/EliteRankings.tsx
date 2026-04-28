@@ -6,27 +6,14 @@ import { Link } from 'react-router-dom';
 import { INITIAL_PLAYERS, computePlayerStats, sortRankedPlayers } from '../lib/store';
 
 export default function EliteRankings() {
-  const { rankedPlayers, matches, elos } = useFirebase();
+  const { rankedPlayers } = useFirebase();
 
-  // Get current season matches for "Top Performers This Season"
-  const currentSeasonPlayers = useMemo(() => {
-    const seasonId = getSeasonInfo(new Date()).name;
-
-    const seasonMatches = matches.filter(m => {
-      return getSeasonInfo(new Date(m.timestamp)).name === seasonId;
-    });
-
-    const playersWithSeasonStats = rankedPlayers.map(p => {
-      const stats = computePlayerStats(p, seasonMatches, elos[p.id] || 1200);
-      stats.ovr = p.ovr; // Keep global OVR
-      return stats;
-    }).filter(p => p.win > 0 || p.loss > 0 || p.draw > 0);
-
-    return sortRankedPlayers(playersWithSeasonStats);
-  }, [rankedPlayers, matches, elos]);
-
-  const activePlayers = currentSeasonPlayers.length > 0 ? currentSeasonPlayers : rankedPlayers;
-  const topPlayers = activePlayers.slice(0, 5);
+  // Optimized: We use the pre-computed 'ovr' and 'seasonStats' directly from 
+  // the player document. This saves us from downloading hundreds of matches 
+  // on every page load.
+  const topPlayers = useMemo(() => {
+    return rankedPlayers.slice(0, 5);
+  }, [rankedPlayers]);
 
   return (
     <section className="py-20 px-8 max-w-7xl mx-auto">

@@ -247,8 +247,10 @@ export function calculateOvrHybrid(player: Player, elo: number): number {
 
 export const INITIAL_PLAYERS: Player[] = [];
 
-export async function fetchPlayers(): Promise<Player[]> {
-  const q = query(collection(db, 'players'));
+export async function fetchPlayers(limitCount?: number): Promise<Player[]> {
+  const q = limitCount 
+    ? query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount))
+    : query(collection(db, 'players'));
   const snap = await getDocs(q);
   return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
 }
@@ -341,10 +343,13 @@ export async function updatePlayerProfile(
 }
 
 
-// Real-time listeners (for Admins)
-export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void) {
+// Real-time listeners
+export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount?: number) {
   const path = 'players';
-  const q = query(collection(db, path));
+  const q = limitCount 
+    ? query(collection(db, path), orderBy('ovr', 'desc'), limit(limitCount))
+    : query(collection(db, path));
+    
   return onSnapshot(q, (snapshot) => {
     const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
     callback(players, snapshot.metadata.hasPendingWrites);

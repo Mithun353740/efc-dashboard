@@ -87,6 +87,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     });
 
     const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+    const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
 
     let unsubPlayers: () => void = () => {};
     let unsubLeaders: () => void = () => {};
@@ -113,9 +114,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     });
 
     // 3. Conditional Heavy Data (Matches, Players, Tournaments)
-    // Only subscribe to the full firehose if user is Admin.
-    // Otherwise, we load data on-demand in the components.
-    if (isAdmin) {
+    // - Members (Admins & Players): Get the "Advanced" full firehose.
+    // - Guests: Get the "Fast" optimized view to save your daily quota.
+    if (isAdmin || isPlayer) {
       unsubPlayers = subscribeToPlayers((data, pending) => {
         if (!mounted) return;
         setPlayers(data);
@@ -133,12 +134,20 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setTournaments(data);
       });
     } else {
-      // For Guests/Players: Fetch Tournaments once (cheaper than subscription)
+      // FOR GUESTS (The Free Tier protection):
+      // Only subscribe to Top 15 players for the home page.
+      // This is where you can change the limit in the future!
+      unsubPlayers = subscribeToPlayers((data) => {
+        if (mounted) {
+          setPlayers(data);
+          setIsLoadingPlayers(false);
+        }
+      }, 15);
+
       fetchTournaments().then(data => {
         if (mounted) setTournaments(data);
       });
-      // Set loaders to false since we aren't subscribing
-      setIsLoadingPlayers(false);
+
       setIsLoadingMatches(false);
     }
 
