@@ -5,6 +5,11 @@ import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { updatePlayerProfile } from '../lib/store';
 
+// Module-level cache: player profile is fetched once per session.
+// Cleared when a profile update succeeds.
+let _profileCache: Record<string, { image: string; uid: string; device: string; name: string; email: string; password: string }> = {};
+export function clearProfileCache(playerId: string) { delete _profileCache[playerId]; }
+
 interface PlayerSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -52,18 +57,30 @@ export default function PlayerSettingsModal({ isOpen, onClose }: PlayerSettingsM
 
   useEffect(() => {
     if (isOpen && playerId) {
+      // Use cached data if available — no Firestore read needed
+      if (_profileCache[playerId]) {
+        const c = _profileCache[playerId];
+        setImage(c.image); setImagePreview(c.image);
+        setUid(c.uid); setDevice(c.device);
+        setPlayerNameLocal(c.name);
+        setEmail(c.email); setPassword(c.password);
+        return;
+      }
       const fetchPlayerData = async () => {
         try {
           const snap = await getDoc(doc(db, 'players', playerId));
           if (snap.exists()) {
             const data = snap.data();
-            setImage(data.image || '');
-            setImagePreview(data.image || '');
-            setUid(data.uid || '');
-            setDevice(data.device || '');
-            setPlayerNameLocal(data.name || '');
-            setEmail(data.email || '');
-            setPassword(data.password || '');
+            const cached = {
+              image: data.image || '', uid: data.uid || '',
+              device: data.device || '', name: data.name || '',
+              email: data.email || '', password: data.password || '',
+            };
+            _profileCache[playerId] = cached;
+            setImage(cached.image); setImagePreview(cached.image);
+            setUid(cached.uid); setDevice(cached.device);
+            setPlayerNameLocal(cached.name);
+            setEmail(cached.email); setPassword(cached.password);
           }
         } catch (err) {
           console.error('Error fetching player data:', err);
@@ -102,7 +119,11 @@ export default function PlayerSettingsModal({ isOpen, onClose }: PlayerSettingsM
         uid: uid || undefined,
         device: device || undefined,
       });
-      // No localStorage write for image — Navbar reads image from live Firestore context.
+      // Invalidate cache so next open gets fresh data
+      clearProfileCache(playerId);
+      if (playerId) {
+        _profileCache[playerId] = { image, uid, device, name: playerName, email, password };
+      }
       setProfileMsg({ type: 'success', text: '✅ Profile updated successfully!' });
       setTimeout(onClose, 1800);
     } catch (err: any) {

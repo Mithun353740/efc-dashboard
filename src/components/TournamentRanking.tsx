@@ -7,11 +7,10 @@ import { Player } from '../types';
 import { Trophy, ChevronDown, Calendar, History } from 'lucide-react';
 
 export default function TournamentRanking() {
-  const { rankedPlayers, matches, tournaments } = useFirebase();
+  const { rankedPlayers, tournaments } = useFirebase();
   
   const currentSeason = useMemo(() => getSeasonInfo(new Date()).name, []);
 
-  // Build available seasons from pre-computed player stats (full history) + matches feed
   const availableSeasons = useMemo(() => {
     const seasons = new Set<string>();
     rankedPlayers.forEach(p => {
@@ -22,10 +21,10 @@ export default function TournamentRanking() {
       if (t.season) seasons.add(t.season);
       else if (t.createdAt) seasons.add(getSeasonInfo(new Date(t.createdAt)).name);
     });
-    matches.forEach(m => seasons.add(getSeasonInfo(new Date(m.timestamp)).name));
+    // Always include current season
     seasons.add(currentSeason);
     return Array.from(seasons).sort().reverse();
-  }, [rankedPlayers, matches, tournaments, currentSeason]);
+  }, [rankedPlayers, tournaments, currentSeason]);
 
   const [selectedSeason, setSelectedSeason] = useState(currentSeason);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);

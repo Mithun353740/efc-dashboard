@@ -3,8 +3,10 @@ import { motion } from 'motion/react';
 import { Shield, Lock, Chrome } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { loginAnonymously, loginWithGoogle } from '../firebase';
+import { useFirebase } from '../FirebaseContext';
 
 export default function Login() {
+  const { dbError } = useFirebase();
   const [loginType, setLoginType] = useState<'select' | 'admin' | 'player'>('select');
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
@@ -253,6 +255,13 @@ export default function Login() {
             </>
           )}
 
+          {dbError === 'QUOTA_EXCEEDED' && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-4">
+              <p className="text-[10px] font-black text-red-500 text-center uppercase tracking-widest">
+                SYSTEM TEMPORARILY LOCKED: DAILY DATABASE LIMIT EXCEEDED. PLEASE TRY AGAIN TOMORROW.
+              </p>
+            </div>
+          )}
           {error && <p className="text-[10px] font-bold text-red-500 text-center">{error}</p>}
         </form>
 

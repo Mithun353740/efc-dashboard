@@ -9,7 +9,7 @@ interface TournamentHistoryProps {
 }
 
 export default function TournamentHistory({ onOpenTournament }: TournamentHistoryProps) {
-  const { matches, tournaments } = useFirebase();
+  const { tournaments } = useFirebase();
   
   // 1. Determine Current Season & Available Seasons
   const currentSeason = useMemo(() => getSeasonInfo(new Date()).name, []);
@@ -23,12 +23,10 @@ export default function TournamentHistory({ onOpenTournament }: TournamentHistor
         seasons.add(getSeasonInfo(new Date(t.createdAt)).name);
       }
     });
-    matches.forEach(m => {
-      seasons.add(getSeasonInfo(new Date(m.timestamp)).name);
-    });
+    // Always include current season even if no tournaments yet
     seasons.add(currentSeason);
     return Array.from(seasons).sort().reverse();
-  }, [matches, tournaments, currentSeason]);
+  }, [tournaments, currentSeason]);
 
   const [selectedSeason, setSelectedSeason] = useState(currentSeason);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);

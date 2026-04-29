@@ -10,6 +10,10 @@ import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournam
 import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+// ─── Module-level cache (persists across route changes, cleared on write) ─────
+let _clubCache: { clubs: Club[]; config: ClubSystemConfig | null; listings: MarketListing[] } | null = null;
+export function invalidateClubCache() { _clubCache = null; }
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function cn(...classes: (string | boolean | undefined)[]) {
@@ -22,11 +26,11 @@ function fmtBudget(n: number) {
   return String(n);
 }
 
-function calcLevel(player?: Player) {
-  if (!player) return 1;
+function calcLevel(player?: Player): { lvl: number; progress: number } {
+  if (!player) return { lvl: 1, progress: 0 };
   const xp = (player.win * 500) + (player.goalsScored * 50);
   const lvl = Math.floor(xp / 1000) + 1;
-  const progress = (xp % 1000) / 10; // 0-100%
+  const progress = (xp % 1000) / 10;
   return { lvl, progress };
 }
 
@@ -267,9 +271,18 @@ export default function ClubManager() {
   const squad = useMemo(() => myClub ? players.filter(p => myClub.squadIds?.includes(p.id)) : [], [players, myClub]);
   const isOwner = myClub?.ownerId === playerId;
 
-  const load = async () => {
+  const load = async (force = false) => {
+    // Return cached data immediately unless forced or cache is empty
+    if (_clubCache && !force) {
+      setClubs(_clubCache.clubs);
+      if (_clubCache.config) setConfig(_clubCache.config);
+      setListings(_clubCache.listings);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const [cs, cfg, ls] = await Promise.all([fetchClubs(), fetchClubConfig(), fetchMarketListings()]);
+    _clubCache = { clubs: cs, config: cfg, listings: ls };
     setClubs(cs);
     if (cfg) setConfig(cfg);
     setListings(ls);
@@ -390,7 +403,7 @@ export default function ClubManager() {
             )}
             {activeTab === 'market' && (
               <motion.div key="market" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
-                <MarketTab listings={listings} clubs={clubs} myClub={myClub} players={players} isOwner={isOwner} config={config} onRefresh={load} setMsg={setMsg} />
+                <MarketTab listings={listings} clubs={clubs} myClub={myClub} players={players} isOwner={isOwner} config={config} onRefresh={() => load(true)} setMsg={setMsg} />
               </motion.div>
             )}
             {activeTab === 'rankings' && (
@@ -753,6 +766,10 @@ function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; player
 
 // ─── Tournaments Hub ─────────────────────────────────────────────────────────
 
+// Module-level cache for club tournaments/fixtures keyed by season
+const _tournamentsCache: Record<string, { tournaments: ClubTournament[]; fixtures: ClubFixture[] }> = {};
+export function invalidateTournamentsCache() { Object.keys(_tournamentsCache).forEach(k => delete _tournamentsCache[k]); }
+
 function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { config: ClubSystemConfig | null; clubs: Club[]; myClub?: Club; squad: Player[]; players: Player[]; setMsg: (m: any) => void }) {
   const [tournaments, setTournaments] = useState<ClubTournament[]>([]);
   const [fixtures, setFixtures] = useState<ClubFixture[]>([]);
@@ -768,15 +785,24 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
   useEffect(() => {
     async function load() {
       if (!config?.season) return;
+      // Use cache if available for this season
+      const cached = _tournamentsCache[config.season];
+      if (cached) {
+        setTournaments(cached.tournaments);
+        setFixtures(cached.fixtures);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const [ts, fs] = await Promise.all([
           fetchClubTournaments(config.season),
           fetchClubFixtures(config.season)
         ]);
+        const sortedFs = fs.sort((a, b) => b.createdAt - a.createdAt);
+        _tournamentsCache[config.season] = { tournaments: ts, fixtures: sortedFs };
         setTournaments(ts);
-        // Only show fixtures for active or completed tournaments
-        setFixtures(fs.sort((a, b) => b.createdAt - a.createdAt));
+        setFixtures(sortedFs);
       } catch (e) {
         console.error(e);
       }
@@ -837,9 +863,50 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
       }
 
       await saveClubFixture(nf);
-      setFixtures(prev => prev.map(x => x.id === f.id ? nf : x));
+      // Update local state directly (no refetch) and invalidate cache
+      setFixtures(prev => {
+        const updated = prev.map(x => x.id === f.id ? nf : x);
+        // Update cache in-place so next mount gets fresh data
+        if (config?.season && _tournamentsCache[config.season]) {
+          _tournamentsCache[config.season].fixtures = updated;
+        }
+        return updated;
+      });
       setSelFixtureId(null);
       setMsg({ text: '✅ Lineup submitted', type: 'success' });
+    } catch (e: any) {
+      setMsg({ text: '❌ ' + e.message, type: 'error' });
+    }
+    setSubmitting(false);
+  };
+
+  const handleSubmitMatchups = async (f: ClubFixture) => {
+    if (!myClub) return;
+    setSubmitting(true);
+    try {
+      const nf: ClubFixture = {
+        ...f,
+        subMatches: f.awayLineupIds.map(aId => ({
+          id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
+          p1Id: matchupSelection[aId],
+          p1Name: players.find(p => p.id === matchupSelection[aId])?.name || 'Unknown',
+          p2Id: aId,
+          p2Name: players.find(p => p.id === aId)?.name || 'Unknown',
+          p1Score: null, p2Score: null,
+        })),
+        status: 'active',
+      };
+      await saveClubFixture(nf);
+      setFixtures(prev => {
+        const updated = prev.map(x => x.id === f.id ? nf : x);
+        if (config?.season && _tournamentsCache[config.season]) {
+          _tournamentsCache[config.season].fixtures = updated;
+        }
+        return updated;
+      });
+      setSelFixtureId(null);
+      setMatchupSelection({});
+      setMsg({ text: '✅ Matchups locked!', type: 'success' });
     } catch (e: any) {
       setMsg({ text: '❌ ' + e.message, type: 'error' });
     }

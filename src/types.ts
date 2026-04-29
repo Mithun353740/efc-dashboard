@@ -27,6 +27,10 @@ export interface Player {
   device?: string;
   uid?: string;
   role?: 'admin' | 'player';
+  /** Custom auth fields — stored in Firestore, used for player login */
+  email?: string;
+  password?: string;
+  overall?: string | number; // alias used in some display components
 
   // ── Club Zone fields (optional — only set when club system is active) ─────
   clubId?: string;

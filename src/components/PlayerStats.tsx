@@ -31,16 +31,16 @@ export default function PlayerStats() {
     }
   }, [players, playerIdParam, selectedPlayer]);
 
-  // Available seasons — pulled from pre-computed keys (full history) + recent matches
+  // Available seasons — pulled from pre-computed keys (full history)
   const availableSeasons = useMemo(() => {
     const seasons = new Set<string>();
     players.forEach(p => {
       if (p.seasonStats) Object.keys(p.seasonStats).forEach(s => seasons.add(s));
     });
-    matches.forEach(m => seasons.add(getSeasonInfo(new Date(m.timestamp)).name));
+    // Fallback to current season if no stats yet
     seasons.add(getSeasonInfo(new Date()).name);
     return Array.from(seasons).sort().reverse();
-  }, [players, matches]);
+  }, [players]);
 
   const availableTournaments = useMemo(() => {
     const core = ['QVFC ELITE LEAGUE CUP DIVISION 1', 'QVFC ELITE LEAGUE CUP DIVISION 2', 'VORTEX CHAMPIONS CUP', 'VORTEX DOMESTIC CUP'];

@@ -94,8 +94,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     let unsubMatches: () => void = () => {};
     let unsubTournaments: () => void = () => {};
 
-    // Always probe server health
-    testFirestoreConnection();
+    // Only probe server health for admins — guests use IndexedDB persistence as fallback
+    if (isAdmin) testFirestoreConnection();
 
     // ─────────────────────────────────────────────────────────────────────────
     // OPTIMIZED SUBSCRIPTIONS
@@ -117,17 +117,25 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // - Members (Admins & Players): Get the "Advanced" full firehose.
     // - Guests: Get the "Fast" optimized view to save your daily quota.
     if (isAdmin || isPlayer) {
+      // Players NO LONGER subscribe to matches globally. Only Admins do.
+      if (isAdmin) {
+        unsubMatches = subscribeToMatches((data, pending) => {
+          if (mounted) {
+            setMatches(data);
+            setIsLoadingMatches(false);
+          }
+          matchesRef.current = data;
+        });
+      } else {
+        setIsLoadingMatches(false); // Players don't wait for matches
+      }
+
+      // Players subscribe to top players for rankings (limit to 100 for performance)
       unsubPlayers = subscribeToPlayers((data, pending) => {
         if (!mounted) return;
         setPlayers(data);
         setIsLoadingPlayers(false);
-      });
-
-      unsubMatches = subscribeToMatches((data, pending) => {
-        if (!mounted) return;
-        setMatches(data);
-        setIsLoadingMatches(false);
-      });
+      }, 100);
 
       unsubTournaments = subscribeToTournaments((data, pending) => {
         if (!mounted) return;

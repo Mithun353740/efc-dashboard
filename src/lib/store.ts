@@ -111,7 +111,7 @@ interface FirestoreErrorInfo {
   }
 }
 
-let isQuotaExceeded = false;
+export let isQuotaExceeded = false;
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errStrRaw = error instanceof Error ? error.message : (typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error));
@@ -149,15 +149,18 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+let _connectionTested = false;
 export async function testFirestoreConnection() {
+  if (_connectionTested) return;
+  _connectionTested = true;
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
     console.log('Firestore connection test successful');
   } catch (error: any) {
+    _connectionTested = false; // allow retry if it was a transient failure
     if (error?.message?.includes('the client is offline')) {
       console.error("Firestore is offline. Please check your Firebase configuration.");
     } else if (error?.code === 'resource-exhausted' || String(error).toLowerCase().includes('quota') || String(error).toLowerCase().includes('resource-exhausted')) {
-      // Only fire quota error for actual quota exhaustion — NOT for permission-denied
       console.warn("Quota exceeded detected during connection test.");
       const errInfo: FirestoreErrorInfo = {
         error: error.message || 'Quota exceeded',
@@ -175,7 +178,6 @@ export async function testFirestoreConnection() {
       const event = new CustomEvent('firestore-error', { detail: errInfo });
       window.dispatchEvent(event);
     } else if (error?.code === 'permission-denied') {
-      // Permission denied on the test collection is expected for anonymous users — ignore silently
       console.log('Firestore connection test: permission-denied on test collection (expected for anon users).');
     }
   }
@@ -344,12 +346,9 @@ export async function updatePlayerProfile(
 
 
 // Real-time listeners
-export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount?: number) {
+export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 100) {
   const path = 'players';
-  const q = limitCount 
-    ? query(collection(db, path), orderBy('ovr', 'desc'), limit(limitCount))
-    : query(collection(db, path));
-    
+  const q = query(collection(db, path), orderBy('ovr', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
     const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
     callback(players, snapshot.metadata.hasPendingWrites);
@@ -360,7 +359,8 @@ export function subscribeToPlayers(callback: (players: Player[], hasPending: boo
 
 export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boolean) => void) {
   const path = 'leaders';
-  const q = query(collection(db, path));
+  // Leaders collection is tiny — limit to 50 to be safe
+  const q = query(collection(db, path), limit(50));
   return onSnapshot(q, (snapshot) => {
     const leaders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
     callback(leaders, snapshot.metadata.hasPendingWrites);
@@ -393,8 +393,8 @@ export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending
  */
 async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]> {
   const [snap1, snap2] = await Promise.all([
-    getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId))),
-    getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId))),
+    getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId), orderBy('timestamp', 'desc'), limit(50))),
+    getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId), orderBy('timestamp', 'desc'), limit(50))),
   ]);
   const seen = new Set<string>();
   const results: MatchRecord[] = [];
@@ -409,7 +409,8 @@ async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]
 
 export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void) {
   const path = 'tournaments';
-  const q = query(collection(db, path), orderBy('createdAt', 'desc'));
+  // Cap at 100 — if you have more than 100 tournaments something has gone wrong
+  const q = query(collection(db, path), orderBy('createdAt', 'desc'), limit(100));
   return onSnapshot(q, (snapshot) => {
     const tournaments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
     callback(tournaments, snapshot.metadata.hasPendingWrites);
@@ -1086,15 +1087,19 @@ export async function deleteClubTournament(id: string): Promise<void> {
 }
 
 export async function fetchClubFixtures(seasonName: string): Promise<import('../types').ClubFixture[]> {
-  // To optimize reads, we load fixtures for the current season.
+  // Filter by season to avoid reading the entire collection
   try {
-    // Note: We might need a composite index if we filter by season, but since clubFixtures is small, 
-    // a basic query or client-side filtering can work. We will fetch all and filter by season config for now.
-    const snap = await getDocs(collection(db, 'clubFixtures'));
+    const snap = await getDocs(query(collection(db, 'clubFixtures'), where('season', '==', seasonName), limit(200)));
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubFixture));
   } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, 'clubFixtures');
-    return [];
+    // Fallback: if no 'season' field on old documents, fetch all (graceful degradation)
+    try {
+      const snap = await getDocs(query(collection(db, 'clubFixtures'), limit(200)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubFixture));
+    } catch (err2) {
+      handleFirestoreError(err2, OperationType.LIST, 'clubFixtures');
+      return [];
+    }
   }
 }
 
@@ -1155,13 +1160,13 @@ export async function updateFixtureSubMatch(
       ...newSubMatches.map(sm => sm.p2Id)
     ])];
     
-    // We need to fetch these players, decrement their contract, and write back
-    // (In a real high-scale app, we'd use a transaction or FieldValue.increment(-1),
-    // but we need to check if the contract reaches 0 to handle free agency).
-    // For now, we will just decrement it via the client's cached player array if passed,
-    // or we can just fetch them here.
-    const playersSnap = await getDocs(query(collection(db, 'players'), where('id', 'in', allParticipantIds)));
-    playersSnap.docs.forEach(docSnap => {
+    // Fetch each participant doc individually — more reads but correct.
+    // Using FieldValue.increment is not possible here since we need to check if amount hits 0.
+    // Each fixture has at most lineupSize*2 participants, typically 4-10 reads max.
+    const playerFetches = allParticipantIds.map(pid => getDoc(doc(db, 'players', pid)));
+    const playerSnaps = await Promise.all(playerFetches);
+    playerSnaps.forEach(docSnap => {
+      if (!docSnap.exists()) return;
       const p = docSnap.data() as import('../types').Player;
       if (p.clubContract && p.clubContract.type === 'matches' && p.clubContract.amount > 0) {
         batch.update(docSnap.ref, {
