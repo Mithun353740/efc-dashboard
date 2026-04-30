@@ -144,9 +144,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }
         matchesRef.current = data;
       });
-    } else {
-      setIsLoadingMatches(false);
-    }
 
       unsubPlayers = subscribeToPlayers((data, pending) => {
         if (!mounted) return;
@@ -161,6 +158,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (_globalCache) _globalCache.tournaments = data;
       });
     } else {
+      setIsLoadingMatches(false);
       // FOR GUESTS (The Free Tier protection):
       unsubPlayers = subscribeToPlayers((data) => {
         if (mounted) {
