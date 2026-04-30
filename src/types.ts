@@ -46,6 +46,8 @@ export interface Player {
     type: 'matches' | 'days';
     amount: number; // matches remaining OR expiration timestamp (ms)
   };
+  /** Release clause — if set, any club can buy this player for this amount without negotiation */
+  releaseClause?: ReleaseClause;
 
   /**
    * Pre-computed per-season stats.
@@ -97,8 +99,142 @@ export interface Club {
   ownerName?: string;     // denormalized for display
   budget: number;         // virtual currency (e.g. 50_000_000)
   squadIds: string[];     // Player IDs in this club's squad
+  shortlistedPlayerIds?: string[]; // Player IDs this club has shortlisted for transfer
   createdAt: number;
 }
+
+// ─── RELEASE CLAUSE ───────────────────────────────────────────────────────────
+
+/** A release clause set by a club owner on one of their players. */
+export interface ReleaseClause {
+  active: boolean;
+  amount: number;
+  setByClubId: string;
+  setByClubName: string;
+  setAt: number; // timestamp ms
+}
+
+// ─── AUCTION TYPES ────────────────────────────────────────────────────────────
+
+/** The current state of the live auction, stored in auctions/live */
+export interface AuctionState {
+  auctionId: string;           // unique ID per auction session (e.g., timestamp string)
+  status: 'idle' | 'active' | 'sold' | 'folded' | 'ended';
+  currentPlayer: {
+    id: string;
+    name: string;
+    image: string;
+    ovr: number;
+    currentClubId: string | null;
+    currentClubName: string | null;
+  } | null;
+  basePrice: number;
+  currentBid: number;
+  leadingClubId: string | null;
+  leadingClubName: string | null;
+  minNextBid: number;          // currentBid + bidIncrement
+  bidIncrement: number;
+  biddingOrder: string[];      // Ordered club IDs for turn management
+  currentTurnIndex: number;    // Whose turn it is (index into biddingOrder)
+  foldedClubs: string[];       // Club IDs that have folded this round
+  startedAt: number | null;
+  soldAt: number | null;
+  adminId: string | null;
+}
+
+// ─── INTERNAL CLUB SEASONS ────────────────────────────────────────────────────
+
+/** One internal mini-season under a global season year */
+export interface ClubSeason {
+  id: string;                  // e.g., "2026_2027__S1"
+  globalSeason: string;        // e.g., "2026/2027"
+  seasonNumber: number;        // 1, 2, 3...
+  label: string;               // e.g., "Season 1"
+  status: 'upcoming' | 'active' | 'completed';
+  startedAt: number | null;
+  endedAt: number | null;
+  standingsSnapshot?: Record<string, {
+    clubId: string;
+    clubName: string;
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    goalsScored: number;
+    goalsConceded: number;
+    points: number;
+  }>;
+}
+
+// ─── CLUB INBOX / NOTIFICATIONS ───────────────────────────────────────────────
+
+export type InboxMessageType =
+  | 'proposal_received'
+  | 'proposal_accepted'
+  | 'proposal_declined'
+  | 'counter_offer'
+  | 'release_clause_triggered'
+  | 'transfer_window_opened'
+  | 'transfer_window_closed'
+  | 'auction_started'
+  | 'system';
+
+/** One notification in a club owner's inbox */
+export interface ClubInboxMessage {
+  id: string;
+  type: InboxMessageType;
+  from: { clubId: string; clubName: string } | null;  // null for system messages
+  relatedPlayerId?: string;
+  relatedPlayerName?: string;
+  threadId?: string;          // Links to a TransferThread if relevant
+  message: string;
+  read: boolean;
+  createdAt: number;
+}
+
+/** The inbox document for one club owner, stored at clubInbox/{ownerId} */
+export interface ClubInbox {
+  ownerId: string;
+  messages: ClubInboxMessage[];
+  unreadCount: number;
+}
+
+// ─── TRANSFER NEGOTIATION ─────────────────────────────────────────────────────
+
+export type TransferOfferType = 'money' | 'swap';
+export type TransferThreadStatus = 'pending' | 'negotiating' | 'accepted' | 'declined' | 'expired';
+
+export interface TransferOffer {
+  type: TransferOfferType;
+  amount: number | null;             // For money deals
+  swapPlayerId: string | null;       // For swap deals
+  swapPlayerName: string | null;
+  sentBy: 'buyer' | 'seller';        // Who sent this offer
+  sentAt: number;
+  note?: string;                     // Optional message attached to offer
+}
+
+/** One negotiation thread between two clubs for a specific player */
+export interface TransferThread {
+  id: string;
+  status: TransferThreadStatus;
+  buyerClubId: string;
+  buyerClubName: string;
+  buyerOwnerId: string;
+  sellerClubId: string;
+  sellerClubName: string;
+  sellerOwnerId: string;
+  playerId: string;
+  playerName: string;
+  playerImage: string;
+  playerOvr: number;
+  currentOffer: TransferOffer;
+  history: TransferOffer[];          // Full history for audit
+  createdAt: number;
+  updatedAt: number;
+  expiresAt: number;                 // Auto-expire after 72 hours
+}
+
 
 /** One slot in the matchday schedule. */
 export interface MatchdaySlot {

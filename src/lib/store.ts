@@ -1,4 +1,4 @@
-import { Player, PartialPlayerStats, Leader, MatchRecord, Tournament } from '../types';
+import { Player, PartialPlayerStats, Leader, MatchRecord, Tournament, AuctionState, ClubSeason, ClubInboxMessage, TransferThread, TransferOffer, ReleaseClause } from '../types';
 import { db, auth } from '../firebase';
 import { resolveCanonicalTournamentName, getSeasonInfo } from './utils';
 import { 
@@ -15,7 +15,9 @@ import {
   limit,
   getDocFromServer,
   serverTimestamp,
-  where
+  where,
+  arrayUnion,
+  increment
 } from 'firebase/firestore';
 
 /**
@@ -1248,4 +1250,408 @@ export function sortRankedPlayers(players: Player[]): Player[] {
     // 7. Alphabetical order fallback
     return a.name.localeCompare(b.name);
   });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLUB ZONE V2 — AUCTION SYSTEM
+// Single shared document "auctions/live" — all 60+ viewers share ONE listener.
+// Cost: 1 read per user to connect + 1 write per bid/fold/reveal. Extremely cheap.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const AUCTION_DOC = doc(db, 'auctions', 'live');
+
+/** Real-time listener on the single auction document. */
+export function subscribeToAuction(callback: (state: AuctionState | null) => void) {
+  return onSnapshot(AUCTION_DOC, (snap) => {
+    callback(snap.exists() ? (snap.data() as AuctionState) : null);
+  }, (err) => handleFirestoreError(err, OperationType.GET, 'auctions/live'));
+}
+
+/** Admin: Initialize/reset the auction for a new session. */
+export async function adminStartAuction(clubIds: string[], bidIncrement: number, basePrice: number): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const state: AuctionState = {
+    auctionId: Date.now().toString(),
+    status: 'idle',
+    currentPlayer: null,
+    basePrice,
+    currentBid: 0,
+    leadingClubId: null,
+    leadingClubName: null,
+    minNextBid: basePrice,
+    bidIncrement,
+    biddingOrder: clubIds,
+    currentTurnIndex: 0,
+    foldedClubs: [],
+    startedAt: Date.now(),
+    soldAt: null,
+    adminId: auth.currentUser?.uid || null,
+  };
+  await setDoc(AUCTION_DOC, state);
+}
+
+/** Admin: Reveal the next player card. Resets bid state for the new player. */
+export async function adminRevealCard(player: { id: string; name: string; image: string; ovr: number; currentClubId: string | null; currentClubName: string | null }, basePrice: number, bidIncrement: number): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  await setDoc(AUCTION_DOC, {
+    status: 'active',
+    currentPlayer: player,
+    basePrice,
+    currentBid: basePrice,
+    leadingClubId: null,
+    leadingClubName: null,
+    minNextBid: basePrice + bidIncrement,
+    foldedClubs: [],
+    currentTurnIndex: 0,
+    soldAt: null,
+  }, { merge: true });
+}
+
+/** Club owner: Place a bid on the current player. */
+export async function placeBid(clubId: string, clubName: string, bidAmount: number, currentState: AuctionState): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const nextTurnIndex = (currentState.currentTurnIndex + 1) % currentState.biddingOrder.filter(id => !currentState.foldedClubs.includes(id)).length;
+  await setDoc(AUCTION_DOC, {
+    currentBid: bidAmount,
+    leadingClubId: clubId,
+    leadingClubName: clubName,
+    minNextBid: bidAmount + currentState.bidIncrement,
+    currentTurnIndex: nextTurnIndex,
+  }, { merge: true });
+}
+
+/** Club owner: Fold — remove from current round. */
+export async function foldBid(clubId: string, currentState: AuctionState): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const newFolded = [...currentState.foldedClubs, clubId];
+  const activeBidders = currentState.biddingOrder.filter(id => !newFolded.includes(id));
+  // If only 1 left and someone already bid, they win automatically
+  const autoSold = activeBidders.length === 1 && currentState.leadingClubId !== null;
+  await setDoc(AUCTION_DOC, {
+    foldedClubs: newFolded,
+    status: autoSold ? 'sold' : 'active',
+    soldAt: autoSold ? Date.now() : null,
+    currentTurnIndex: autoSold ? currentState.currentTurnIndex : (currentState.currentTurnIndex + 1) % Math.max(activeBidders.length, 1),
+  }, { merge: true });
+}
+
+/** Admin: Confirm the sale — deduct budget from winning club, assign player. */
+export async function adminConfirmSold(currentState: AuctionState, winningClub: import('../types').Club): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  if (!currentState.currentPlayer || !currentState.leadingClubId) return;
+  const batch = writeBatch(db);
+  // Deduct budget from winning club
+  batch.update(doc(db, 'clubs', winningClub.id), { budget: winningClub.budget - currentState.currentBid });
+  // Transfer player to new club
+  batch.update(doc(db, 'players', currentState.currentPlayer.id), {
+    clubId: winningClub.id,
+    clubName: winningClub.name,
+    primaryColor: winningClub.primaryColor,
+    secondaryColor: winningClub.secondaryColor,
+    isListed: false,
+    listingPrice: null,
+  });
+  // Mark auction as sold
+  batch.set(AUCTION_DOC, { status: 'sold', soldAt: Date.now() }, { merge: true });
+  await batch.commit();
+  await updateLastUpdated();
+}
+
+/** Admin: Skip the current player (unsold / folded). */
+export async function adminSkipPlayer(): Promise<void> {
+  await setDoc(AUCTION_DOC, { status: 'folded', currentPlayer: null, leadingClubId: null, leadingClubName: null, currentBid: 0, foldedClubs: [] }, { merge: true });
+}
+
+/** Admin: End the entire auction session. */
+export async function adminEndAuction(): Promise<void> {
+  await setDoc(AUCTION_DOC, { status: 'ended', currentPlayer: null }, { merge: true });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLUB INBOX / NOTIFICATIONS
+// Each owner has ONE document at clubInbox/{ownerId}.
+// Reading inbox = 1 read. Pushing notification = 1 write (arrayUnion).
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Real-time listener on a club owner's inbox. */
+export function subscribeToInbox(ownerId: string, callback: (messages: ClubInboxMessage[], unreadCount: number) => void) {
+  const ref = doc(db, 'clubInbox', ownerId);
+  return onSnapshot(ref, (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      callback(data.messages || [], data.unreadCount || 0);
+    } else {
+      callback([], 0);
+    }
+  }, (err) => handleFirestoreError(err, OperationType.GET, `clubInbox/${ownerId}`));
+}
+
+/** Push a notification into a club owner's inbox. Costs 1 write. */
+export async function pushInboxMessage(ownerId: string, message: ClubInboxMessage): Promise<void> {
+  if (isQuotaExceeded) return;
+  const ref = doc(db, 'clubInbox', ownerId);
+  try {
+    await setDoc(ref, {
+      ownerId,
+      messages: arrayUnion(message),
+      unreadCount: increment(1),
+    }, { merge: true });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubInbox/${ownerId}`);
+  }
+}
+
+/** Mark all messages as read for an owner. */
+export async function markInboxRead(ownerId: string, messages: ClubInboxMessage[]): Promise<void> {
+  if (isQuotaExceeded) return;
+  const ref = doc(db, 'clubInbox', ownerId);
+  const updated = messages.map(m => ({ ...m, read: true }));
+  try {
+    await setDoc(ref, { messages: updated, unreadCount: 0 }, { merge: true });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clubInbox/${ownerId}`);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TRANSFER NEGOTIATION SYSTEM
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Fetch all active transfer threads for a club (buyer or seller). ~1 read. */
+export async function fetchTransferThreadsForClub(clubId: string): Promise<TransferThread[]> {
+  try {
+    const [buyerSnap, sellerSnap] = await Promise.all([
+      getDocs(query(collection(db, 'transferThreads'), where('buyerClubId', '==', clubId), where('status', 'in', ['pending', 'negotiating']), limit(50))),
+      getDocs(query(collection(db, 'transferThreads'), where('sellerClubId', '==', clubId), where('status', 'in', ['pending', 'negotiating']), limit(50))),
+    ]);
+    const seen = new Set<string>();
+    const results: TransferThread[] = [];
+    [...buyerSnap.docs, ...sellerSnap.docs].forEach(d => {
+      if (!seen.has(d.id)) { seen.add(d.id); results.push({ id: d.id, ...d.data() } as TransferThread); }
+    });
+    return results;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'transferThreads');
+    return [];
+  }
+}
+
+/** Create a new transfer proposal. Costs 1 write (thread) + 1 write (inbox). */
+export async function sendTransferProposal(thread: Omit<TransferThread, 'id' | 'createdAt' | 'updatedAt' | 'expiresAt' | 'history' | 'status'>): Promise<string> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Transfer window may be closed or quota exceeded.');
+  const id = `thread_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const now = Date.now();
+  const fullThread: TransferThread = {
+    ...thread,
+    id,
+    status: 'pending',
+    history: [thread.currentOffer],
+    createdAt: now,
+    updatedAt: now,
+    expiresAt: now + 72 * 60 * 60 * 1000, // 72h
+  };
+  await setDoc(doc(db, 'transferThreads', id), fullThread);
+
+  const msgId = `msg_${Date.now()}`;
+  await pushInboxMessage(thread.sellerOwnerId, {
+    id: msgId,
+    type: 'proposal_received',
+    from: { clubId: thread.buyerClubId, clubName: thread.buyerClubName },
+    relatedPlayerId: thread.playerId,
+    relatedPlayerName: thread.playerName,
+    threadId: id,
+    message: `${thread.buyerClubName} sent a transfer proposal for ${thread.playerName}.`,
+    read: false,
+    createdAt: now,
+  });
+  return id;
+}
+
+/** Respond to a proposal — accept, decline, or counter. Costs 1-2 writes. */
+export async function respondToProposal(
+  thread: TransferThread,
+  action: 'accept' | 'decline' | 'counter',
+  counterOffer?: Omit<TransferOffer, 'sentAt'>,
+  clubs?: { buyerClub: import('../types').Club; sellerClub: import('../types').Club },
+  player?: import('../types').Player
+): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const now = Date.now();
+  const threadRef = doc(db, 'transferThreads', thread.id);
+
+  if (action === 'decline') {
+    await setDoc(threadRef, { status: 'declined', updatedAt: now }, { merge: true });
+    await pushInboxMessage(thread.buyerOwnerId, {
+      id: `msg_${now}`, type: 'proposal_declined',
+      from: { clubId: thread.sellerClubId, clubName: thread.sellerClubName },
+      relatedPlayerId: thread.playerId, relatedPlayerName: thread.playerName, threadId: thread.id,
+      message: `${thread.sellerClubName} declined your proposal for ${thread.playerName}.`,
+      read: false, createdAt: now,
+    });
+    return;
+  }
+
+  if (action === 'accept' && clubs && player) {
+    const batch = writeBatch(db);
+    const offer = thread.currentOffer;
+
+    if (offer.type === 'money' && offer.amount !== null) {
+      batch.update(doc(db, 'clubs', clubs.buyerClub.id), { budget: clubs.buyerClub.budget - offer.amount });
+      batch.update(doc(db, 'clubs', clubs.sellerClub.id), { budget: clubs.sellerClub.budget + offer.amount });
+    } else if (offer.type === 'swap' && offer.swapPlayerId) {
+      // Swap: move each player to the other club
+      batch.update(doc(db, 'players', player.id), { clubId: clubs.buyerClub.id, clubName: clubs.buyerClub.name, primaryColor: clubs.buyerClub.primaryColor, secondaryColor: clubs.buyerClub.secondaryColor });
+      batch.update(doc(db, 'players', offer.swapPlayerId), { clubId: clubs.sellerClub.id, clubName: clubs.sellerClub.name, primaryColor: clubs.sellerClub.primaryColor, secondaryColor: clubs.sellerClub.secondaryColor });
+      batch.update(doc(db, 'clubs', clubs.buyerClub.id), { squadIds: [...clubs.buyerClub.squadIds.filter(id => id !== offer.swapPlayerId), player.id] });
+      batch.update(doc(db, 'clubs', clubs.sellerClub.id), { squadIds: [...clubs.sellerClub.squadIds.filter(id => id !== player.id), offer.swapPlayerId] });
+    }
+
+    // Move bought player to buyer club (for money deal)
+    if (offer.type === 'money') {
+      batch.update(doc(db, 'players', player.id), { clubId: clubs.buyerClub.id, clubName: clubs.buyerClub.name, primaryColor: clubs.buyerClub.primaryColor, secondaryColor: clubs.buyerClub.secondaryColor, isListed: false, listingPrice: null });
+      batch.update(doc(db, 'clubs', clubs.buyerClub.id), { squadIds: [...clubs.buyerClub.squadIds, player.id] });
+      batch.update(doc(db, 'clubs', clubs.sellerClub.id), { squadIds: clubs.sellerClub.squadIds.filter(id => id !== player.id) });
+    }
+
+    batch.update(threadRef, { status: 'accepted', updatedAt: now });
+    await batch.commit();
+    await updateLastUpdated();
+
+    await pushInboxMessage(thread.buyerOwnerId, {
+      id: `msg_${now}`, type: 'proposal_accepted',
+      from: { clubId: thread.sellerClubId, clubName: thread.sellerClubName },
+      relatedPlayerId: thread.playerId, relatedPlayerName: thread.playerName, threadId: thread.id,
+      message: `🎉 ${thread.sellerClubName} accepted your proposal! ${thread.playerName} is now yours.`,
+      read: false, createdAt: now,
+    });
+    return;
+  }
+
+  if (action === 'counter' && counterOffer) {
+    const newOffer: TransferOffer = { ...counterOffer, sentAt: now };
+    await setDoc(threadRef, {
+      status: 'negotiating',
+      currentOffer: newOffer,
+      history: arrayUnion(newOffer),
+      updatedAt: now,
+    }, { merge: true });
+    const targetOwnerId = counterOffer.sentBy === 'seller' ? thread.buyerOwnerId : thread.sellerOwnerId;
+    const fromClub = counterOffer.sentBy === 'seller' ? { clubId: thread.sellerClubId, clubName: thread.sellerClubName } : { clubId: thread.buyerClubId, clubName: thread.buyerClubName };
+    await pushInboxMessage(targetOwnerId, {
+      id: `msg_${now}`, type: 'counter_offer', from: fromClub,
+      relatedPlayerId: thread.playerId, relatedPlayerName: thread.playerName, threadId: thread.id,
+      message: `${fromClub.clubName} sent a counter-offer for ${thread.playerName}.`,
+      read: false, createdAt: now,
+    });
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// RELEASE CLAUSES
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Club owner sets a release clause on one of their players. 1 write. */
+export async function setReleaseClause(playerId: string, clause: ReleaseClause): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  await setDoc(doc(db, 'players', playerId), { releaseClause: clause }, { merge: true });
+  await updateLastUpdated();
+}
+
+/** Remove a release clause from a player. 1 write. */
+export async function removeReleaseClause(playerId: string): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  await setDoc(doc(db, 'players', playerId), { releaseClause: null }, { merge: true });
+  await updateLastUpdated();
+}
+
+/** Trigger a release clause — instant purchase, no negotiation needed. 1 batch write. */
+export async function triggerReleaseClause(
+  player: import('../types').Player,
+  buyerClub: import('../types').Club,
+  sellerClub: import('../types').Club,
+): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  if (!player.releaseClause?.active) throw new Error('No active release clause.');
+  const amount = player.releaseClause.amount;
+  if (buyerClub.budget < amount) throw new Error(`Insufficient budget. Need ${amount.toLocaleString()}, have ${buyerClub.budget.toLocaleString()}.`);
+
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'clubs', buyerClub.id), { budget: buyerClub.budget - amount, squadIds: [...buyerClub.squadIds, player.id] });
+  batch.update(doc(db, 'clubs', sellerClub.id), { budget: sellerClub.budget + amount, squadIds: sellerClub.squadIds.filter(id => id !== player.id) });
+  batch.update(doc(db, 'players', player.id), { clubId: buyerClub.id, clubName: buyerClub.name, primaryColor: buyerClub.primaryColor, secondaryColor: buyerClub.secondaryColor, releaseClause: null, isListed: false, listingPrice: null });
+  await batch.commit();
+  await updateLastUpdated();
+
+  const now = Date.now();
+  const sellerMsg: ClubInboxMessage = { id: `msg_${now}`, type: 'release_clause_triggered', from: { clubId: buyerClub.id, clubName: buyerClub.name }, relatedPlayerId: player.id, relatedPlayerName: player.name, message: `${buyerClub.name} triggered the release clause for ${player.name} (${amount.toLocaleString()} coins).`, read: false, createdAt: now };
+  const buyerMsg: ClubInboxMessage = { id: `msg_${now + 1}`, type: 'release_clause_triggered', from: { clubId: sellerClub.id, clubName: sellerClub.name }, relatedPlayerId: player.id, relatedPlayerName: player.name, message: `✅ Release clause triggered! ${player.name} has joined ${buyerClub.name}.`, read: false, createdAt: now };
+  await Promise.all([pushInboxMessage(sellerClub.ownerId, sellerMsg), pushInboxMessage(buyerClub.ownerId, buyerMsg)]);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SHORTLIST
+// Stored on the Club document — no extra reads needed.
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function addToShortlist(clubId: string, playerId: string): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  await setDoc(doc(db, 'clubs', clubId), { shortlistedPlayerIds: arrayUnion(playerId) }, { merge: true });
+}
+
+export async function removeFromShortlist(clubId: string, playerId: string): Promise<void> {
+  if (isQuotaExceeded) return;
+  const clubDoc = await getDoc(doc(db, 'clubs', clubId));
+  if (!clubDoc.exists()) return;
+  const current: string[] = clubDoc.data().shortlistedPlayerIds || [];
+  await setDoc(doc(db, 'clubs', clubId), { shortlistedPlayerIds: current.filter(id => id !== playerId) }, { merge: true });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// INTERNAL CLUB SEASONS
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Fetch all internal seasons for a global season (e.g., "2026/2027"). */
+export async function fetchClubSeasons(globalSeason: string): Promise<ClubSeason[]> {
+  try {
+    const snap = await getDocs(query(collection(db, 'clubSeasons'), where('globalSeason', '==', globalSeason), orderBy('seasonNumber', 'asc'), limit(20)));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'clubSeasons');
+    return [];
+  }
+}
+
+/** Admin: Start a new internal season. 1 write. */
+export async function startClubSeason(globalSeason: string, seasonNumber: number): Promise<ClubSeason> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const id = `${globalSeason.replace('/', '_')}__S${seasonNumber}`;
+  const season: ClubSeason = {
+    id,
+    globalSeason,
+    seasonNumber,
+    label: `Season ${seasonNumber}`,
+    status: 'active',
+    startedAt: Date.now(),
+    endedAt: null,
+  };
+  await setDoc(doc(db, 'clubSeasons', id), season);
+  // Update the active season reference in clubConfig
+  await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: id, activeInternalSeasonLabel: season.label }, { merge: true });
+  return season;
+}
+
+/** Admin: End an internal season, saving the final standings snapshot. 1 write. */
+export async function endClubSeason(seasonId: string, standingsSnapshot: ClubSeason['standingsSnapshot']): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  await setDoc(doc(db, 'clubSeasons', seasonId), { status: 'completed', endedAt: Date.now(), standingsSnapshot }, { merge: true });
+  await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: null, activeInternalSeasonLabel: null }, { merge: true });
+}
+
+/** Admin: Broadcast a system notification to all club owners' inboxes. */
+export async function broadcastToAllOwners(ownerIds: string[], message: Omit<ClubInboxMessage, 'id' | 'read' | 'createdAt'>): Promise<void> {
+  if (isQuotaExceeded) return;
+  const now = Date.now();
+  await Promise.all(ownerIds.map((ownerId, i) =>
+    pushInboxMessage(ownerId, { ...message, id: `msg_${now}_${i}`, read: false, createdAt: now })
+  ));
 }

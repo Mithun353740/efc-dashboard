@@ -77,5 +77,55 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // ─── Club Zone V2 Collections ───────────────────────────────────────────
+
+    // Clubs
+    match /clubs/{clubId} {
+      allow read: if true;
+      allow write: if isAdmin() || isAuthenticated();
+    }
+
+    // Club Listings (transfer market)
+    match /clubListings/{listingId} {
+      allow read: if true;
+      allow write: if isAdmin() || isAuthenticated();
+    }
+
+    // Auction room — all users can watch, only admin can drive
+    match /auctions/{auctionId} {
+      allow read: if true;
+      allow write: if isAdmin() || isAuthenticated(); // owners can write bids/folds
+    }
+
+    // Club owner inbox — owner can read their own, anyone authenticated can push
+    match /clubInbox/{ownerId} {
+      allow read: if request.auth != null && (request.auth.uid == ownerId || isAdmin());
+      allow write: if isAuthenticated();
+    }
+
+    // Transfer negotiation threads — buyer and seller can read and write their thread
+    match /transferThreads/{threadId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+    }
+
+    // Internal club seasons — public read, admin write
+    match /clubSeasons/{seasonId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Club fixtures and tournaments
+    match /clubFixtures/{fixtureId} {
+      allow read: if true;
+      allow write: if isAdmin() || isAuthenticated();
+    }
+
+    match /clubTournaments/{tournamentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }
