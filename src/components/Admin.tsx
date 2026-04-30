@@ -439,11 +439,11 @@ export default function Admin() {
           
           <button 
             onClick={async () => {
-              if (!window.confirm("WARNING: This will resync stats using the last 1,000 matches only to protect Firestore quota. Older matches will be ignored. Proceed?")) return;
+              if (!window.confirm("WARNING: This will resync ALL historical match stats. Depending on your match count, this could use a large amount of Firestore quota. Proceed?")) return;
               setIsResyncing(true);
               try {
                 await recalculateAllStats(players);
-                alert('Stats resynced successfully (Limited to last 1,000 matches).');
+                alert('Stats resynced successfully for all historical records.');
               } catch(e) {
                 alert('Failed to resync stats. Quota may be exceeded.');
               }
@@ -452,7 +452,7 @@ export default function Admin() {
             disabled={isResyncing}
             className="px-4 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all disabled:opacity-50"
           >
-            {isResyncing ? 'SYNCING...' : 'FORCE RESYNC (1K)'}
+            {isResyncing ? 'SYNCING...' : 'FORCE FULL RESYNC'}
           </button>
           
           <button onClick={() => navigate('/')} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all">

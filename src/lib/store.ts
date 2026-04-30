@@ -589,7 +589,7 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[], el
  */
 export async function recalculateAllStats(players: Player[]) {
   const batch = writeBatch(db);
-  const fullMatchesSnap = await getDocs(query(collection(db, 'matches'), orderBy('timestamp', 'asc'), limit(1000)));
+  const fullMatchesSnap = await getDocs(query(collection(db, 'matches'), orderBy('timestamp', 'asc')));
   const allMatches = fullMatchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
   const elos = computeGlobalElo(players, allMatches);
   players.forEach(p => {
