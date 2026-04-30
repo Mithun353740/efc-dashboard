@@ -23,7 +23,8 @@ export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPa
   const isLocked = systemLocks?.tournaments && !isAdmin;
 
   // Registration lock: defaults to locked (true) if undefined in Firestore
-  const isRegistrationLocked = systemLocks?.tournamentRegistration !== false;
+  // Registration lock: defaults to locked (true) if undefined in Firestore
+  const isRegistrationLocked = systemLocks?.tournamentRegistration !== false && !isAdmin;
 
   const loggedInPlayerId = localStorage.getItem('playerId');
   const loggedInPlayerName = localStorage.getItem('playerName') || '';

@@ -111,7 +111,7 @@ export default function Navbar() {
           { label: 'RANKINGS', path: '/rankings' },
           { label: 'ANALYTICS', path: '/stats' },
           { label: 'TOURNAMENTS', path: '/tournament' },
-          ...(!systemLocks?.clubManager && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
+          ...((!systemLocks?.clubManager || isAdmin) && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
           ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
         ].map((item: any) => (
           item.externalUrl ? (
@@ -256,7 +256,7 @@ export default function Navbar() {
                 { label: 'RANKINGS', path: '/rankings' },
                 { label: 'ANALYTICS', path: '/stats' },
                 { label: 'TOURNAMENTS', path: '/tournament' },
-                ...(!systemLocks?.clubManager && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
+                ...((!systemLocks?.clubManager || isAdmin) && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
                 ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
               ].map((item: any) => (
                 item.externalUrl ? (

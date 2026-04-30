@@ -79,7 +79,7 @@ export function TournamentCard({
 
   // Determine registration button state
   const isPlayerLoggedIn = Boolean(loggedInPlayerId);
-  const showRegButton = isPlayerLoggedIn && !isAdmin && !tournament.archived;
+  const showRegButton = isPlayerLoggedIn && !tournament.archived;
   const regButtonLabel = isRegistered ? 'VIEW →' : isFull ? 'FULL' : 'REGISTER';
   const regButtonStyle = isRegistered
     ? 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/30'
@@ -101,7 +101,7 @@ export function TournamentCard({
       </div>
 
       {/* Registration Locked Overlay Badge */}
-      {isRegistrationLocked && !isAdmin && isPlayerLoggedIn && (
+      {isRegistrationLocked && isPlayerLoggedIn && (
         <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full">
           <Lock size={9} className="text-amber-400" />
           <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest">Registration Locked</span>
