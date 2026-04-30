@@ -1632,7 +1632,83 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const [configSaving, setConfigSaving] = React.useState(false);
 
   // ── Match & Engine state (lazy-loaded, quota-safe) ──
-  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'config'|'auction'>('clubs');
+  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'config'|'auction'|'history'>('clubs');
+
+  // History state (3-layer navigation)
+  const [hSeasons, setHSeasons] = React.useState<ClubSeason[]>([]);
+  const [hMatches, setHMatches] = React.useState<MatchRecord[]>([]);
+  const [hSelectedSeasonId, setHSelectedSeasonId] = React.useState<string | null>(null);
+  const [hSelectedTournament, setHSelectedTournament] = React.useState<string | null>(null);
+  const [hLoading, setHLoading] = React.useState(false);
+  const [hEditingMatch, setHEditingMatch] = React.useState<MatchRecord | null>(null);
+  const [hEditForm, setHEditForm] = React.useState({ p1Score: '0', p2Score: '0', tournament: '', matchday: '1' });
+
+  const groupedHistory = useMemo(() => {
+    if (!hMatches.length) return {};
+    const grouped: any = {};
+    hMatches.forEach(m => {
+      const t = m.tournament || 'UNCATEGORIZED';
+      if (!grouped[t]) grouped[t] = {};
+      const md = m.matchday || 1;
+      if (!grouped[t][md]) grouped[t][md] = [];
+      grouped[t][md].push(m);
+    });
+    return grouped;
+  }, [hMatches]);
+
+
+  const loadHistory = async () => {
+    setHLoading(true);
+    try {
+      const ss = await fetchClubSeasons();
+      setHSeasons(ss);
+      if (ss.length > 0 && !hSelectedSeasonId) {
+        setHSelectedSeasonId(ss[0].id);
+      }
+    } catch (e) { console.error(e); }
+    finally { setHLoading(false); }
+  };
+
+  React.useEffect(() => {
+    if (subTab === 'history') loadHistory();
+  }, [subTab]);
+
+  React.useEffect(() => {
+    const loadSeasonMatches = async () => {
+      if (!hSelectedSeasonId) return;
+      setHLoading(true);
+      try {
+        const ms = await fetchClubSeasonMatches(hSelectedSeasonId);
+        setHMatches(ms);
+      } catch (e) { console.error(e); }
+      finally { setHLoading(false); }
+    };
+    if (subTab === 'history') loadSeasonMatches();
+  }, [hSelectedSeasonId, subTab]);
+
+  const handleEditMatch = async () => {
+    if (!hEditingMatch) return;
+    setHLoading(true);
+    try {
+      await editMatch(hEditingMatch, Number(hEditForm.p1Score), Number(hEditForm.p2Score), players, [], hEditForm.tournament, hEditingMatch.seasonId, Number(hEditForm.matchday));
+      setMsg({ text: 'Match updated and ratings recalculated!', type: 'success' });
+
+      setHEditingMatch(null);
+      loadHistory();
+    } catch (e: any) { setMsg({ text: e.message, type: 'error' }); }
+    finally { setHLoading(false); }
+  };
+
+  const handleDeleteMatch = async (m: MatchRecord) => {
+    if (!window.confirm('Are you sure? This will undo ELO, OVR, and Club Manager Rating changes for this match.')) return;
+    setHLoading(true);
+    try {
+      await deleteMatchFromHistory(m, players, []);
+      setMsg({ text: 'Match deleted and stats reverted!', type: 'success' });
+      loadHistory();
+    } catch (e: any) { setMsg({ text: e.message, type: 'error' }); }
+    finally { setHLoading(false); }
+  };
 
   // Tournaments state
   const [tournaments, setTournaments] = React.useState<ClubTournament[]>([]);
@@ -1771,7 +1847,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     if (!p1 || !mForm.p1Score || !mForm.p2Score) { flashMatch('❌ Select both players and scores', false); return; }
     setMatchBusy(true);
     try {
-      await addMatch(p1, Number(mForm.p1Score), Number(mForm.p2Score), p2, [], config.season);
+      await addMatch(p1, Number(mForm.p1Score), Number(mForm.p2Score), p2, [], config.season, undefined, config.season, config.currentMatchday);
       flashMatch('✅ Match added', true);
       resetMForm();
       await loadMatches();
@@ -1782,7 +1858,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const handleEditMatch = async (m: MatchRecord) => {
     setMatchBusy(true);
     try {
-      await editMatch(m, Number(editS1), Number(editS2), players, [], m.tournament);
+      await editMatch(m, Number(editS1), Number(editS2), players, [], m.tournament, m.seasonId, m.matchday);
       setClubMatches(prev => prev.map(x => x.id === m.id ? { ...x, p1Score: Number(editS1), p2Score: Number(editS2) } : x));
       setEditMatchId(null);
       flashMatch('✅ Match updated', true);
@@ -1898,7 +1974,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
       const p1 = players.find(p => p.id === sm.p1Id);
       const p2 = players.find(p => p.id === sm.p2Id);
       if (p1) {
-        await addMatch(p1, s1, s2, p2, [], f.tournamentName || config.season, p2?.name || 'Unknown');
+        await addMatch(p1, s1, s2, p2, [], f.tournamentName || config.season, p2?.name || 'Unknown', config.season, config.currentMatchday);
       }
 
       const nf = { ...f };
@@ -1932,12 +2008,12 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     <div className="space-y-6">
       {/* SubTab Nav */}
       <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-2xl flex-wrap">
-        {(['clubs','tournaments','fixtures','matches','config','auction'] as const).map(t => (
+        {(['clubs','tournaments','fixtures','matches','config','auction','history'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)}
             className={cn('flex-1 min-w-[100px] py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all',
               subTab === t ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
             )}>
-            {t === 'clubs' ? '⚽ CLUBS' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : t === 'config' ? '⚙️ CONFIG' : '🔨 AUCTION'}
+            {t === 'clubs' ? '⚽ CLUBS' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : t === 'config' ? '⚙️ CONFIG' : t === 'auction' ? '🔨 AUCTION' : '🕒 HISTORY'}
           </button>
         ))}
       </div>
@@ -2509,6 +2585,92 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                 {configSaving ? 'SAVING...' : 'SAVE CONFIG'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── HISTORY subtab ── */}
+      {subTab === 'history' && (
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-2">
+              {hSeasons.map(s => (
+                <button key={s.id} onClick={() => setHSelectedSeasonId(s.id)} 
+                  className={cn("px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap", 
+                    hSelectedSeasonId === s.id ? "bg-brand-purple text-white shadow-lg shadow-brand-purple/25" : "bg-white/5 text-slate-500 hover:text-white"
+                  )}>
+                  {s.id.replace('__', ' ')}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
+            {hLoading ? (
+               <p className="text-slate-500 text-xs font-bold animate-pulse text-center py-20 uppercase tracking-widest">Fetching club records...</p>
+            ) : Object.keys(groupedHistory).length === 0 ? (
+               <div className="text-center py-20">
+                 <History size={48} className="text-slate-700 mx-auto mb-4" />
+                 <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">No history found for this season</p>
+               </div>
+            ) : (
+              <div className="space-y-10">
+                {Object.entries(groupedHistory).map(([tName, matchdays]: [string, any]) => (
+                  <div key={tName} className="space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1 bg-white/10" />
+                      <h4 className="text-lg font-black tracking-tight uppercase italic text-amber-500">{tName}</h4>
+                      <div className="h-px flex-1 bg-white/10" />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-8">
+                      {Object.entries(matchdays).sort((a,b) => Number(a[0]) - Number(b[0])).map(([md, matches]: [string, any]) => (
+                        <div key={md} className="space-y-3">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">MATCHDAY {md}</p>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                            {matches.map((m: MatchRecord) => (
+                              <div key={m.id} className="bg-[#0f172a] border border-white/5 rounded-xl p-4 flex items-center justify-between hover:border-white/20 transition-all">
+                                <div className="flex-1">
+                                  <p className="text-[8px] font-black text-slate-600 uppercase mb-1">{new Date(m.timestamp).toLocaleDateString()}</p>
+                                  {hEditingMatch?.id === m.id ? (
+                                    <div className="flex items-center gap-2">
+                                      <input type="number" value={hEditForm.p1Score} onChange={e => setHEditForm({...hEditForm, p1Score: e.target.value})} className="w-12 bg-white/10 border border-white/20 p-2 rounded text-xs font-black text-white text-center" />
+                                      <span className="text-slate-500 font-bold">-</span>
+                                      <input type="number" value={hEditForm.p2Score} onChange={e => setHEditForm({...hEditForm, p2Score: e.target.value})} className="w-12 bg-white/10 border border-white/20 p-2 rounded text-xs font-black text-white text-center" />
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-black text-white uppercase">{m.p1Name}</span>
+                                      <span className="px-2 py-0.5 bg-white/5 rounded text-[10px] font-black text-amber-500">{m.p1Score}</span>
+                                      <span className="text-slate-600 font-bold">-</span>
+                                      <span className="px-2 py-0.5 bg-white/5 rounded text-[10px] font-black text-amber-500">{m.p2Score}</span>
+                                      <span className="text-[11px] font-black text-white uppercase">{m.p2Name}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex gap-2">
+                                  {hEditingMatch?.id === m.id ? (
+                                    <>
+                                      <button onClick={handleEditMatch} className="px-3 py-1.5 bg-emerald-500 text-white text-[9px] font-black rounded-lg uppercase">SAVE</button>
+                                      <button onClick={() => setHEditingMatch(null)} className="px-3 py-1.5 bg-white/5 text-slate-400 text-[9px] font-black rounded-lg uppercase">X</button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button onClick={() => { setHEditingMatch(m); setHEditForm({ p1Score: String(m.p1Score), p2Score: String(m.p2Score), tournament: m.tournament || '', matchday: String(m.matchday || 1) }); }} className="p-2 text-slate-500 hover:text-white transition-all"><Settings size={14} /></button>
+                                      <button onClick={() => handleDeleteMatch(m)} className="p-2 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={14} /></button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

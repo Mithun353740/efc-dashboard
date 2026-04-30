@@ -634,7 +634,9 @@ export async function addMatch(
   p2: Player | undefined,
   _legacyMatches: MatchRecord[], // kept for API compatibility, not used
   tournament?: string,
-  p2NameOverride?: string
+  p2NameOverride?: string,
+  seasonId?: string,
+  matchday?: number
 ) {
   if (isQuotaExceeded) {
     throw new Error("SYSTEM LOCKED: Cannot add match while Quota is exceeded.");
@@ -653,6 +655,8 @@ export async function addMatch(
     p2Name: p2 ? p2.name : (p2NameOverride || 'External Opponent'),
     p2Score,
     tournament: tournament || 'Friendly',
+    seasonId: seasonId || '',
+    matchday: matchday || 0,
   };
   batch.set(matchRef, matchRecord);
 
@@ -724,7 +728,9 @@ export async function editMatch(
   newP2Score: number,
   players: Player[],
   _legacyMatches: MatchRecord[], // kept for API compatibility, not used
-  newTournament?: string
+  newTournament?: string,
+  newSeasonId?: string,
+  newMatchday?: number
 ) {
   if (isQuotaExceeded) return;
   const batch = writeBatch(db);
@@ -734,12 +740,16 @@ export async function editMatch(
     p1Score: newP1Score,
     p2Score: newP2Score,
     tournament: newTournament || oldMatch.tournament || 'Friendly',
+    seasonId: newSeasonId || oldMatch.seasonId || '',
+    matchday: newMatchday || oldMatch.matchday || 0,
   };
 
   batch.update(doc(db, 'matches', oldMatch.id), {
     p1Score: newP1Score,
     p2Score: newP2Score,
     tournament: updatedMatchRecord.tournament,
+    seasonId: updatedMatchRecord.seasonId,
+    matchday: updatedMatchRecord.matchday,
   });
 
   const p1 = players.find(p => p.id === oldMatch.p1Id);
@@ -768,6 +778,37 @@ export async function editMatch(
   }
   if (p2) {
     batch.set(doc(db, 'players', p2.id), computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200));
+  }
+
+  // Dynamic Manager Rating updates (Edit logic)
+  try {
+    const allClubsSnap = await getDocs(collection(db, 'clubs'));
+    const allClubs = allClubsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Club));
+    
+    const p1Club = allClubs.find(c => c.squadIds?.includes(p1?.id || ''));
+    const p2Club = p2 ? allClubs.find(c => c.squadIds?.includes(p2.id)) : undefined;
+
+    const getChange = (s1: number, s2: number) => {
+      if (s1 > s2) return 2;
+      if (s2 > s1) return -2;
+      return 1;
+    };
+
+    const oldP1Change = getChange(oldMatch.p1Score, oldMatch.p2Score);
+    const oldP2Change = getChange(oldMatch.p2Score, oldMatch.p1Score);
+    const newP1Change = getChange(newP1Score, newP2Score);
+    const newP2Change = getChange(newP2Score, newP1Score);
+
+    if (p1Club) {
+      const newRating = Math.max(0, Math.min(100, (p1Club.managerRating || 80) - oldP1Change + newP1Change));
+      batch.update(doc(db, 'clubs', p1Club.id), { managerRating: newRating });
+    }
+    if (p2Club) {
+      const newRating = Math.max(0, Math.min(100, (p2Club.managerRating || 80) - oldP2Change + newP2Change));
+      batch.update(doc(db, 'clubs', p2Club.id), { managerRating: newRating });
+    }
+  } catch(e) {
+    console.warn("Could not recalculate manager ratings on edit", e);
   }
 
   try {
@@ -814,6 +855,35 @@ export async function deleteMatchFromHistory(
   }
   if (p2) {
     batch.set(doc(db, 'players', p2.id), computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200));
+  }
+
+  // Dynamic Manager Rating updates (Delete logic)
+  try {
+    const allClubsSnap = await getDocs(collection(db, 'clubs'));
+    const allClubs = allClubsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Club));
+    
+    const p1Club = allClubs.find(c => c.squadIds?.includes(p1?.id || ''));
+    const p2Club = p2 ? allClubs.find(c => c.squadIds?.includes(p2.id)) : undefined;
+
+    const getChange = (s1: number, s2: number) => {
+      if (s1 > s2) return 2;
+      if (s2 > s1) return -2;
+      return 1;
+    };
+
+    const oldP1Change = getChange(matchRecord.p1Score, matchRecord.p2Score);
+    const oldP2Change = getChange(matchRecord.p2Score, matchRecord.p1Score);
+
+    if (p1Club) {
+      const newRating = Math.max(0, Math.min(100, (p1Club.managerRating || 80) - oldP1Change));
+      batch.update(doc(db, 'clubs', p1Club.id), { managerRating: newRating });
+    }
+    if (p2Club) {
+      const newRating = Math.max(0, Math.min(100, (p2Club.managerRating || 80) - oldP2Change));
+      batch.update(doc(db, 'clubs', p2Club.id), { managerRating: newRating });
+    }
+  } catch(e) {
+    console.warn("Could not recalculate manager ratings on delete", e);
   }
 
   try {

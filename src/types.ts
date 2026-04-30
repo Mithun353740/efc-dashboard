@@ -329,6 +329,8 @@ export interface MatchRecord {
   p2Name: string;
   p2Score: number;
   tournament?: string;
+  seasonId?: string;
+  matchday?: number;
 }
 
 export type { Tournament, Fixture, Team, TournamentFormat } from './types/tournament';
