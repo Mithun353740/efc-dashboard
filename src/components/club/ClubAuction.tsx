@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Hammer, Gavel, TrendingUp, Users, DollarSign, CheckCircle, X, SkipForward, Play } from 'lucide-react';
-import { AuctionState, Club, Player } from '../../types';
+import { AuctionState, Club, Player, ClubSystemConfig } from '../../types';
 import { getPlayerGrade, GRADE_COLORS, GRADE_BASE_PRICES } from '../../lib/utils';
 import {
   subscribeToAuction, placeBid, foldBid,
@@ -19,9 +19,10 @@ interface ClubAuctionProps {
   allClubs: Club[];
   allPlayers: Player[];
   isAdmin: boolean;
+  config: ClubSystemConfig | null;
 }
 
-export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin }: ClubAuctionProps) {
+export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, config }: ClubAuctionProps) {
   const [auctionState, setAuctionState] = useState<AuctionState | null>(null);
   const [prevBid, setPrevBid] = useState(0);
   const [isBidding, setIsBidding] = useState(false);
@@ -60,9 +61,16 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin }: C
           <Gavel size={44} />
         </div>
         <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-3">Auction Room</h2>
-        <p className="text-slate-400 text-sm max-w-xs mb-8">
-          {auctionState?.status === 'ended' ? 'The auction has ended. All players have been assigned.' : 'No auction is currently active. Check back when the Admin starts a session.'}
-        </p>
+        {auctionState?.status === 'ended' ? (
+          <p className="text-slate-400 text-sm max-w-xs mx-auto mb-8">The auction has ended. All players have been assigned.</p>
+        ) : config?.auctionSchedule ? (
+          <div className="bg-white/5 border border-white/10 p-6 rounded-3xl inline-block mb-8">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Next Auction Scheduled For</p>
+            <p className="text-xl font-black text-amber-500 uppercase">{config.auctionSchedule}</p>
+          </div>
+        ) : (
+          <p className="text-slate-400 text-sm max-w-xs mx-auto mb-8">No auction is currently active. Check back when the Admin starts a session.</p>
+        )}
       </div>
     );
   }
@@ -91,8 +99,16 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin }: C
             exit={{ opacity: 0, scale: 0.5 }}
             className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
           >
-            <div className="text-[12vw] font-black text-amber-500 uppercase italic tracking-tighter drop-shadow-[0_0_60px_rgba(245,158,11,0.8)] select-none" style={{ WebkitTextStroke: '2px #f59e0b' }}>
-              SOLD!
+            <div className="flex flex-col items-center gap-6">
+              <div className="text-[12vw] font-black text-amber-500 uppercase italic tracking-tighter drop-shadow-[0_0_60px_rgba(245,158,11,0.8)] select-none leading-none" style={{ WebkitTextStroke: '2px #f59e0b' }}>
+                SOLD!
+              </div>
+              {myClub?.id === auctionState.leadingClubId && (
+                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="bg-black/80 backdrop-blur-xl px-10 py-6 rounded-3xl border border-amber-500/50 shadow-[0_0_50px_rgba(245,158,11,0.3)]">
+                  <p className="text-2xl font-black text-white uppercase mb-2">🎉 Congratulations!</p>
+                  <p className="text-sm font-bold text-amber-400">{auctionState.currentPlayer?.name} has officially joined {myClub.name}!</p>
+                </motion.div>
+              )}
             </div>
           </motion.div>
         )}

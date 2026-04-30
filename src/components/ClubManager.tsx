@@ -537,7 +537,7 @@ export default function ClubManager() {
             )}
             {activeTab === 'auction' && (
               <motion.div key="auction" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
-                <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} />
+                <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} config={config} />
               </motion.div>
             )}
             {activeTab === 'inbox' && myClub && (

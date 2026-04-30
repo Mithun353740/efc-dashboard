@@ -293,6 +293,7 @@ export interface ClubSystemConfig {
   contractsActive: boolean;         // global toggle for contract economy
   defaultContractType: 'matches' | 'days';
   defaultContractAmount: number;    // matches or days
+  auctionSchedule?: string;         // e.g. "Sunday, 8:00 PM PST"
 }
 
 /** A player listing on the transfer market. */

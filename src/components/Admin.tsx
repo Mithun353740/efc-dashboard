@@ -2704,7 +2704,13 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                 </button>
               </div>
               
-              <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Next Auction Schedule</label>
+                <input value={config.auctionSchedule || ''} onChange={e => setConfig({...config, auctionSchedule: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" placeholder="e.g. Sunday, 8:00 PM PST" />
+                <p className="text-[8px] font-bold text-slate-500 mt-1">This will be displayed in the Club Zone when no auction is active.</p>
+              </div>
+
+              <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-4 mt-4">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Contracts Economy</label>
                   <button onClick={() => setConfig({...config, contractsActive: !config.contractsActive})}
