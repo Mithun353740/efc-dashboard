@@ -29,9 +29,6 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, con
   const [error, setError] = useState('');
 
   // Admin setup
-  const [showSetup, setShowSetup] = useState(false);
-  const [setupBasePrice, setSetupBasePrice] = useState('500000');
-  const [setupIncrement, setSetupIncrement] = useState('100000');
   const [revealPlayerId, setRevealPlayerId] = useState('');
 
   // Confetti state
@@ -71,41 +68,6 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, con
         ) : (
           <p className="text-slate-400 text-sm max-w-xs mx-auto mb-8">No auction is currently active. Check back when the Admin starts a session.</p>
         )}
-        {isAdmin && (
-          <button onClick={() => setShowSetup(true)} className="px-8 py-4 bg-amber-500 text-black font-black text-xs tracking-widest rounded-2xl hover:scale-105 active:scale-95 transition-all uppercase">
-            <Play size={14} className="inline mr-2" />Start Auction Session
-          </button>
-        )}
-
-        {/* Admin setup modal */}
-        <AnimatePresence>
-          {showSetup && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSetup(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0a14] border border-white/10 rounded-3xl p-8 z-10">
-                <h3 className="text-xl font-black text-white uppercase mb-6">Setup Auction</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Base Price (per player)</label>
-                    <input type="number" value={setupBasePrice} onChange={e => setSetupBasePrice(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold outline-none focus:border-amber-500/50" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Bid Increment</label>
-                    <input type="number" value={setupIncrement} onChange={e => setSetupIncrement(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold outline-none focus:border-amber-500/50" />
-                  </div>
-                  <p className="text-[10px] text-slate-500">Bidding order will follow club creation order.</p>
-                </div>
-                <div className="flex gap-3 mt-6">
-                  <button onClick={async () => {
-                    await adminStartAuction(allClubs.map(c => c.id), Number(setupIncrement), Number(setupBasePrice));
-                    setShowSetup(false);
-                  }} className="flex-1 py-3 bg-amber-500 text-black font-black text-xs uppercase rounded-2xl">Start</button>
-                  <button onClick={() => setShowSetup(false)} className="flex-1 py-3 bg-white/5 text-slate-400 font-black text-xs uppercase rounded-2xl">Cancel</button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
       </div>
     );
   }
@@ -159,11 +121,6 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, con
             </div>
             <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Club Zone Auction</h1>
           </div>
-          {isAdmin && (
-            <button onClick={adminEndAuction} className="px-4 py-2 bg-red-500/10 text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">
-              End Session
-            </button>
-          )}
         </div>
 
         {/* Main auction area */}
@@ -277,7 +234,7 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, con
                     onClick={async () => {
                       if (!revealPlayerId) return;
                       const p = allPlayers.find(pl => pl.id === revealPlayerId)!;
-                      await adminRevealCard({ id: p.id, name: p.name, image: p.image, ovr: p.ovr, currentClubId: p.clubId || null, currentClubName: p.clubName || null }, Number(setupBasePrice), Number(setupIncrement));
+                      await adminRevealCard({ id: p.id, name: p.name, image: p.image, ovr: p.ovr, currentClubId: p.clubId || null, currentClubName: p.clubName || null }, auctionState.basePrice, auctionState.bidIncrement);
                       setRevealPlayerId('');
                     }}
                     className="px-4 py-2.5 bg-violet-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-violet-600 transition-all"
