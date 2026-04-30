@@ -65,3 +65,49 @@ export function getSeasonInfo(date: Date) {
   }
   return { name: "Legacy", start: null, end: null };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAYER FORM GRADE (used in Auction + Player Cards)
+// Grade is calculated from: win rate (60%), OVR (20%), goal difference (20%)
+// Requires minimum 5 matches — ungraded players return 'E'
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type PlayerGrade = 'S' | 'A' | 'B' | 'C' | 'D' | 'E';
+
+export const GRADE_COLORS: Record<PlayerGrade, string> = {
+  S: '#f59e0b',  // gold
+  A: '#8b5cf6',  // violet
+  B: '#3b82f6',  // blue
+  C: '#22c55e',  // green
+  D: '#94a3b8',  // slate
+  E: '#475569',  // dark slate
+};
+
+export const GRADE_BASE_PRICES: Record<PlayerGrade, number> = {
+  S: 2_000_000,
+  A: 1_500_000,
+  B: 1_000_000,
+  C:   750_000,
+  D:   500_000,
+  E:   300_000,
+};
+
+export function getPlayerGrade(player: { win: number; loss: number; draw: number; ovr: number; goalsScored: number; goalsConceded: number }): PlayerGrade {
+  const total = player.win + player.loss + player.draw;
+  if (total < 5) return 'E'; // Not enough matches to grade
+
+  const winRate = player.win / total; // 0–1
+  const ovrNorm = Math.min(player.ovr, 99) / 99; // 0–1
+  const gd = player.goalsScored - player.goalsConceded;
+  const gdNorm = Math.max(0, Math.min(1, (gd + 50) / 100)); // normalize GD to 0–1 scale
+
+  // Weighted score: 60% win rate, 20% OVR, 20% goal diff
+  const score = (winRate * 0.60) + (ovrNorm * 0.20) + (gdNorm * 0.20);
+
+  if (score >= 0.80) return 'S';
+  if (score >= 0.65) return 'A';
+  if (score >= 0.50) return 'B';
+  if (score >= 0.35) return 'C';
+  if (score >= 0.20) return 'D';
+  return 'E';
+}

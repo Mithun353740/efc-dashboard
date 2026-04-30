@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Hammer, Gavel, TrendingUp, Users, DollarSign, CheckCircle, X, SkipForward, Play } from 'lucide-react';
 import { AuctionState, Club, Player } from '../../types';
+import { getPlayerGrade, GRADE_COLORS, GRADE_BASE_PRICES } from '../../lib/utils';
 import {
   subscribeToAuction, placeBid, foldBid,
   adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, adminStartAuction,
@@ -169,28 +170,80 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin }: C
                   animate={{ opacity: 1, rotateY: 0, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.5 }}
                   transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                  className="relative w-52 h-72 rounded-3xl overflow-hidden mx-auto shadow-2xl shadow-amber-500/20"
-                  style={{ background: `linear-gradient(155deg, ${currentPlayerData ? '#8b5cf630' : '#1e1e2e'} 0%, #0f172a 60%)`, border: `2px solid ${auctionState.leadingClubId ? '#f59e0b' : '#ffffff20'}` }}
+                  className="w-full max-w-[220px] mx-auto"
                 >
-                  {/* Player image */}
-                  <div className="absolute inset-x-0 top-4 bottom-12 flex items-end justify-center overflow-hidden">
-                    <img src={auctionState.currentPlayer.image} alt={auctionState.currentPlayer.name} className="w-full h-full object-cover object-top" style={{ maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)' }} />
-                  </div>
-                  {/* OVR */}
-                  <div className="absolute top-4 left-4 w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center font-black text-black text-lg shadow-lg">
-                    {auctionState.currentPlayer.ovr}
-                  </div>
-                  {/* Name footer */}
-                  <div className="absolute bottom-0 inset-x-0 p-4" style={{ background: 'linear-gradient(to top, #0f172a, transparent)' }}>
-                    <p className="text-white font-black text-lg uppercase tracking-tight">{auctionState.currentPlayer.name}</p>
-                    <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest">{auctionState.currentPlayer.currentClubName || 'Free Agent'}</p>
-                  </div>
-                  {/* Sold overlay */}
-                  {auctionState.status === 'sold' && (
-                    <div className="absolute inset-0 bg-amber-500/20 flex items-center justify-center">
-                      <div className="bg-amber-500 text-black font-black text-2xl px-6 py-3 rounded-2xl uppercase italic rotate-[-12deg] shadow-xl">SOLD!</div>
-                    </div>
-                  )}
+                  {/* Grade-enhanced player card */}
+                  {(() => {
+                    const p = currentPlayerData;
+                    const grade = p ? getPlayerGrade(p) : 'E';
+                    const gradeColor = GRADE_COLORS[grade];
+                    const total = p ? p.win + p.loss + p.draw : 0;
+                    const recentForm = p?.form?.slice(0, 5) || [];
+                    return (
+                      <div
+                        className="relative rounded-3xl overflow-hidden shadow-2xl"
+                        style={{ background: `linear-gradient(155deg, ${gradeColor}20 0%, #0f172a 55%, ${gradeColor}10 100%)`, border: `2px solid ${gradeColor}60` }}
+                      >
+                        {/* Grade glow */}
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse at top, ${gradeColor}25, transparent 70%)` }} />
+
+                        {/* Grade badge */}
+                        <div className="absolute top-3 left-3 z-20 w-12 h-12 rounded-2xl flex flex-col items-center justify-center shadow-lg font-black" style={{ background: gradeColor }}>
+                          <span className="text-black text-xl leading-none">{grade}</span>
+                          <span className="text-black text-[8px] leading-none uppercase">Grade</span>
+                        </div>
+
+                        {/* OVR badge */}
+                        <div className="absolute top-3 right-3 z-20 bg-black/60 backdrop-blur-sm rounded-xl px-2 py-1.5 text-center">
+                          <p className="text-white font-black text-xl leading-none">{auctionState.currentPlayer!.ovr}</p>
+                          <p className="text-slate-400 text-[8px] font-black uppercase">OVR</p>
+                        </div>
+
+                        {/* Player image */}
+                        <div className="h-52 overflow-hidden">
+                          <img src={auctionState.currentPlayer!.image} alt={auctionState.currentPlayer!.name} className="w-full h-full object-cover object-top" style={{ maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)' }} />
+                        </div>
+
+                        {/* Name + previous club */}
+                        <div className="px-4 pt-3 pb-2">
+                          <h3 className="font-black text-white text-lg uppercase tracking-tight leading-tight truncate">{auctionState.currentPlayer!.name}</h3>
+                          <p className="text-[10px] font-bold mt-0.5" style={{ color: gradeColor }}>{auctionState.currentPlayer!.currentClubName || 'Free Agent'}</p>
+                        </div>
+
+                        {/* Stats grid */}
+                        <div className="grid grid-cols-4 gap-px mx-4 mb-4 bg-white/5 rounded-2xl overflow-hidden border border-white/10">
+                          {[
+                            { label: 'W', value: p?.win ?? '-', color: '#22c55e' },
+                            { label: 'L', value: p?.loss ?? '-', color: '#ef4444' },
+                            { label: 'D', value: p?.draw ?? '-', color: '#f59e0b' },
+                            { label: 'MP', value: total || '-', color: '#94a3b8' },
+                          ].map(stat => (
+                            <div key={stat.label} className="bg-black/30 py-2 text-center">
+                              <p className="font-black text-base leading-none" style={{ color: stat.color }}>{stat.value}</p>
+                              <p className="text-[8px] text-slate-500 font-black uppercase mt-0.5">{stat.label}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Form indicators */}
+                        {recentForm.length > 0 && (
+                          <div className="px-4 pb-4 flex items-center gap-1.5">
+                            <span className="text-[9px] font-black text-slate-600 uppercase mr-1">Form:</span>
+                            {recentForm.map((r, i) => (
+                              <div key={i} className={`w-5 h-5 rounded-md flex items-center justify-center text-[8px] font-black ${r === 'W' ? 'bg-green-500/20 text-green-400' : r === 'L' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>{r}</div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Sold overlay */}
+                        {auctionState.status === 'sold' && (
+                          <div className="absolute inset-0 bg-amber-500/20 flex items-center justify-center">
+                            <div className="bg-amber-500 text-black font-black text-2xl px-6 py-3 rounded-2xl uppercase italic rotate-[-12deg] shadow-xl">SOLD!</div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </motion.div>
               ) : null}
             </AnimatePresence>
