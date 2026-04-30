@@ -12,6 +12,7 @@ import {
   computeGlobalElo,
   addMatch
 } from './lib/store';
+import { VERSION } from './constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL MODULE CACHE
@@ -120,7 +121,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     // 1b. App Version — Real-time update monitoring
     const unsubVersion = subscribeToAppVersion((version) => {
-      if (mounted) setAppVersion(version);
+      if (mounted) {
+        setAppVersion(version);
+        if (version !== VERSION) {
+          window.location.reload();
+        }
+      }
     });
 
     // 2. Leaders — Always needed for Home Page (small collection)

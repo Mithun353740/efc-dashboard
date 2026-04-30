@@ -9,34 +9,32 @@ import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, Cl
 import { getSeasonInfo, cn, getPlayerGrade } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
 import { auth, loginAnonymously, db } from '../firebase';
-import { CLUB_LOGO, CLUB_NAME } from '../constants';
+import { CLUB_LOGO, CLUB_NAME, VERSION } from '../constants';
 
 export default function Admin() {
   const { players, leaders, matches, tournaments, systemLocks, dbError, hasPendingWrites, appVersion } = useFirebase();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials' | 'clubs' | 'auction-control'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
+  const [isResyncing, setIsResyncing] = useState(false);
   
   React.useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        setAuthStatus('authenticated');
-      } else {
+    const checkAuth = async () => {
+      const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+      if (!isAdmin) {
         setAuthStatus('unauthenticated');
-        // Try to re-login anonymously if localStorage says we should be logged in
-        if (localStorage.getItem('adminLoggedIn') === 'true') {
-          loginAnonymously().catch(err => {
-            console.error('Auto-login failed:', err);
-            if (err.code === 'auth/admin-restricted-operation') {
-              setAuthStatus('unauthenticated');
-              // Silent fail for auto-login, the user will see the message on the login page
-            }
-          });
-        }
+        return;
       }
-    });
-    return () => unsubscribe();
-  }, []);
+      
+      // Auto-sync version: If the local code version is newer than Firestore, update Firestore
+      if (appVersion && appVersion !== VERSION) {
+        import('../lib/store').then(({ updateAppVersion }) => updateAppVersion(VERSION));
+      }
+
+      setAuthStatus('authenticated');
+    };
+    checkAuth();
+  }, [appVersion]);
 
   // Player Form
   const DEFAULT_PLAYER: Partial<Player> = { name: '', number: '', device: 'PS5', uid: '', image: '', role: 'player' };
@@ -438,6 +436,7 @@ export default function Admin() {
               SYSTEM ACTIVE
             </div>
           )}
+          
           <button 
             onClick={async () => {
               if (!window.confirm("WARNING: This will resync stats using the last 1,000 matches only to protect Firestore quota. Older matches will be ignored. Proceed?")) return;
@@ -456,19 +455,6 @@ export default function Admin() {
             {isResyncing ? 'SYNCING...' : 'FORCE RESYNC (1K)'}
           </button>
           
-          <button 
-            onClick={async () => {
-              const nextVer = prompt("Enter new version number (e.g. 1.0.2):", appVersion);
-              if (nextVer && nextVer !== appVersion) {
-                if (window.confirm(`Pushing update ${nextVer} will force all active users to refresh. Proceed?`)) {
-                  import('../lib/store').then(({ updateAppVersion }) => updateAppVersion(nextVer));
-                }
-              }
-            }}
-            className="px-4 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all"
-          >
-            PUSH UPDATE ({appVersion})
-          </button>
           <button onClick={() => navigate('/')} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all">
             HOME
           </button>
