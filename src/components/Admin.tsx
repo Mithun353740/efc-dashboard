@@ -1686,7 +1686,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     if (subTab === 'history') loadSeasonMatches();
   }, [hSelectedSeasonId, subTab]);
 
-  const handleEditMatch = async () => {
+  const handleHistoryEditMatch = async () => {
     if (!hEditingMatch) return;
     setHLoading(true);
     try {
@@ -1699,7 +1699,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     finally { setHLoading(false); }
   };
 
-  const handleDeleteMatch = async (m: MatchRecord) => {
+  const handleHistoryDeleteMatch = async (m: MatchRecord) => {
     if (!window.confirm('Are you sure? This will undo ELO, OVR, and Club Manager Rating changes for this match.')) return;
     setHLoading(true);
     try {
@@ -2651,13 +2651,13 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                                 <div className="flex gap-2">
                                   {hEditingMatch?.id === m.id ? (
                                     <>
-                                      <button onClick={handleEditMatch} className="px-3 py-1.5 bg-emerald-500 text-white text-[9px] font-black rounded-lg uppercase">SAVE</button>
+                                      <button onClick={handleHistoryEditMatch} className="px-3 py-1.5 bg-emerald-500 text-white text-[9px] font-black rounded-lg uppercase">SAVE</button>
                                       <button onClick={() => setHEditingMatch(null)} className="px-3 py-1.5 bg-white/5 text-slate-400 text-[9px] font-black rounded-lg uppercase">X</button>
                                     </>
                                   ) : (
                                     <>
                                       <button onClick={() => { setHEditingMatch(m); setHEditForm({ p1Score: String(m.p1Score), p2Score: String(m.p2Score), tournament: m.tournament || '', matchday: String(m.matchday || 1) }); }} className="p-2 text-slate-500 hover:text-white transition-all"><Settings size={14} /></button>
-                                      <button onClick={() => handleDeleteMatch(m)} className="p-2 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={14} /></button>
+                                      <button onClick={() => handleHistoryDeleteMatch(m)} className="p-2 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={14} /></button>
                                     </>
                                   )}
                                 </div>
