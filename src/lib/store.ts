@@ -1478,11 +1478,38 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
   const activeBidders = currentState.biddingOrder.filter(id => !newFolded.includes(id));
   // If only 1 left and someone already bid, they win automatically
   const autoSold = activeBidders.length === 1 && currentState.leadingClubId !== null;
+  
+  if (autoSold && currentState.leadingClubId && currentState.currentPlayer) {
+    const batch = writeBatch(db);
+    const winningClubDoc = await getDoc(doc(db, 'clubs', currentState.leadingClubId));
+    if (winningClubDoc.exists()) {
+      const winningClub = winningClubDoc.data() as import('../types').Club;
+      batch.update(doc(db, 'clubs', winningClub.id), { budget: winningClub.budget - currentState.currentBid });
+      batch.update(doc(db, 'players', currentState.currentPlayer.id), {
+        clubId: winningClub.id,
+        clubName: winningClub.name,
+        primaryColor: winningClub.primaryColor,
+        secondaryColor: winningClub.secondaryColor,
+        isListed: false,
+        listingPrice: null,
+      });
+      batch.set(AUCTION_DOC, {
+        foldedClubs: newFolded,
+        status: 'sold',
+        soldAt: Date.now(),
+        currentTurnIndex: currentState.currentTurnIndex,
+      }, { merge: true });
+      await batch.commit();
+      await updateLastUpdated();
+      return;
+    }
+  }
+
   await setDoc(AUCTION_DOC, {
     foldedClubs: newFolded,
-    status: autoSold ? 'sold' : 'active',
-    soldAt: autoSold ? Date.now() : null,
-    currentTurnIndex: autoSold ? currentState.currentTurnIndex : (currentState.currentTurnIndex + 1) % Math.max(activeBidders.length, 1),
+    status: 'active',
+    soldAt: null,
+    currentTurnIndex: (currentState.currentTurnIndex + 1) % Math.max(activeBidders.length, 1),
   }, { merge: true });
 }
 
