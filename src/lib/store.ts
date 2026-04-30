@@ -1846,3 +1846,13 @@ export function calculateBasePrize(ovr: number, form: 'A' | 'B' | 'C' | 'D' | 'E
   const formMultiplier = { 'A': 1.5, 'B': 1.2, 'C': 1.0, 'D': 0.8, 'E': 0.6 }[form];
   return Math.round(baseByOvr * formMultiplier);
 }
+
+export async function deleteClubSeason(seasonId: string): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  try {
+    await deleteDoc(doc(db, 'clubSeasons', seasonId));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `clubSeasons/${seasonId}`);
+    throw err;
+  }
+}

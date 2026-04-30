@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners, deleteClubSeason } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
 import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture, AuctionState, ClubSeason } from '../types';
@@ -1710,6 +1710,25 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     finally { setHLoading(false); }
   };
 
+  const handleDeleteSeason = async () => {
+    if (!hSelectedSeasonId) return;
+    const confirm1 = window.confirm("🚨 CRITICAL WARNING: You are about to DELETE this entire Club Season record. This action is irreversible. Are you absolutely sure?");
+    if (!confirm1) return;
+    const confirm2 = window.prompt("To confirm deletion, type 'DELETE' in the box below:");
+    if (confirm2 !== 'DELETE') {
+      setMsg({ text: '❌ Deletion cancelled. Confirmation text did not match.', type: 'error' });
+      return;
+    }
+    setHLoading(true);
+    try {
+      await deleteClubSeason(hSelectedSeasonId);
+      setMsg({ text: '✅ Season deleted successfully.', type: 'success' });
+      setHSelectedSeasonId(null);
+      await loadHistory();
+    } catch (e: any) { setMsg({ text: '❌ ' + e.message, type: 'error' }); }
+    finally { setHLoading(false); }
+  };
+
   // Tournaments state
   const [tournaments, setTournaments] = React.useState<ClubTournament[]>([]);
   const [tLoaded, setTLoaded] = React.useState(false);
@@ -2593,7 +2612,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
       {subTab === 'history' && (
         <div className="space-y-6">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-2">
+            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-2 flex-1">
               {hSeasons.map(s => (
                 <button key={s.id} onClick={() => setHSelectedSeasonId(s.id)} 
                   className={cn("px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap", 
@@ -2603,6 +2622,11 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                 </button>
               ))}
             </div>
+            {hSelectedSeasonId && (
+              <button onClick={handleDeleteSeason} className="px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl text-[9px] font-black tracking-widest transition-all uppercase whitespace-nowrap">
+                🗑️ DELETE SEASON
+              </button>
+            )}
           </div>
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
