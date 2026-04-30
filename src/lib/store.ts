@@ -66,6 +66,31 @@ export async function toggleSystemLock(systemId: string, locked: boolean) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// APP VERSIONING (Real-time Sync)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function subscribeToAppVersion(callback: (version: string) => void) {
+  const docRef = doc(db, 'settings', 'version');
+  return onSnapshot(docRef, (snap) => {
+    if (snap.exists()) {
+      callback(snap.data().currentVersion || '1.0.0');
+    }
+  });
+}
+
+export async function updateAppVersion(newVersion: string) {
+  if (isQuotaExceeded) return;
+  try {
+    await setDoc(doc(db, 'settings', 'version'), { 
+      currentVersion: newVersion,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, 'settings/version');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SYSTEM METADATA
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -258,19 +283,19 @@ export async function fetchPlayers(limitCount?: number): Promise<Player[]> {
 }
 
 export async function fetchLeaders(): Promise<Leader[]> {
-  const q = query(collection(db, 'leaders'));
+  const q = query(collection(db, 'leaders'), limit(50));
   const snap = await getDocs(q);
   return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
 }
 
 export async function fetchMatches(): Promise<MatchRecord[]> {
-  const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'));
+  const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(100));
   const snap = await getDocs(q);
   return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
 }
 
 export async function fetchTournaments(): Promise<Tournament[]> {
-  const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(50));
   const snap = await getDocs(q);
   return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
 }
@@ -407,10 +432,9 @@ async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]
   return results.sort((a, b) => a.timestamp - b.timestamp);
 }
 
-export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void) {
+export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void, limitCount = 100) {
   const path = 'tournaments';
-  // Cap at 100 — if you have more than 100 tournaments something has gone wrong
-  const q = query(collection(db, path), orderBy('createdAt', 'desc'), limit(100));
+  const q = query(collection(db, path), orderBy('createdAt', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
     const tournaments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
     callback(tournaments, snapshot.metadata.hasPendingWrites);
@@ -508,7 +532,7 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[], el
  */
 export async function recalculateAllStats(players: Player[]) {
   const batch = writeBatch(db);
-  const fullMatchesSnap = await getDocs(query(collection(db, 'matches'), orderBy('timestamp', 'asc')));
+  const fullMatchesSnap = await getDocs(query(collection(db, 'matches'), orderBy('timestamp', 'asc'), limit(1000)));
   const allMatches = fullMatchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
   const elos = computeGlobalElo(players, allMatches);
   players.forEach(p => {
@@ -828,7 +852,7 @@ export async function saveClubConfig(config: ClubSystemConfig): Promise<void> {
 /** Fetch all clubs (1 read per club doc — very small collection). */
 export async function fetchClubs(): Promise<Club[]> {
   try {
-    const snap = await getDocs(collection(db, 'clubs'));
+    const snap = await getDocs(query(collection(db, 'clubs'), limit(100)));
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'clubs');
@@ -953,7 +977,7 @@ export async function removePlayerFromClubSquad(club: Club, playerId: string): P
 /** Fetch all active market listings (1 collection read). */
 export async function fetchMarketListings(): Promise<MarketListing[]> {
   try {
-    const snap = await getDocs(collection(db, 'clubListings'));
+    const snap = await getDocs(query(collection(db, 'clubListings'), limit(100)));
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketListing));
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'clubListings');
@@ -969,7 +993,7 @@ export async function fetchMarketListings(): Promise<MarketListing[]> {
 export async function fetchClubSeasonMatches(seasonName: string): Promise<import('../types').MatchRecord[]> {
   try {
     const snap = await getDocs(
-      query(collection(db, 'matches'), where('tournament', '==', seasonName))
+      query(collection(db, 'matches'), where('tournament', '==', seasonName), limit(200))
     );
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').MatchRecord));
   } catch (err) {
@@ -1058,7 +1082,7 @@ export async function purchasePlayer(
 
 export async function fetchClubTournaments(seasonName: string): Promise<import('../types').ClubTournament[]> {
   try {
-    const snap = await getDocs(query(collection(db, 'clubTournaments'), where('season', '==', seasonName)));
+    const snap = await getDocs(query(collection(db, 'clubTournaments'), where('season', '==', seasonName), limit(50)));
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubTournament));
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'clubTournaments');

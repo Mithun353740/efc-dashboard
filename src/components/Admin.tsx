@@ -414,19 +414,34 @@ export default function Admin() {
           )}
           <button 
             onClick={async () => {
+              if (!window.confirm("WARNING: This will resync stats using the last 1,000 matches only to protect Firestore quota. Older matches will be ignored. Proceed?")) return;
               setIsResyncing(true);
               try {
                 await recalculateAllStats(players);
-                alert('All player stats resynced successfully based on Match History.');
+                alert('Stats resynced successfully (Limited to last 1,000 matches).');
               } catch(e) {
-                alert('Failed to resync stats. If quota is still exceeded, this will fail.');
+                alert('Failed to resync stats. Quota may be exceeded.');
               }
               setIsResyncing(false);
             }} 
             disabled={isResyncing}
             className="px-4 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all disabled:opacity-50"
           >
-            {isResyncing ? 'SYNCING...' : 'FORCE RESYNC'}
+            {isResyncing ? 'SYNCING...' : 'FORCE RESYNC (1K)'}
+          </button>
+          
+          <button 
+            onClick={async () => {
+              const nextVer = prompt("Enter new version number (e.g. 1.0.2):", appVersion);
+              if (nextVer && nextVer !== appVersion) {
+                if (window.confirm(`Pushing update ${nextVer} will force all active users to refresh. Proceed?`)) {
+                  import('../lib/store').then(({ updateAppVersion }) => updateAppVersion(nextVer));
+                }
+              }
+            }}
+            className="px-4 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all"
+          >
+            PUSH UPDATE ({appVersion})
           </button>
           <button onClick={() => navigate('/')} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all">
             HOME

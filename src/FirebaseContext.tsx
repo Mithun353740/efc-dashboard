@@ -4,18 +4,24 @@ import {
   subscribeToPlayers,
   subscribeToLeaders,
   subscribeToMatches,
-  subscribeToTournaments,
-  subscribeToSystemLocks,
-  fetchSystemLocks,
+  subscribeToAppVersion,
   sortRankedPlayers,
   testFirestoreConnection,
   computeGlobalElo,
-  addMatch,
-  fetchPlayers,
-  fetchLeaders,
-  fetchMatches,
-  fetchTournaments
+  addMatch
 } from './lib/store';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GLOBAL MODULE CACHE
+// Prevents redundant Firestore reads when navigating between pages.
+// ─────────────────────────────────────────────────────────────────────────────
+let _globalCache: {
+  players: Player[];
+  leaders: Leader[];
+  matches: MatchRecord[];
+  tournaments: Tournament[];
+  systemLocks: Record<string, boolean>;
+} | null = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Context type
@@ -31,22 +37,24 @@ interface FirebaseContextType {
   isLoading: boolean;
   dbError: string | null;
   hasPendingWrites: boolean;
+  appVersion: string;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
 
 export function FirebaseProvider({ children }: { children: React.ReactNode }) {
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [leaders, setLeaders] = useState<Leader[]>([]);
-  const [matches, setMatches] = useState<MatchRecord[]>([]);
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>({});
-  const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
-  const [isLoadingLeaders, setIsLoadingLeaders] = useState(true);
-  const [isLoadingMatches, setIsLoadingMatches] = useState(true);
+  const [players, setPlayers] = useState<Player[]>(_globalCache?.players || []);
+  const [leaders, setLeaders] = useState<Leader[]>(_globalCache?.leaders || []);
+  const [matches, setMatches] = useState<MatchRecord[]>(_globalCache?.matches || []);
+  const [tournaments, setTournaments] = useState<Tournament[]>(_globalCache?.tournaments || []);
+  const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>(_globalCache?.systemLocks || {});
+  const [isLoadingPlayers, setIsLoadingPlayers] = useState(!_globalCache);
+  const [isLoadingLeaders, setIsLoadingLeaders] = useState(!_globalCache);
+  const [isLoadingMatches, setIsLoadingMatches] = useState(!_globalCache);
   const [isMinLoadTimePassed, setIsMinLoadTimePassed] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
   const [hasPendingWrites, setHasPendingWrites] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>('1.0.0');
 
   useEffect(() => {
     let mounted = true;
@@ -102,7 +110,15 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // ─────────────────────────────────────────────────────────────────────────
     // 1. System Locks — Always needed (tiny doc)
     const unsubLocks = subscribeToSystemLocks((locks) => {
-      if (mounted) setSystemLocks(locks);
+      if (mounted) {
+        setSystemLocks(locks);
+        if (_globalCache) _globalCache.systemLocks = locks;
+      }
+    });
+
+    // 1b. App Version — Real-time update monitoring
+    const unsubVersion = subscribeToAppVersion((version) => {
+      if (mounted) setAppVersion(version);
     });
 
     // 2. Leaders — Always needed for Home Page (small collection)
@@ -111,52 +127,68 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setLeaders(data);
       setHasPendingWrites(pending);
       setIsLoadingLeaders(false);
+      if (_globalCache) _globalCache.leaders = data;
     });
 
     // 3. Conditional Heavy Data (Matches, Players, Tournaments)
     // - Members (Admins & Players): Get the "Advanced" full firehose.
     // - Guests: Get the "Fast" optimized view to save your daily quota.
     if (isAdmin || isPlayer) {
-      // Players NO LONGER subscribe to matches globally. Only Admins do.
       if (isAdmin) {
         unsubMatches = subscribeToMatches((data, pending) => {
           if (mounted) {
             setMatches(data);
             setIsLoadingMatches(false);
+            if (_globalCache) _globalCache.matches = data;
           }
           matchesRef.current = data;
         });
       } else {
-        setIsLoadingMatches(false); // Players don't wait for matches
+        setIsLoadingMatches(false);
       }
 
-      // Players subscribe to top players for rankings (limit to 100 for performance)
       unsubPlayers = subscribeToPlayers((data, pending) => {
         if (!mounted) return;
         setPlayers(data);
         setIsLoadingPlayers(false);
+        if (_globalCache) _globalCache.players = data;
       }, 100);
 
       unsubTournaments = subscribeToTournaments((data, pending) => {
         if (!mounted) return;
         setTournaments(data);
+        if (_globalCache) _globalCache.tournaments = data;
       });
     } else {
       // FOR GUESTS (The Free Tier protection):
-      // Only subscribe to Top 15 players for the home page.
-      // This is where you can change the limit in the future!
       unsubPlayers = subscribeToPlayers((data) => {
         if (mounted) {
           setPlayers(data);
           setIsLoadingPlayers(false);
+          if (_globalCache) _globalCache.players = data;
         }
       }, 15);
 
-      fetchTournaments().then(data => {
-        if (mounted) setTournaments(data);
-      });
+      // Guests now use a limited real-time subscription instead of an unbounded fetch
+      unsubTournaments = subscribeToTournaments((data) => {
+        if (mounted) {
+          setTournaments(data);
+          if (_globalCache) _globalCache.tournaments = data;
+        }
+      }, 10);
 
       setIsLoadingMatches(false);
+    }
+
+    // Initialize cache on first success
+    if (!_globalCache) {
+      _globalCache = {
+        players: [],
+        leaders: [],
+        matches: [],
+        tournaments: [],
+        systemLocks: {}
+      };
     }
 
     // Merge cleanups
@@ -167,6 +199,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       unsubMatches();
       unsubTournaments();
       unsubLocks(); 
+      unsubVersion();
     };
 
     // Fallback: don't hang forever if Firestore takes too long
@@ -262,7 +295,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     elos,
     isLoading,
     dbError,
-    hasPendingWrites
+    hasPendingWrites,
+    appVersion
   };
 
   return (
