@@ -136,18 +136,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // - Members (Admins & Players): Get the "Advanced" full firehose.
     // - Guests: Get the "Fast" optimized view to save your daily quota.
     if (isAdmin || isPlayer) {
-      if (isAdmin) {
-        unsubMatches = subscribeToMatches((data, pending) => {
-          if (mounted) {
-            setMatches(data);
-            setIsLoadingMatches(false);
-            if (_globalCache) _globalCache.matches = data;
-          }
-          matchesRef.current = data;
-        });
-      } else {
-        setIsLoadingMatches(false);
-      }
+      unsubMatches = subscribeToMatches((data, pending) => {
+        if (mounted) {
+          setMatches(data);
+          setIsLoadingMatches(false);
+          if (_globalCache) _globalCache.matches = data;
+        }
+        matchesRef.current = data;
+      });
+    } else {
+      setIsLoadingMatches(false);
+    }
 
       unsubPlayers = subscribeToPlayers((data, pending) => {
         if (!mounted) return;

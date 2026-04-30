@@ -1626,7 +1626,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const [msg, setMsg] = React.useState({ text: '', type: '' });
   const [ownerSearch, setOwnerSearch] = React.useState('');
   const [showOwnerDrop, setShowOwnerDrop] = React.useState(false);
-  const [form, setForm] = React.useState({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b', ownerId: '', budget: '5000000' });
+  const [form, setForm] = React.useState({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b', ownerId: '', budget: '5000000', managerRating: '80', activeObjective: '' });
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [config, setConfig] = React.useState<ClubSystemConfig>(DEFAULT_CFG);
   const [configSaving, setConfigSaving] = React.useState(false);
@@ -1677,7 +1677,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   React.useEffect(() => { reload(); }, []);
 
   const resetForm = () => {
-    setForm({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b', ownerId: '', budget: '5000000' });
+    setForm({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b', ownerId: '', budget: '5000000', managerRating: '80', activeObjective: '' });
     setEditingId(null); setOwnerSearch(''); setShowOwnerDrop(false);
   };
 
@@ -1693,6 +1693,8 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
       ownerId: form.ownerId,
       ownerName: players.find(p => p.id === form.ownerId)?.name,
       budget: Number(form.budget) || 5000000,
+      managerRating: Number(form.managerRating) || 80,
+      activeObjective: form.activeObjective || null,
       squadIds: existing?.squadIds || [],
       createdAt: existing?.createdAt || Date.now(),
     };
@@ -2011,6 +2013,16 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                 )}
               </AnimatePresence>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Manager Rating (0-100)</label>
+                <input type="number" min="0" max="100" value={form.managerRating} onChange={e => setForm({...form, managerRating: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Active Board Objective</label>
+                <input type="text" value={form.activeObjective} onChange={e => setForm({...form, activeObjective: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="e.g. Win the next match" />
+              </div>
+            </div>
             {/* Preview card */}
             <div className="rounded-xl border p-4 flex items-center gap-4 transition-all" style={{ borderColor: form.primaryColor + '50', background: form.primaryColor + '12' }}>
               <div className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-black text-lg shrink-0 shadow-lg" style={{ background: `linear-gradient(135deg, ${form.primaryColor}, ${form.secondaryColor})` }}>
@@ -2055,7 +2067,16 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                       onClick={() => {
                         setEditingId(club.id);
                         setOwnerSearch('');
-                        setForm({ name: club.name, shortName: club.shortName, primaryColor: club.primaryColor, secondaryColor: club.secondaryColor, ownerId: club.ownerId, budget: String(club.budget) });
+                        setForm({ 
+                          name: club.name, 
+                          shortName: club.shortName, 
+                          primaryColor: club.primaryColor, 
+                          secondaryColor: club.secondaryColor, 
+                          ownerId: club.ownerId, 
+                          budget: String(club.budget),
+                          managerRating: String(club.managerRating || 80),
+                          activeObjective: club.activeObjective || ''
+                        });
                         setMsg({ text: '', type: '' });
                       }}
                       className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase"
@@ -2437,8 +2458,12 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
               <div className="space-y-1">
                 <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Transfer Window</label>
                 <button onClick={() => setConfig({...config, transferWindowOpen: !config.transferWindowOpen})}
-                  className={cn('w-full p-4 rounded-xl text-[10px] font-black tracking-widest transition-all border uppercase', config.transferWindowOpen ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20')}>
+                  className={cn('w-full p-4 rounded-xl text-[10px] font-black tracking-widest transition-all border uppercase mb-2', config.transferWindowOpen ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20')}>
                   {config.transferWindowOpen ? '✓ TRANSFER WINDOW OPEN' : 'TRANSFER WINDOW CLOSED'}
+                </button>
+                <button onClick={() => setConfig({...config, deadlineDayActive: !config.deadlineDayActive})}
+                  className={cn('w-full p-4 rounded-xl text-[10px] font-black tracking-widest transition-all border uppercase flex items-center justify-center gap-2', config.deadlineDayActive ? 'bg-red-500 text-black border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.4)] animate-pulse' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20')}>
+                  {config.deadlineDayActive ? '🚨 DEADLINE DAY LIVE' : 'START DEADLINE DAY EVENT'}
                 </button>
               </div>
               

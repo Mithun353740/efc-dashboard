@@ -95,7 +95,7 @@ export interface Club {
   logo?: string;        // base64 or URL (high quality)
   primaryColor: string;   // hex e.g. "#8b5cf6"
   secondaryColor: string; // hex e.g. "#f59e0b"
-  ownerId: string;        // Player ID of the club manager
+  ownerId: string;\n  managerRating?: number;\n  activeObjective?: string | null;\n  objectiveReward?: number;        // Player ID of the club manager
   ownerName?: string;     // denormalized for display
   budget: number;         // virtual currency (e.g. 50_000_000)
   squadIds: string[];     // Player IDs in this club's squad
@@ -246,7 +246,7 @@ export interface MatchdaySlot {
 export interface ClubTournament {
   id: string;
   name: string;      // e.g. "Vortex Winter Cup"
-  season: string;    // e.g. "QVFC Club Season 2026/2027"
+  season: string;\n  deadlineDayActive?: boolean;    // e.g. "QVFC Club Season 2026/2027"
   status: 'active' | 'paused' | 'postponed' | 'completed';
   statusReason?: string;
   createdAt: number;

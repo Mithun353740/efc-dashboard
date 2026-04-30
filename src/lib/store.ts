@@ -375,25 +375,52 @@ export async function updatePlayerProfile(
 // Real-time listeners
 export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 100) {
   const path = 'players';
-  const q = query(collection(db, path), orderBy('ovr', 'desc'), limit(limitCount));
-  return onSnapshot(q, (snapshot) => {
-    const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
-    callback(players, snapshot.metadata.hasPendingWrites);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.GET, path);
-  });
+  let isUnsubscribed = false;
+  
+  const fetch = async () => {
+    if (isUnsubscribed) return;
+    try {
+      const q = query(collection(db, path), orderBy('ovr', 'desc'), limit(limitCount));
+      const snapshot = await getDocs(q);
+      const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+      callback(players, false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+    }
+  };
+
+  fetch();
+  const unsubMeta = onSnapshot(doc(db, 'metadata', 'cache'), () => { fetch(); });
+
+  return () => {
+    isUnsubscribed = true;
+    unsubMeta();
+  };
 }
 
 export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boolean) => void) {
   const path = 'leaders';
-  // Leaders collection is tiny — limit to 50 to be safe
-  const q = query(collection(db, path), limit(50));
-  return onSnapshot(q, (snapshot) => {
-    const leaders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
-    callback(leaders, snapshot.metadata.hasPendingWrites);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.GET, path);
-  });
+  let isUnsubscribed = false;
+
+  const fetch = async () => {
+    if (isUnsubscribed) return;
+    try {
+      const q = query(collection(db, path), limit(50));
+      const snapshot = await getDocs(q);
+      const leaders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
+      callback(leaders, false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+    }
+  };
+
+  fetch();
+  const unsubMeta = onSnapshot(doc(db, 'metadata', 'cache'), () => { fetch(); });
+
+  return () => {
+    isUnsubscribed = true;
+    unsubMeta();
+  };
 }
 
 /**
@@ -404,13 +431,27 @@ export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boo
  */
 export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending: boolean) => void) {
   const path = 'matches';
-  const q = query(collection(db, path), orderBy('timestamp', 'desc'), limit(200));
-  return onSnapshot(q, (snapshot) => {
-    const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
-    callback(matches, snapshot.metadata.hasPendingWrites);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.GET, path);
-  });
+  let isUnsubscribed = false;
+
+  const fetch = async () => {
+    if (isUnsubscribed) return;
+    try {
+      const q = query(collection(db, path), orderBy('timestamp', 'desc'), limit(200));
+      const snapshot = await getDocs(q);
+      const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
+      callback(matches, false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+    }
+  };
+
+  fetch();
+  const unsubMeta = onSnapshot(doc(db, 'metadata', 'cache'), () => { fetch(); });
+
+  return () => {
+    isUnsubscribed = true;
+    unsubMeta();
+  };
 }
 
 /**
@@ -436,13 +477,27 @@ async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]
 
 export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void, limitCount = 100) {
   const path = 'tournaments';
-  const q = query(collection(db, path), orderBy('createdAt', 'desc'), limit(limitCount));
-  return onSnapshot(q, (snapshot) => {
-    const tournaments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
-    callback(tournaments, snapshot.metadata.hasPendingWrites);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.GET, path);
-  });
+  let isUnsubscribed = false;
+
+  const fetch = async () => {
+    if (isUnsubscribed) return;
+    try {
+      const q = query(collection(db, path), orderBy('createdAt', 'desc'), limit(limitCount));
+      const snapshot = await getDocs(q);
+      const tournaments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
+      callback(tournaments, false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+    }
+  };
+
+  fetch();
+  const unsubMeta = onSnapshot(doc(db, 'metadata', 'cache'), () => { fetch(); });
+
+  return () => {
+    isUnsubscribed = true;
+    unsubMeta();
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -623,6 +678,32 @@ export async function addMatch(
   if (p2) {
     const updatedP2 = computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200);
     batch.set(doc(db, 'players', p2.id), updatedP2);
+  }
+
+  // 5. Dynamic Manager Rating updates
+  try {
+    const allClubsSnap = await getDocs(collection(db, 'clubs'));
+    const allClubs = allClubsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Club));
+    
+    const p1Club = allClubs.find(c => c.squadIds?.includes(p1.id));
+    const p2Club = p2 ? allClubs.find(c => c.squadIds?.includes(p2.id)) : undefined;
+
+    let p1Change = 0;
+    let p2Change = 0;
+    if (p1Score > p2Score) { p1Change = 2; p2Change = -2; }
+    else if (p2Score > p1Score) { p1Change = -2; p2Change = 2; }
+    else { p1Change = 1; p2Change = 1; } // Draw gives +1 for effort
+
+    if (p1Club) {
+      const newRating = Math.max(0, Math.min(100, (p1Club.managerRating || 80) + p1Change));
+      batch.update(doc(db, 'clubs', p1Club.id), { managerRating: newRating });
+    }
+    if (p2Club) {
+      const newRating = Math.max(0, Math.min(100, (p2Club.managerRating || 80) + p2Change));
+      batch.update(doc(db, 'clubs', p2Club.id), { managerRating: newRating });
+    }
+  } catch(e) {
+    console.warn("Could not calculate dynamic manager ratings", e);
   }
 
   try {
@@ -1654,4 +1735,44 @@ export async function broadcastToAllOwners(ownerIds: string[], message: Omit<Clu
   await Promise.all(ownerIds.map((ownerId, i) =>
     pushInboxMessage(ownerId, { ...message, id: `msg_${now}_${i}`, read: false, createdAt: now })
   ));
+}
+
+/**
+ * Calculates a player's form (A-E) based on their last 5 matches.
+ */
+export function calculatePlayerForm(matches: MatchRecord[], playerId: string): 'A' | 'B' | 'C' | 'D' | 'E' {
+  const recent = matches
+    .filter(m => m.p1Id === playerId || m.p2Id === playerId)
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 5);
+
+  if (recent.length === 0) return 'C';
+
+  let wins = 0;
+  let draws = 0;
+  recent.forEach(m => {
+    const isP1 = m.p1Id === playerId;
+    const myScore = isP1 ? m.p1Score : m.p2Score;
+    const oppScore = isP1 ? m.p2Score : m.p1Score;
+
+    if (myScore > oppScore) wins++;
+    else if (myScore === oppScore) draws++;
+  });
+
+  const winRate = wins / recent.length;
+  if (winRate >= 0.8) return 'A';
+  if (winRate >= 0.6) return 'B';
+  if (winRate >= 0.4 || draws >= 2) return 'C';
+  if (winRate >= 0.2) return 'D';
+  return 'E';
+}
+
+/**
+ * Calculates a suggested base prize for auction based on OVR and Form.
+ */
+export function calculateBasePrize(ovr: number, form: 'A' | 'B' | 'C' | 'D' | 'E'): number {
+  // Base price starts at 100k, scales up
+  const baseByOvr = Math.max(100000, Math.pow(ovr - 50, 2) * 2000); 
+  const formMultiplier = { 'A': 1.5, 'B': 1.2, 'C': 1.0, 'D': 0.8, 'E': 0.6 }[form];
+  return Math.round(baseByOvr * formMultiplier);
 }

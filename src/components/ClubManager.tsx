@@ -8,6 +8,7 @@ import {
   subscribeToInbox, markInboxRead, subscribeToAuction,
   addToShortlist, removeFromShortlist, sendTransferProposal,
   setReleaseClause, removeReleaseClause, triggerReleaseClause,
+  calculatePlayerForm, calculateBasePrize
 } from '../lib/store';
 import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture, AuctionState, ClubInboxMessage } from '../types';
 import { getPlayerGrade, GRADE_COLORS } from '../lib/utils';
@@ -49,7 +50,9 @@ function ovrColor(ovr: number) {
 
 // ─── FIFA Player Card ─────────────────────────────────────────────────────────
 
-function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; size?: 'sm' | 'md' | 'lg' }) {
+function FifaCard({ player, club, size = 'md', matches = [] }: { player: Player; club?: Club; size?: 'sm' | 'md' | 'lg', matches?: MatchRecord[] }) {
+  const form = calculatePlayerForm(matches, player.id);
+  const formColor = { 'A': '#4ade80', 'B': '#84cc16', 'C': '#eab308', 'D': '#f97316', 'E': '#ef4444' }[form];
   const dims = size === 'lg' ? 'w-36 h-48 md:w-44 md:h-60' : size === 'md' ? 'w-28 h-36 md:w-36 md:h-48' : 'w-24 h-32 md:w-28 md:h-36';
   const pri = club?.primaryColor || '#8b5cf6';
   const sec = club?.secondaryColor || '#f59e0b';
@@ -71,6 +74,9 @@ function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; 
       <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 z-20">
         <div className="w-6 h-6 md:w-8 md:h-8 rounded md:rounded-lg flex items-center justify-center font-black text-[9px] md:text-xs text-white shadow-lg" style={{ background: ovrColor(player.ovr) }}>
           {player.ovr}
+        </div>
+        <div className="mt-1 w-6 h-4 md:w-8 md:h-5 rounded flex items-center justify-center font-black text-[7px] md:text-[9px] text-black shadow-lg" style={{ background: formColor }}>
+          {form}
         </div>
       </div>
 
@@ -145,11 +151,39 @@ function ClubStatBar({ label, val, icon }: { label: string; val: string | number
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ myClub, squad, allClubs, config }: { myClub: Club; squad: Player[]; allClubs: Club[]; config: ClubSystemConfig | null }) {
+function OverviewTab({ myClub, squad, allClubs, config, matches }: { myClub: Club; squad: Player[]; allClubs: Club[]; config: ClubSystemConfig | null; matches: MatchRecord[] }) {
   const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
   
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 md:auto-rows-[160px]">
+      {/* MANAGER RATING / BOARD WIDGET */}
+      <div className="relative group overflow-hidden rounded-[1.5rem] md:rounded-[2rem] bg-[#0f172a] border border-white/10 p-6 flex flex-col justify-between transition-all hover:border-violet-500/50">
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-transparent" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full bg-violet-500" />
+            <p className="text-[9px] font-black tracking-[0.2em] text-violet-400 uppercase">Manager Rating</p>
+          </div>
+          <div className="flex items-end gap-2">
+            <h2 className="text-4xl font-black text-white tracking-tighter">{myClub.managerRating || 80}</h2>
+            <span className={`text-[10px] font-black uppercase mb-1.5 ${(!myClub.managerRating || myClub.managerRating >= 80) ? 'text-green-400' : myClub.managerRating >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+              {(!myClub.managerRating || myClub.managerRating >= 80) ? 'Excellent' : myClub.managerRating >= 50 ? 'Average' : 'Critical'}
+            </span>
+          </div>
+          <div className="w-full bg-white/10 h-1.5 rounded-full mt-3 overflow-hidden">
+            <div className={`h-full ${(!myClub.managerRating || myClub.managerRating >= 80) ? 'bg-green-500' : myClub.managerRating >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${myClub.managerRating || 80}%` }} />
+          </div>
+          {myClub.activeObjective ? (
+            <div className="mt-3 p-2 bg-white/5 rounded-lg border border-white/5">
+              <p className="text-[8px] text-amber-500 font-black uppercase tracking-widest">BOARD OBJECTIVE</p>
+              <p className="text-[10px] text-white font-bold leading-tight mt-0.5">{myClub.activeObjective}</p>
+            </div>
+          ) : (
+            <p className="text-[9px] text-slate-500 font-bold mt-3 uppercase tracking-widest">No active board objectives.</p>
+          )}
+        </div>
+      </div>
+
       {/* PLAY MATCH / NEXT FIXTURE (Large) */}
       <div className="md:col-span-2 lg:col-span-2 row-span-2 relative group overflow-hidden rounded-[1.5rem] md:rounded-[2rem] bg-[#0f172a] border border-white/10 p-6 md:p-8 flex flex-col justify-between transition-all hover:scale-[1.01] hover:border-amber-500/50">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-transparent" />
@@ -180,25 +214,46 @@ function OverviewTab({ myClub, squad, allClubs, config }: { myClub: Club; squad:
         </div>
       </div>
 
-      {/* MINI STANDINGS (Square) */}
-      <div className="row-span-2 bg-[#0f172a] border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 flex flex-col hover:border-amber-500/50 transition-all">
+      {/* MINI STANDINGS / RUMOR MILL (Square) */}
+      <div className={cn(
+        "row-span-2 border rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 flex flex-col transition-all",
+        config?.deadlineDayActive ? "bg-red-950/20 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.1)]" : "bg-[#0f172a] border-white/10 hover:border-amber-500/50"
+      )}>
         <div className="flex items-center gap-2 mb-4">
-          <Trophy size={14} className="text-amber-500" />
-          <p className="text-[9px] md:text-[10px] font-black tracking-widest text-slate-500 uppercase">STANDINGS</p>
+          {config?.deadlineDayActive ? <Zap size={14} className="text-red-500 animate-pulse" /> : <Trophy size={14} className="text-amber-500" />}
+          <p className={cn("text-[9px] md:text-[10px] font-black tracking-widest uppercase", config?.deadlineDayActive ? "text-red-500" : "text-slate-500")}>
+            {config?.deadlineDayActive ? "RUMOR MILL" : "STANDINGS"}
+          </p>
         </div>
-        <div className="flex-1 space-y-2 md:space-y-3">
-          {[1,2,3,4,5].map(i => (
-            <div key={i} className={`flex items-center justify-between p-2 rounded-xl border border-transparent ${i === 1 ? 'bg-amber-500/10 border-amber-500/20' : ''}`}>
-              <div className="flex items-center gap-2 md:gap-3">
-                <span className="text-[9px] md:text-[10px] font-black text-slate-500">0{i}</span>
-                <div className="w-4 h-4 md:w-5 md:h-5 rounded bg-white/5" />
-                <div className="w-12 md:w-16 h-1 md:h-1.5 bg-white/5 rounded-full" />
+        
+        {config?.deadlineDayActive ? (
+          <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
+            {[
+              { t: "BREAKING", m: "Big budget bid reported for " + (squad[0]?.name || "top players") },
+              { t: "RUMOR", m: "Several clubs eyeing swap deals before the window slams shut." },
+              { t: "LIVE", m: "Last minute negotiations are underway in the Transfer Hub." }
+            ].map((r, i) => (
+              <div key={i} className="p-2.5 bg-white/5 border border-white/5 rounded-xl">
+                <span className="text-[7px] font-black px-1.5 py-0.5 bg-red-500 text-black rounded mb-1 inline-block">{r.t}</span>
+                <p className="text-[9px] font-bold text-slate-300 leading-tight">{r.m}</p>
               </div>
-              <span className="text-[9px] md:text-[10px] font-black text-white">0</span>
-            </div>
-          ))}
-        </div>
-        <button className="mt-4 w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[8px] md:text-[9px] font-black text-slate-400 transition-all uppercase tracking-widest">FULL TABLE</button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex-1 space-y-2 md:space-y-3">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className={`flex items-center justify-between p-2 rounded-xl border border-transparent ${i === 1 ? 'bg-amber-500/10 border-amber-500/20' : ''}`}>
+                <div className="flex items-center gap-2 md:gap-3">
+                  <span className="text-[9px] md:text-[10px] font-black text-slate-500">0{i}</span>
+                  <div className="w-4 h-4 md:w-5 md:h-5 rounded bg-white/5" />
+                  <div className="w-12 md:w-16 h-1 md:h-1.5 bg-white/5 rounded-full" />
+                </div>
+                <span className="text-[9px] md:text-[10px] font-black text-white">0</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {!config?.deadlineDayActive && <button className="mt-4 w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[8px] md:text-[9px] font-black text-slate-400 transition-all uppercase tracking-widest">FULL TABLE</button>}
       </div>
 
       {/* TRANSFER HUB (Tall) */}
@@ -261,7 +316,7 @@ function OverviewTab({ myClub, squad, allClubs, config }: { myClub: Club; squad:
 // ─── Main Component (shell + tab router) ─────────────────────────────────────
 
 export default function ClubManager() {
-  const { players, systemLocks } = useFirebase();
+  const { players, matches, systemLocks } = useFirebase();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [config, setConfig] = useState<ClubSystemConfig | null>(null);
   const [listings, setListings] = useState<MarketListing[]>([]);
@@ -428,8 +483,33 @@ export default function ClubManager() {
         </div>
       </div>
 
+      {/* Deadline Day Alert */}
+      {config?.deadlineDayActive && (
+        <div className="bg-red-600 overflow-hidden relative py-2">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
+          <motion.div 
+            animate={{ x: [0, -1000] }} 
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            className="flex whitespace-nowrap gap-10 items-center"
+          >
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <span className="text-black font-black text-[10px] tracking-[0.3em] uppercase italic flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-white animate-pulse" /> 
+                  TRANSFER DEADLINE DAY LIVE
+                </span>
+                <span className="text-white/40 font-black text-[10px] tracking-[0.3em] uppercase italic">THE CLOCK IS TICKING</span>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      )}
+
       {/* Content */}
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-10">
+      <div className={cn(
+        "max-w-6xl mx-auto px-4 md:px-8 py-10",
+        config?.deadlineDayActive && "bg-gradient-to-b from-red-900/10 to-transparent"
+      )}>
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-amber-400 font-black text-sm animate-pulse tracking-widest">LOADING CLUB DATA...</div>
@@ -439,7 +519,7 @@ export default function ClubManager() {
             {activeTab === 'overview' && (
               <motion.div key="overview" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
                 {myClub ? (
-                  <OverviewTab myClub={myClub} squad={squad} allClubs={clubs} config={config} />
+                  <OverviewTab myClub={myClub} squad={squad} allClubs={clubs} config={config} matches={matches} />
                 ) : (
                   <NoClubScreen />
                 )}
@@ -447,7 +527,7 @@ export default function ClubManager() {
             )}
             {activeTab === 'market' && (
               <motion.div key="market" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
-                <MarketTab listings={listings} clubs={clubs} myClub={myClub} players={players} isOwner={isOwner} config={config} onRefresh={() => load(true)} setMsg={setMsg} />
+                <MarketTab listings={listings} clubs={clubs} myClub={myClub} players={players} isOwner={isOwner} config={config} onRefresh={() => load(true)} setMsg={setMsg} matches={matches} />
               </motion.div>
             )}
             {activeTab === 'rankings' && (
@@ -479,6 +559,7 @@ export default function ClubManager() {
                   onShortlistPlayer={(p) => { setShortlistPlayer(p); setProposalStep('shortlist'); }}
                   onSetReleaseClause={(p) => { setReleaseTarget(p); setReleaseAmount(String(p.releaseClause?.amount || '')); }}
                   setMsg={setMsg}
+                  matches={matches}
                 />
               </motion.div>
             )}
@@ -635,9 +716,9 @@ function NoClubScreen() {
 
 // ─── Squad Tab (with Shortlist + Release Clause) ──────────────────────────────
 
-function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, onShortlistPlayer, onSetReleaseClause, setMsg }: {
+function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, matches, onShortlistPlayer, onSetReleaseClause, setMsg }: {
   myClub: Club; squad: Player[]; allClubs: Club[]; allPlayers: Player[];
-  isOwner: boolean; isAdmin: boolean;
+  isOwner: boolean; isAdmin: boolean; matches: MatchRecord[];
   onShortlistPlayer: (p: Player) => void;
   onSetReleaseClause: (p: Player) => void;
   setMsg: (m: any) => void;
@@ -667,7 +748,15 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, onSho
               <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all">
                 <div className="relative h-40 overflow-hidden">
                   <img src={p.image} className="w-full h-full object-cover object-top" alt={p.name} style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} />
-                  <div className="absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-black" style={{ background: gradeColor, color: '#000' }}>{grade}</div>
+                  <div className="absolute top-2 left-2 flex gap-1">
+                    <div className="px-2 py-1 rounded-lg text-[10px] font-black" style={{ background: gradeColor, color: '#000' }}>{grade}</div>
+                    <div className="px-2 py-1 rounded-lg text-[10px] font-black" style={{ 
+                      background: { 'A': '#4ade80', 'B': '#84cc16', 'C': '#eab308', 'D': '#f97316', 'E': '#ef4444' }[calculatePlayerForm(matches, p.id)], 
+                      color: '#000' 
+                    }}>
+                      {calculatePlayerForm(matches, p.id)}
+                    </div>
+                  </div>
                   <div className="absolute top-2 right-2 bg-black/60 rounded-lg px-2 py-1 text-[10px] font-black text-white">{p.ovr} OVR</div>
                   {p.releaseClause?.active && <div className="absolute bottom-2 right-2 bg-amber-500 text-black text-[8px] font-black px-2 py-0.5 rounded-full">RC: {(p.releaseClause.amount/1000).toFixed(0)}K</div>}
                 </div>
@@ -788,8 +877,8 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, onSho
 
 // ─── Transfer Market Tab ──────────────────────────────────────────────────────
 
-function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefresh, setMsg }:
-  { listings: MarketListing[]; clubs: Club[]; myClub?: Club; players: Player[]; isOwner: boolean; config: ClubSystemConfig | null; onRefresh: () => void; setMsg: (m: { text: string; type: string }) => void }) {
+function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefresh, setMsg, matches }:
+  { listings: MarketListing[]; clubs: Club[]; myClub?: Club; players: Player[]; isOwner: boolean; config: ClubSystemConfig | null; onRefresh: () => void; setMsg: (m: { text: string; type: string }) => void; matches: MatchRecord[] }) {
 
   const windowOpen = config?.transferWindowOpen ?? false;
   const [listPrice, setListPrice] = useState('');
@@ -851,7 +940,22 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
               <option value="">Select player to list...</option>
               {mySquad.map(p => <option key={p.id} value={p.id} className="bg-[#0f172a]">{p.name} — OVR {p.ovr}</option>)}
             </select>
-            <input type="number" value={listPrice} onChange={e => setListPrice(e.target.value)} placeholder="Price (VCC)" className="flex-1 bg-white/5 border border-white/10 p-3 md:p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
+            <div className="flex-1 relative">
+              <input type="number" value={listPrice} onChange={e => setListPrice(e.target.value)} placeholder="Price (VCC)" className="w-full bg-white/5 border border-white/10 p-3 md:p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
+              {listingPlayerId && (() => {
+                const p = players.find(x => x.id === listingPlayerId);
+                if (!p) return null;
+                const suggestion = calculateBasePrize(p.ovr, calculatePlayerForm(matches, p.id));
+                return (
+                  <button 
+                    onClick={() => setListPrice(String(suggestion))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black bg-amber-500/10 text-amber-500 px-2 py-1 rounded border border-amber-500/20 hover:bg-amber-500 hover:text-black transition-all"
+                  >
+                    SUGGEST: VCC {fmtBudget(suggestion)}
+                  </button>
+                );
+              })()}
+            </div>
             <button onClick={handleList} disabled={busy || !listingPlayerId || !listPrice} className="px-6 py-3 md:py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl disabled:opacity-50 transition-all whitespace-nowrap">{busy ? 'LISTING...' : 'LIST PLAYER'}</button>
           </div>
         </div>
@@ -867,11 +971,16 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
               const fromClub = clubs.find(c => c.id === l.fromClubId);
               const isMine = myClub?.id === l.fromClubId;
               const canAfford = myClub && myClub.budget >= l.price;
+              const form = calculatePlayerForm(matches, l.playerId);
+              const formColor = { 'A': '#4ade80', 'B': '#84cc16', 'C': '#eab308', 'D': '#f97316', 'E': '#ef4444' }[form];
               return (
                 <motion.div key={l.id} whileHover={{ scale: 1.01 }} className="bg-[#0f172a] border border-white/10 rounded-2xl p-4 flex items-center gap-4">
                   <div className="relative shrink-0">
                     <img src={l.playerImage} className="w-14 h-14 rounded-xl object-cover" alt="" />
-                    <div className="absolute -top-1 -right-1 w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black text-white shadow-lg" style={{ background: ovrColor(l.playerOvr) }}>{l.playerOvr}</div>
+                    <div className="absolute -top-1 -right-1 flex flex-col gap-1">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black text-white shadow-lg" style={{ background: ovrColor(l.playerOvr) }}>{l.playerOvr}</div>
+                      <div className="w-6 h-4 rounded flex items-center justify-center text-[7px] font-black text-black shadow-lg" style={{ background: formColor }}>{form}</div>
+                    </div>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-black text-white text-sm truncate">{l.playerName}</p>
