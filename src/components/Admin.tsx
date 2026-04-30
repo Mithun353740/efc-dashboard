@@ -1629,6 +1629,19 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const [hEditingMatch, setHEditingMatch] = React.useState<MatchRecord | null>(null);
   const [hEditForm, setHEditForm] = React.useState({ p1Score: '0', p2Score: '0', tournament: '', matchday: '1' });
 
+  // Auction Admin state
+  const [auctionState, setAuctionState] = React.useState<AuctionState | null>(null);
+  const [setupBasePrice, setSetupBasePrice] = React.useState('500000');
+  const [setupIncrement, setSetupIncrement] = React.useState('100000');
+  const [revealPlayerId, setRevealPlayerId] = React.useState('');
+
+  React.useEffect(() => {
+    const unsub = subscribeToAuction((state) => {
+      setAuctionState(state);
+    });
+    return unsub;
+  }, []);
+
   const groupedHistory = useMemo(() => {
     if (!hMatches.length) return {};
     const grouped: any = {};
@@ -2497,15 +2510,158 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
       )}
 
       {/* ── AUCTION subtab ── */}
+      {/* ── AUCTION subtab ── */}
       {subTab === 'auction' && (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl text-center py-20">
-          <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 mx-auto mb-4">
-            <span className="text-2xl">🔨</span>
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-xl font-black tracking-tight mb-1">LIVE AUCTION CONTROL</h3>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manage player distribution and live bidding sessions</p>
+            </div>
+            {auctionState && auctionState.status !== 'ended' && (
+              <button onClick={adminEndAuction} className="px-4 py-2 bg-red-500/10 text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">
+                End Session
+              </button>
+            )}
           </div>
-          <h3 className="text-2xl font-black tracking-tight mb-2 uppercase">Auction Coming Soon</h3>
-          <p className="text-slate-400 text-xs font-bold max-w-md mx-auto">
-            The player distribution auction system is currently under development. Check back later.
-          </p>
+
+          {!auctionState || auctionState.status === 'ended' ? (
+            <div className="text-center py-20 bg-black/20 rounded-3xl border border-white/5">
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 mx-auto mb-6">
+                <Gavel size={32} />
+              </div>
+              <h4 className="text-lg font-black text-white uppercase mb-2">No Active Session</h4>
+              <p className="text-slate-400 text-xs font-bold max-w-xs mx-auto mb-8">Set the base price and bid increment to start a new auction session for all clubs.</p>
+              
+              <div className="max-w-sm mx-auto grid grid-cols-2 gap-4 text-left">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Base Price</label>
+                  <input type="number" value={setupBasePrice} onChange={e => setSetupBasePrice(e.target.value)} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Increment</label>
+                  <input type="number" value={setupIncrement} onChange={e => setSetupIncrement(e.target.value)} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" />
+                </div>
+                <button 
+                  onClick={async () => {
+                    if (!clubs.length) { alert('No clubs found!'); return; }
+                    await adminStartAuction(clubs.map(c => c.id), Number(setupIncrement), Number(setupBasePrice));
+                    setMsg({ text: 'Auction session started!', type: 'success' });
+                  }}
+                  className="col-span-2 py-4 bg-amber-500 text-black font-black text-xs tracking-widest rounded-xl hover:scale-[1.02] active:scale-95 transition-all uppercase"
+                >
+                  Start Auction Session
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left: Player Reveal & Controls */}
+              <div className="space-y-6">
+                <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
+                  <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] mb-4">REVEAL PLAYER CARD</h4>
+                  <div className="flex gap-2 mb-4">
+                    <select 
+                      value={revealPlayerId} 
+                      onChange={e => setRevealPlayerId(e.target.value)}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-amber-500/50"
+                    >
+                      <option value="">Select a Free Agent...</option>
+                      {players.filter(p => !p.clubId || p.clubId === '').map(p => (
+                        <option key={p.id} value={p.id}>{p.name} ({p.ovr} OVR)</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={async () => {
+                        if (!revealPlayerId) return;
+                        const p = players.find(pl => pl.id === revealPlayerId)!;
+                        await adminRevealCard({ id: p.id, name: p.name, image: p.image, ovr: p.ovr, currentClubId: p.clubId || null, currentClubName: p.clubName || null }, Number(setupBasePrice), Number(setupIncrement));
+                        setRevealPlayerId('');
+                      }}
+                      className="px-6 bg-amber-500 text-black rounded-xl text-xs font-black uppercase hover:bg-amber-600 transition-all"
+                    >
+                      REVEAL
+                    </button>
+                  </div>
+                  
+                  {auctionState.currentPlayer ? (
+                    <div className="flex items-center gap-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                      <img src={auctionState.currentPlayer.image} className="w-16 h-16 rounded-xl object-cover" alt="" />
+                      <div>
+                        <p className="text-xs font-black text-white">{auctionState.currentPlayer.name}</p>
+                        <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">{auctionState.currentPlayer.ovr} OVR PLAYER</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-24 border-2 border-dashed border-white/10 rounded-2xl flex items-center justify-center text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                      Waiting to reveal...
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    disabled={!auctionState.leadingClubId || auctionState.status === 'sold'}
+                    onClick={async () => {
+                      const winningClub = clubs.find(c => c.id === auctionState.leadingClubId);
+                      if (winningClub) {
+                        await adminConfirmSold(auctionState, winningClub);
+                        setMsg({ text: 'Player SOLD successfully!', type: 'success' });
+                      }
+                    }}
+                    className="py-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all disabled:opacity-30"
+                  >
+                    Confirm Sold
+                  </button>
+                  <button 
+                    onClick={adminSkipPlayer}
+                    className="py-4 bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                  >
+                    Skip Player
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: Live Status */}
+              <div className="space-y-6">
+                <div className="p-6 bg-[#0a0a14] border border-amber-500/20 rounded-3xl">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">LIVE BID STATUS</p>
+                  <div className="flex items-baseline gap-3 mb-4">
+                    <span className="text-5xl font-black text-white">{(auctionState.currentBid / 1000).toFixed(0)}K</span>
+                    <span className="text-amber-500 font-black text-xs uppercase">Current Bid</span>
+                  </div>
+                  
+                  {auctionState.leadingClubId ? (
+                    <div className="flex items-center gap-3 p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                      <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
+                      <p className="text-xs font-black text-amber-500 uppercase tracking-widest">{auctionState.leadingClubName} IS LEADING</p>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest italic">Waiting for first bid...</p>
+                  )}
+                </div>
+
+                <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">BIDDING ORDER</p>
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto no-scrollbar">
+                    {auctionState.biddingOrder.map((clubId, idx) => {
+                      const club = clubs.find(c => c.id === clubId);
+                      const isFolded = auctionState.foldedClubs.includes(clubId);
+                      const isTurn = auctionState.biddingOrder[auctionState.currentTurnIndex % auctionState.biddingOrder.length] === clubId;
+                      return (
+                        <div key={clubId} className={cn("flex items-center gap-3 p-3 rounded-xl border transition-all", isTurn ? "bg-amber-500/10 border-amber-500/30" : "bg-black/20 border-white/5", isFolded && "opacity-30")}>
+                          <div className="w-2 h-2 rounded-full" style={{ background: club?.primaryColor }} />
+                          <p className="text-[10px] font-black text-white uppercase flex-1">{club?.name}</p>
+                          {isTurn && <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest animate-pulse">Their Turn</span>}
+                          {isFolded && <span className="text-[8px] font-black text-slate-500 uppercase">Folded</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
