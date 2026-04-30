@@ -4,11 +4,17 @@ import { useFirebase } from '../FirebaseContext';
 import {
   fetchClubs, fetchClubConfig, fetchMarketListings, fetchClubSeasonMatches,
   listPlayerOnMarket, delistPlayerFromMarket, purchasePlayer,
-  fetchClubTournaments, fetchClubFixtures, saveClubFixture
+  fetchClubTournaments, fetchClubFixtures, saveClubFixture,
+  subscribeToInbox, markInboxRead, subscribeToAuction,
+  addToShortlist, removeFromShortlist, sendTransferProposal,
+  setReleaseClause, removeReleaseClause, triggerReleaseClause,
 } from '../lib/store';
-import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture } from '../types';
-import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check } from 'lucide-react';
+import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture, AuctionState, ClubInboxMessage } from '../types';
+import { getPlayerGrade, GRADE_COLORS } from '../lib/utils';
+import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check, Bell, ArrowLeftRight, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import ClubAuction from './club/ClubAuction';
+import ClubInbox from './club/ClubInbox';
 
 // ─── Module-level cache (persists across route changes, cleared on write) ─────
 let _clubCache: { clubs: Club[]; config: ClubSystemConfig | null; listings: MarketListing[] } | null = null;
@@ -260,8 +266,21 @@ export default function ClubManager() {
   const [config, setConfig] = useState<ClubSystemConfig | null>(null);
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'market' | 'rankings' | 'tournaments' | 'auction'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'squad' | 'market' | 'rankings' | 'tournaments' | 'auction' | 'inbox'>('overview');
   const [msg, setMsg] = useState({ text: '', type: '' });
+  // Inbox state
+  const [inboxMessages, setInboxMessages] = useState<ClubInboxMessage[]>([]);
+  const [inboxUnread, setInboxUnread] = useState(0);
+  // Auction live watcher — minimal: only subscribes when on auction tab
+  const [auctionLive, setAuctionLive] = useState(false);
+  // Shortlist modal state
+  const [shortlistPlayer, setShortlistPlayer] = useState<Player | null>(null);
+  const [proposalStep, setProposalStep] = useState<'shortlist' | 'offer' | null>(null);
+  const [offerType, setOfferType] = useState<'money' | 'swap'>('money');
+  const [offerAmount, setOfferAmount] = useState('');
+  const [offerNote, setOfferNote] = useState('');
+  const [releaseTarget, setReleaseTarget] = useState<Player | null>(null);
+  const [releaseAmount, setReleaseAmount] = useState('');
 
   const playerId = localStorage.getItem('playerId') || '';
   const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
@@ -291,6 +310,25 @@ export default function ClubManager() {
 
   useEffect(() => { load(); }, []);
 
+  // Subscribe to inbox when owner is identified
+  useEffect(() => {
+    if (!playerId || !isPlayer) return;
+    const unsub = subscribeToInbox(playerId, (msgs, count) => {
+      setInboxMessages(msgs);
+      setInboxUnread(count);
+    });
+    return unsub;
+  }, [playerId, isPlayer]);
+
+  // Check if auction is live (cheap single snapshot watcher)
+  useEffect(() => {
+    if (!isPlayer) return;
+    const unsub = subscribeToAuction((state) => {
+      setAuctionLive(!!state && state.status !== 'ended' && state.status !== 'idle');
+    });
+    return unsub;
+  }, [isPlayer]);
+
   // Locked (Bypass for admins)
   const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
   if (systemLocks?.clubManager && !isAdmin) return <LockedScreen />;
@@ -309,10 +347,12 @@ export default function ClubManager() {
 
   const tabs = [
     { id: 'overview', label: 'MY CLUB', icon: <Shield size={14} /> },
+    { id: 'squad', label: 'SQUAD', icon: <Users size={14} /> },
     { id: 'market', label: 'MARKET', icon: <ShoppingCart size={14} /> },
-    { id: 'auction', label: 'AUCTION', icon: <Hammer size={14} /> },
+    { id: 'auction', label: auctionLive ? '🔴 AUCTION' : 'AUCTION', icon: <Hammer size={14} /> },
     { id: 'rankings', label: 'RANKINGS', icon: <Trophy size={14} /> },
-    { id: 'tournaments', label: 'TOURNAMENTS', icon: <Trophy size={14} /> },
+    { id: 'tournaments', label: 'CUPS', icon: <Trophy size={14} /> },
+    { id: 'inbox', label: 'INBOX', icon: <Bell size={14} />, badge: inboxUnread > 0 ? inboxUnread : null },
   ] as const;
 
   return (
@@ -365,18 +405,22 @@ export default function ClubManager() {
           {/* Tabs - Responsive Scrollable Container */}
           <div className="w-full xl:w-auto overflow-x-auto no-scrollbar py-2">
             <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-[1.5rem] md:rounded-full w-max mx-auto xl:mx-0">
-              {tabs.map(t => (
+              {tabs.map((t: any) => (
                 <button
                   key={t.id}
                   onClick={() => setActiveTab(t.id)}
                   className={cn(
-                    "flex items-center gap-2 px-4 md:px-6 py-2.5 md:py-3.5 rounded-full text-[9px] md:text-[11px] font-black tracking-widest whitespace-nowrap transition-all",
+                    "relative flex items-center gap-2 px-4 md:px-6 py-2.5 md:py-3.5 rounded-full text-[9px] md:text-[11px] font-black tracking-widest whitespace-nowrap transition-all",
                     activeTab === t.id
                       ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20 scale-105'
+                      : auctionLive && t.id === 'auction' ? 'text-red-400 hover:text-white hover:bg-white/5 animate-pulse'
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
                   )}
                 >
                   {t.icon}<span className="md:inline">{t.label}</span>
+                  {t.badge > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-violet-500 text-white text-[8px] font-black flex items-center justify-center">{t.badge > 9 ? '9+' : t.badge}</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -413,18 +457,29 @@ export default function ClubManager() {
             )}
             {activeTab === 'auction' && (
               <motion.div key="auction" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-16 backdrop-blur-xl text-center">
-                  <div className="w-20 h-20 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-amber-500/20">
-                    <Hammer size={36} className="text-amber-500" />
-                  </div>
-                  <h3 className="text-3xl font-black text-white mb-2 uppercase tracking-tighter italic">Auction House</h3>
-                  <p className="text-slate-400 text-sm font-bold max-w-md mx-auto mb-8">
-                    The player distribution auction system is currently being built by the federation. This is where clubs will bid for world-class talent soon.
-                  </p>
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 text-amber-500 rounded-full text-[10px] font-black tracking-widest uppercase">
-                    Status: Under Development
-                  </div>
+                <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} />
+              </motion.div>
+            )}
+            {activeTab === 'inbox' && myClub && (
+              <motion.div key="inbox" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+                <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden relative" style={{ minHeight: 500 }}>
+                  <ClubInbox ownerId={playerId} myClub={myClub} allClubs={clubs} allPlayers={players} />
                 </div>
+              </motion.div>
+            )}
+            {activeTab === 'squad' && myClub && (
+              <motion.div key="squad" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+                <SquadTab
+                  myClub={myClub}
+                  squad={squad}
+                  allClubs={clubs}
+                  allPlayers={players}
+                  isOwner={isOwner}
+                  isAdmin={isAdmin}
+                  onShortlistPlayer={(p) => { setShortlistPlayer(p); setProposalStep('shortlist'); }}
+                  onSetReleaseClause={(p) => { setReleaseTarget(p); setReleaseAmount(String(p.releaseClause?.amount || '')); }}
+                  setMsg={setMsg}
+                />
               </motion.div>
             )}
             {activeTab === 'tournaments' && (
@@ -440,10 +495,131 @@ export default function ClubManager() {
             {msg.text}
           </motion.div>
         )}
+
+        {/* ─── Send Proposal Modal ─── */}
+        <AnimatePresence>
+          {proposalStep && shortlistPlayer && myClub && (() => {
+            const sellerClub = clubs.find(c => c.squadIds?.includes(shortlistPlayer.id));
+            return (
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0a14] border border-white/10 rounded-3xl p-6 z-10">
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <p className="text-[10px] font-black text-violet-400 uppercase tracking-widest">Transfer Proposal</p>
+                      <h3 className="text-lg font-black text-white">{shortlistPlayer.name}</h3>
+                    </div>
+                    <button onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="p-2 text-slate-500 hover:text-white"><X size={18} /></button>
+                  </div>
+
+                  {/* Player mini card */}
+                  <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 mb-5">
+                    <img src={shortlistPlayer.image} className="w-14 h-14 rounded-xl object-cover" alt={shortlistPlayer.name} />
+                    <div className="flex-1">
+                      <p className="font-black text-white">{shortlistPlayer.name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold">{shortlistPlayer.ovr} OVR · {sellerClub?.name || 'Unknown Club'}</p>
+                      {(() => { const g = getPlayerGrade(shortlistPlayer); return <span className="text-xs font-black" style={{ color: GRADE_COLORS[g] }}>Grade {g}</span>; })()}
+                    </div>
+                  </div>
+
+                  {/* Offer type toggle */}
+                  <div className="flex gap-2 mb-4">
+                    <button onClick={() => setOfferType('money')} className={`flex-1 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all ${offerType === 'money' ? 'bg-violet-500 text-white' : 'bg-white/5 text-slate-400'}`}>💰 Money</button>
+                    <button onClick={() => setOfferType('swap')} className={`flex-1 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all ${offerType === 'swap' ? 'bg-amber-500 text-black' : 'bg-white/5 text-slate-400'}`}><ArrowLeftRight size={12} className="inline mr-1" />Swap</button>
+                  </div>
+
+                  {offerType === 'money' && (
+                    <input type="number" value={offerAmount} onChange={e => setOfferAmount(e.target.value)} placeholder="Offer amount in coins..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-violet-500/50 mb-3" />
+                  )}
+                  {offerType === 'swap' && (
+                    <select value={offerAmount} onChange={e => setOfferAmount(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-amber-500/50 mb-3">
+                      <option value="">Select your player to offer...</option>
+                      {squad.map(p => <option key={p.id} value={p.id}>{p.name} ({p.ovr} OVR)</option>)}
+                    </select>
+                  )}
+                  <input value={offerNote} onChange={e => setOfferNote(e.target.value)} placeholder="Optional message to seller..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-violet-500/50 mb-5" />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="py-3 bg-white/5 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Cancel</button>
+                    <button onClick={async () => {
+                      if (!myClub || !sellerClub || !shortlistPlayer) return;
+                      if (!offerAmount) { setMsg({ text: 'Enter an offer amount or select a player.', type: 'error' }); return; }
+                      try {
+                        const swapPlayer = offerType === 'swap' ? players.find(p => p.id === offerAmount) : null;
+                        await sendTransferProposal({
+                          playerId: shortlistPlayer.id, playerName: shortlistPlayer.name, playerImage: shortlistPlayer.image, playerOvr: shortlistPlayer.ovr,
+                          buyerClubId: myClub.id, buyerClubName: myClub.name, buyerOwnerId: playerId,
+                          sellerClubId: sellerClub.id, sellerClubName: sellerClub.name, sellerOwnerId: sellerClub.ownerId,
+                          currentOffer: { type: offerType, amount: offerType === 'money' ? Number(offerAmount) : null, swapPlayerId: offerType === 'swap' ? offerAmount : null, swapPlayerName: swapPlayer?.name || null, sentBy: 'buyer', note: offerNote, sentAt: Date.now() },
+                        });
+                        setMsg({ text: `✅ Proposal sent to ${sellerClub.name}!`, type: 'success' });
+                        setProposalStep(null); setShortlistPlayer(null); setOfferAmount(''); setOfferNote('');
+                      } catch(e: any) { setMsg({ text: '❌ ' + e.message, type: 'error' }); }
+                    }} className="py-3 bg-violet-500 hover:bg-violet-400 text-white rounded-2xl text-[10px] font-black uppercase transition-all">Send Proposal</button>
+                  </div>
+                </motion.div>
+              </div>
+            );
+          })()}
+        </AnimatePresence>
+
+        {/* ─── Release Clause Modal ─── */}
+        <AnimatePresence>
+          {releaseTarget && myClub && (() => {
+            const hasClause = !!releaseTarget.releaseClause?.active;
+            return (
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setReleaseTarget(null); setReleaseAmount(''); }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0a14] border border-white/10 rounded-3xl p-6 z-10">
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Release Clause</p>
+                      <h3 className="text-lg font-black text-white">{releaseTarget.name}</h3>
+                    </div>
+                    <button onClick={() => { setReleaseTarget(null); setReleaseAmount(''); }} className="p-2 text-slate-500 hover:text-white"><X size={18} /></button>
+                  </div>
+                  {hasClause ? (
+                    <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl mb-5">
+                      <p className="text-[10px] font-black text-amber-400 uppercase mb-1">Active Release Clause</p>
+                      <p className="text-2xl font-black text-white">{releaseTarget.releaseClause!.amount.toLocaleString()} coins</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Any club can trigger this to buy {releaseTarget.name} instantly.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-slate-400 font-bold mb-4">Set a buyout price. Any club owner can instantly purchase {releaseTarget.name} at this price without negotiation.</p>
+                      <input type="number" value={releaseAmount} onChange={e => setReleaseAmount(e.target.value)} placeholder="Buyout price in coins..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-amber-500/50 mb-5" />
+                    </>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    {hasClause ? (
+                      <button onClick={async () => {
+                        await removeReleaseClause(releaseTarget.id);
+                        setMsg({ text: 'Release clause removed.', type: 'success' });
+                        setReleaseTarget(null);
+                        load(true);
+                      }} className="col-span-2 py-3 bg-red-500/10 text-red-400 rounded-2xl text-[10px] font-black uppercase">Remove Clause</button>
+                    ) : (
+                      <>
+                        <button onClick={() => { setReleaseTarget(null); setReleaseAmount(''); }} className="py-3 bg-white/5 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Cancel</button>
+                        <button onClick={async () => {
+                          if (!releaseAmount) return;
+                          await setReleaseClause(releaseTarget.id, { amount: Number(releaseAmount), active: true, setByClubId: myClub.id, setByClubName: myClub.name, setAt: Date.now() });
+                          setMsg({ text: `✅ Release clause set at ${Number(releaseAmount).toLocaleString()} coins.`, type: 'success' });
+                          setReleaseTarget(null); setReleaseAmount(''); load(true);
+                        }} className="py-3 bg-amber-500 text-black rounded-2xl text-[10px] font-black uppercase">Set Clause</button>
+                      </>
+                    )}
+                  </div>
+                </motion.div>
+              </div>
+            );
+          })()}
+        </AnimatePresence>
       </div>
     </div>
   );
 }
+
 
 function NoClubScreen() {
   return (
@@ -453,6 +629,159 @@ function NoClubScreen() {
       </div>
       <h2 className="text-2xl font-black text-white mb-3">NOT IN A CLUB</h2>
       <p className="text-slate-400 text-sm max-w-sm mx-auto">You haven't been assigned to a club yet. Ask your admin to add you to a club squad.</p>
+    </div>
+  );
+}
+
+// ─── Squad Tab (with Shortlist + Release Clause) ──────────────────────────────
+
+function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, onShortlistPlayer, onSetReleaseClause, setMsg }: {
+  myClub: Club; squad: Player[]; allClubs: Club[]; allPlayers: Player[];
+  isOwner: boolean; isAdmin: boolean;
+  onShortlistPlayer: (p: Player) => void;
+  onSetReleaseClause: (p: Player) => void;
+  setMsg: (m: any) => void;
+}) {
+  const [viewingClubId, setViewingClubId] = useState<string | null>(null);
+  const shortlistIds: string[] = myClub.shortlistedPlayerIds || [];
+  const viewingClub = viewingClubId ? allClubs.find(c => c.id === viewingClubId) : null;
+  const viewingSquad = viewingClub ? allPlayers.filter(p => viewingClub.squadIds?.includes(p.id)) : [];
+
+  if (viewingClub) {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setViewingClubId(null)} className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all"><ArrowLeft size={18} /></button>
+          <div>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Browsing Squad</p>
+            <h3 className="text-lg font-black text-white">{viewingClub.name}</h3>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {viewingSquad.map(p => {
+            const grade = getPlayerGrade(p);
+            const gradeColor = GRADE_COLORS[grade];
+            const inShortlist = shortlistIds.includes(p.id);
+            const total = p.win + p.loss + p.draw;
+            return (
+              <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all">
+                <div className="relative h-40 overflow-hidden">
+                  <img src={p.image} className="w-full h-full object-cover object-top" alt={p.name} style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} />
+                  <div className="absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-black" style={{ background: gradeColor, color: '#000' }}>{grade}</div>
+                  <div className="absolute top-2 right-2 bg-black/60 rounded-lg px-2 py-1 text-[10px] font-black text-white">{p.ovr} OVR</div>
+                  {p.releaseClause?.active && <div className="absolute bottom-2 right-2 bg-amber-500 text-black text-[8px] font-black px-2 py-0.5 rounded-full">RC: {(p.releaseClause.amount/1000).toFixed(0)}K</div>}
+                </div>
+                <div className="p-4">
+                  <p className="font-black text-white truncate">{p.name}</p>
+                  <div className="flex gap-3 mt-2 mb-3">
+                    <span className="text-[10px] font-bold text-green-400">W{p.win}</span>
+                    <span className="text-[10px] font-bold text-red-400">L{p.loss}</span>
+                    <span className="text-[10px] font-bold text-amber-400">D{p.draw}</span>
+                    <span className="text-[10px] font-bold text-slate-500">{total}MP</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={async () => {
+                      if (inShortlist) { await removeFromShortlist(myClub.id, p.id); setMsg({ text: 'Removed from shortlist.', type: 'success' }); }
+                      else { await addToShortlist(myClub.id, p.id); setMsg({ text: `${p.name} added to shortlist!`, type: 'success' }); }
+                    }} className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${inShortlist ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}>
+                      {inShortlist ? '★ Listed' : '☆ Shortlist'}
+                    </button>
+                    <button onClick={() => onShortlistPlayer(p)} className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 border border-violet-500/20 transition-all">
+                      Propose
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* My Squad */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-black text-white uppercase tracking-tight">My Squad</h3>
+          <span className="text-[10px] font-black text-slate-500 uppercase">{squad.length} players</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {squad.map(p => {
+            const grade = getPlayerGrade(p);
+            const gradeColor = GRADE_COLORS[grade];
+            const total = p.win + p.loss + p.draw;
+            return (
+              <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all">
+                <div className="relative h-40 overflow-hidden">
+                  <img src={p.image} className="w-full h-full object-cover object-top" alt={p.name} style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} />
+                  <div className="absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-black" style={{ background: gradeColor, color: '#000' }}>{grade}</div>
+                  <div className="absolute top-2 right-2 bg-black/60 rounded-lg px-2 py-1 text-[10px] font-black text-white">{p.ovr} OVR</div>
+                  {p.releaseClause?.active && <div className="absolute bottom-2 left-2 bg-amber-500 text-black text-[8px] font-black px-2 py-0.5 rounded-full">RC Active</div>}
+                </div>
+                <div className="p-4">
+                  <p className="font-black text-white truncate">{p.name}</p>
+                  <div className="flex gap-3 mt-1 mb-3">
+                    <span className="text-[10px] font-bold text-green-400">W{p.win}</span>
+                    <span className="text-[10px] font-bold text-red-400">L{p.loss}</span>
+                    <span className="text-[10px] font-bold text-amber-400">D{p.draw}</span>
+                    <span className="text-[10px] font-bold text-slate-500">{total}MP</span>
+                  </div>
+                  {(isOwner || isAdmin) && (
+                    <button onClick={() => onSetReleaseClause(p)} className={`w-full py-2 rounded-xl text-[9px] font-black uppercase transition-all ${p.releaseClause?.active ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-white/5 text-slate-500 hover:bg-white/10'}`}>
+                      {p.releaseClause?.active ? `RC: ${(p.releaseClause.amount/1000).toFixed(0)}K — Edit` : 'Set Release Clause'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {squad.length === 0 && <p className="col-span-full text-center text-slate-600 text-sm font-bold py-16">No squad members assigned yet.</p>}
+        </div>
+      </div>
+
+      {/* Browse other clubs */}
+      <div>
+        <h3 className="text-xl font-black text-white uppercase tracking-tight mb-4">Browse Other Clubs</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {allClubs.filter(c => c.id !== myClub.id).map(c => (
+            <button key={c.id} onClick={() => setViewingClubId(c.id)} className="p-4 bg-white/5 border border-white/10 rounded-2xl hover:border-white/20 hover:bg-white/10 transition-all text-left">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xs mb-3" style={{ background: `linear-gradient(135deg, ${c.primaryColor}, ${c.secondaryColor})` }}>{c.shortName}</div>
+              <p className="text-sm font-black text-white truncate">{c.name}</p>
+              <p className="text-[9px] text-slate-500 font-bold mt-0.5">{allPlayers.filter(p => c.squadIds?.includes(p.id)).length} players</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* My Shortlist */}
+      {shortlistIds.length > 0 && (
+        <div>
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-4">My Shortlist</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {shortlistIds.map(id => {
+              const p = allPlayers.find(pl => pl.id === id);
+              if (!p) return null;
+              const grade = getPlayerGrade(p);
+              const gradeColor = GRADE_COLORS[grade];
+              return (
+                <div key={id} className="flex items-center gap-4 p-4 bg-white/5 border border-violet-500/20 rounded-2xl">
+                  <img src={p.image} className="w-12 h-12 rounded-xl object-cover" alt={p.name} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-white truncate">{p.name}</p>
+                    <div className="flex gap-2 items-center mt-0.5">
+                      <span className="text-[10px] font-black" style={{ color: gradeColor }}>Grade {grade}</span>
+                      <span className="text-[10px] text-slate-500">{p.ovr} OVR</span>
+                    </div>
+                  </div>
+                  <button onClick={() => onShortlistPlayer(p)} className="px-3 py-1.5 bg-violet-500/10 text-violet-400 rounded-xl text-[9px] font-black uppercase hover:bg-violet-500/20 transition-all">Propose</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,8 @@ import {
   subscribeToLeaders,
   subscribeToMatches,
   subscribeToAppVersion,
+  subscribeToSystemLocks,
+  subscribeToTournaments,
   sortRankedPlayers,
   testFirestoreConnection,
   computeGlobalElo,
