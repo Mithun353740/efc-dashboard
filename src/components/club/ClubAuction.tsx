@@ -33,10 +33,6 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, con
   const [setupBasePrice, setSetupBasePrice] = useState('500000');
   const [setupIncrement, setSetupIncrement] = useState('100000');
   const [revealPlayerId, setRevealPlayerId] = useState('');
-  const [showSetup, setShowSetup] = useState(false);
-  const [setupBasePrice, setSetupBasePrice] = useState('500000');
-  const [setupIncrement, setSetupIncrement] = useState('100000');
-  const [revealPlayerId, setRevealPlayerId] = useState('');
 
   // Confetti state
   const [showSold, setShowSold] = useState(false);

@@ -86,7 +86,6 @@ export default function Admin() {
   const [leaderPlayerSearch, setLeaderPlayerSearch] = useState('');
   const [playerToDelete, setPlayerToDelete] = useState<string | null>(null);
   const [leaderToDelete, setLeaderToDelete] = useState<string | null>(null);
-  const [isResyncing, setIsResyncing] = useState(false);
   const [showAdminWarning, setShowAdminWarning] = useState(false);
 
   // ── Auction Control State ────────────────────────────────────────────────
