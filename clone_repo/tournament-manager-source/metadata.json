@@ -1,0 +1,6 @@
+{
+  "name": "KickOff - Football Tournament Manager",
+  "description": "A comprehensive tool to create and manage football tournaments with League, Knockout, and Group Stage formats, featuring auto-generated fixtures, standings, and visual brackets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
