@@ -20,6 +20,7 @@ import AutoUpdater from './components/AutoUpdater';
 import { FirebaseProvider, useFirebase } from './FirebaseContext';
 import { INITIAL_PLAYERS } from './lib/store';
 import ClubManager from './components/ClubManager';
+import firebaseConfig from '../firebase-applet-config.json';
 
 function Home() {
   const { rankedPlayers, dbError, isLoading } = useFirebase();
@@ -52,7 +53,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppContent() {
-  const { isLoading, dbError } = useFirebase();
+  const { isLoading, dbError, rankedPlayers, matches, leaders } = useFirebase();
 
   if (isLoading) return (
     <div className="min-h-screen bg-brand-dark flex items-center justify-center">
@@ -81,6 +82,11 @@ function AppContent() {
         </Routes>
       </main>
       <Footer />
+      {localStorage.getItem('adminLoggedIn') === 'true' && (
+        <div className="fixed bottom-0 right-0 bg-black/80 text-[8px] text-slate-500 p-1 px-2 z-[999] font-mono">
+          P:{rankedPlayers.length} | M:{matches.length} | L:{leaders.length} | DB:{firebaseConfig.firestoreDatabaseId || '(default)'}
+        </div>
+      )}
     </div>
   );
 }
