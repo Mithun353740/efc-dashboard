@@ -27,11 +27,14 @@ export default function Admin() {
       }
       
       // Auto-sync version: If the local code version is newer than Firestore, update Firestore
-      if (appVersion && appVersion !== VERSION) {
-        import('../lib/store').then(({ updateAppVersion }) => updateAppVersion(VERSION));
-      }
+      if (isAdmin) {
+        import('../lib/store').then(({ ensureMetadataExists }) => ensureMetadataExists());
+        if (appVersion && appVersion !== VERSION) {
+          import('../lib/store').then(({ updateAppVersion }) => updateAppVersion(VERSION));
+        }
 
-      setAuthStatus('authenticated');
+        setAuthStatus('authenticated');
+      }
     };
     checkAuth();
   }, [appVersion]);

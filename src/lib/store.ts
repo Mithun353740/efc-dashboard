@@ -20,11 +20,29 @@ import {
   increment
 } from 'firebase/firestore';
 
+export const CACHE_DOC_PATH = 'settings/meta';
+
 /**
- * Bump this number whenever the stat computation logic changes.
- * All Player documents with a lower statsVersion will be flagged
- * as stale and can be resynced by the admin via the Resync button.
+ * Ensures the metadata document exists in Firestore.
+ * This prevents "Offline" errors caused by missing documents.
  */
+export async function ensureMetadataExists() {
+  try {
+    const metaRef = doc(db, CACHE_DOC_PATH);
+    const snap = await getDoc(metaRef);
+    if (!snap.exists()) {
+      await setDoc(metaRef, { 
+        lastUpdated: serverTimestamp(),
+        version: '8.3.0',
+        status: 'online'
+      });
+      console.log('[System] Metadata created successfully.');
+    }
+  } catch (err) {
+    console.warn('[System] Failed to ensure metadata:', err);
+  }
+}
+
 export const STATS_VERSION = 2;
 
 export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>) => void) {

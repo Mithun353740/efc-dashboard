@@ -142,6 +142,21 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // - Members (Admins & Players): Get the "Advanced" full firehose.
     // - Guests: Get the "Fast" optimized view to save your daily quota.
     if (isAdmin || isPlayer) {
+      unsubMetadata = onSnapshot(doc(db, 'settings', 'meta'), { includeMetadataChanges: true }, (snapshot) => {
+        if (mounted) {
+          setDbError(null);
+        }
+      }, (error) => {
+        if (mounted) {
+          // Ignore "not-found" errors for the metadata doc, as it might not exist yet
+          if (error.code === 'permission-denied' || error.code === 'unavailable') {
+            console.error('[Firebase] Connection error:', error);
+            setDbError(error.code === 'resource-exhausted' ? 'QUOTA_EXCEEDED' : 'DATABASE_OFFLINE');
+          } else {
+            setDbError(null);
+          }
+        }
+      });
       unsubMatches = subscribeToMatches((data, pending) => {
         if (mounted) {
           setMatches(data);
@@ -254,6 +269,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       window.removeEventListener('firestore-error', errorHandler);
       window.removeEventListener('message', handleTournamentMessage);
+      unsubLocks();
+      unsubVersion();
+      unsubMetadata();
       unsubPlayers();
       unsubLeaders();
       unsubMatches();
