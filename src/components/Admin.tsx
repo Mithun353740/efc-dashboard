@@ -14,7 +14,7 @@ import { CLUB_LOGO, CLUB_NAME, VERSION } from '../constants';
 export default function Admin() {
   const { players, leaders, matches, tournaments, systemLocks, dbError, hasPendingWrites, appVersion } = useFirebase();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials' | 'clubs' | 'seasons' | 'auction'>('players');
+  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials' | 'clubs'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   const [isResyncing, setIsResyncing] = useState(false);
   
@@ -97,7 +97,7 @@ export default function Admin() {
   const [auctionMsg, setAuctionMsg] = useState('');
   // ── Club Season State ────────────────────────────────────────────────────
   const [clubSeasons, setClubSeasons] = useState<ClubSeason[]>([]);
-  const [globalSeason, setGlobalSeason] = useState('2026/2027');
+  const [globalSeason, setGlobalSeason] = useState(() => getSeasonInfo(new Date()).name);
   const [seasonMsg, setSeasonMsg] = useState('');
 
   // Subscribe to auction doc when on auction-control tab
@@ -475,8 +475,6 @@ export default function Admin() {
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} icon={<Trophy size={18} />} label="TOURNAMENTS" /></div>
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'locks'} onClick={() => setActiveTab('locks')} icon={<ShieldCheck size={18} />} label="LOCKS" /></div>
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'clubs'} onClick={() => setActiveTab('clubs')} icon={<Trophy size={18} />} label="CLUBS" /></div>
-            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'seasons'} onClick={() => setActiveTab('seasons')} icon={<Calendar size={18} />} label="SEASONS" /></div>
-            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'auction'} onClick={() => setActiveTab('auction')} icon={<Gavel size={18} />} label="AUCTION" /></div>
           </div>
         </div>
 
@@ -1160,213 +1158,6 @@ export default function Admin() {
               <motion.div key="clubs" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
                 <ClubsAdminTab players={players} />
               </motion.div>
-            ) : activeTab === 'seasons' ? (
-              <motion.div key="seasons" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
-
-                {/* ─── INTERNAL SEASONS ─── */}
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400"><Calendar size={20} /></div>
-                    <div>
-                      <h3 className="text-lg font-black text-white uppercase tracking-tight">Internal Club Seasons</h3>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Global Season: {globalSeason}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Global Season Year</label>
-                      <input value={globalSeason} onChange={e => setGlobalSeason(e.target.value)} placeholder="e.g. 2026/2027" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-violet-500/50" />
-                    </div>
-                  </div>
-
-                  {/* Season history */}
-                  <div className="space-y-3 mb-6">
-                    {clubSeasons.length === 0 && <p className="text-slate-600 text-sm font-bold text-center py-4">No seasons started yet for {globalSeason}.</p>}
-                    {clubSeasons.map(s => (
-                      <div key={s.id} className={`flex items-center justify-between p-4 rounded-2xl border ${s.status === 'active' ? 'bg-emerald-500/5 border-emerald-500/20' : s.status === 'completed' ? 'bg-white/3 border-white/5' : 'bg-white/3 border-white/5'}`}>
-                        <div>
-                          <p className="font-black text-white text-sm">{s.label} <span className="text-[10px] font-bold text-slate-500 ml-2">{globalSeason}</span></p>
-                          <p className="text-[10px] text-slate-500 font-bold mt-0.5">{s.status === 'active' ? `Started ${new Date(s.startedAt!).toLocaleDateString()}` : s.status === 'completed' ? `Ended ${new Date(s.endedAt!).toLocaleDateString()}` : 'Upcoming'}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${s.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : s.status === 'completed' ? 'bg-white/10 text-slate-500' : 'bg-white/5 text-slate-600'}`}>{s.status}</span>
-                          {s.status === 'active' && (
-                            <button onClick={async () => {
-                              if (!window.confirm('End this season? Final standings will be saved.')) return;
-                              await import('../lib/store').then(m => m.endClubSeason(s.id, {}));
-                              await import('../lib/store').then(m => m.fetchClubSeasons(globalSeason)).then(setClubSeasons);
-                              setSeasonMsg('Season ended and standings saved.');
-                            }} className="px-3 py-1 bg-red-500/10 text-red-400 rounded-full text-[9px] font-black uppercase hover:bg-red-500/20 transition-all">End Season</button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <button onClick={async () => {
-                    const activeSeason = clubSeasons.find(s => s.status === 'active');
-                    if (activeSeason) { setSeasonMsg('An active season already exists. End it first.'); return; }
-                    const nextNum = clubSeasons.length + 1;
-                    if (!window.confirm(`Start Season ${nextNum} under ${globalSeason}?`)) return;
-                    await import('../lib/store').then(m => m.startClubSeason(globalSeason, nextNum));
-                    await import('../lib/store').then(m => m.fetchClubSeasons(globalSeason)).then(setClubSeasons);
-                    // Broadcast to all club owners
-                    const ownerIds = auctionClubs.map(c => c.ownerId).filter(Boolean);
-                    await import('../lib/store').then(m => m.broadcastToAllOwners(ownerIds, { type: 'system', from: null, message: `📅 Season ${nextNum} of ${globalSeason} has started! Good luck to all clubs.` }));
-                    setSeasonMsg(`Season ${nextNum} started!`);
-                  }} className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
-                    + Start New Season
-                  </button>
-                  {seasonMsg && <p className="text-center text-xs font-bold text-emerald-400 mt-3">{seasonMsg}</p>}
-                </div>
-
-                {/* ─── AUCTION SETTINGS ─── */}
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400"><Gavel size={20} /></div>
-                    <div>
-                      <h3 className="text-lg font-black text-white uppercase tracking-tight">Auction Control</h3>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-                        Status: <span className={auctionState ? (auctionState.status === 'ended' ? 'text-slate-400' : 'text-amber-400') : 'text-slate-600'}>{auctionState?.status?.toUpperCase() || 'NO AUCTION'}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Auction settings */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Base Price (per player)</label>
-                      <input type="number" value={auctionBasePrice} onChange={e => setAuctionBasePrice(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-amber-500/50" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Bid Increment</label>
-                      <input type="number" value={auctionIncrement} onChange={e => setAuctionIncrement(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-amber-500/50" />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Grade-Based Base Prices</label>
-                      <div className="grid grid-cols-5 gap-1 text-center">
-                        {(['S','A','B','C','D','E'] as const).map((grade, i) => {
-                          const prices: Record<string,string> = { S:'2M+', A:'1.5M', B:'1M', C:'750K', D:'500K', E:'300K' };
-                          const colors: Record<string,string> = { S:'text-yellow-400', A:'text-violet-400', B:'text-blue-400', C:'text-green-400', D:'text-slate-400', E:'text-slate-600' };
-                          return <div key={grade} className="bg-white/5 rounded-lg p-1.5"><p className={`text-[10px] font-black ${colors[grade]}`}>{grade}</p><p className="text-[8px] text-slate-500">{prices[grade]}</p></div>;
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Live auction status */}
-                  {auctionState && auctionState.status !== 'ended' && (
-                    <div className="mb-6 p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
-                      <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-3">Live Auction — {auctionState.status.toUpperCase()}</p>
-                      {auctionState.currentPlayer && (
-                        <div className="flex items-center gap-4 mb-4">
-                          <img src={auctionState.currentPlayer.image} className="w-12 h-12 rounded-xl object-cover" alt={auctionState.currentPlayer.name} />
-                          <div>
-                            <p className="font-black text-white">{auctionState.currentPlayer.name}</p>
-                            <p className="text-amber-400 text-xs font-bold">{auctionState.currentPlayer.ovr} OVR · Current bid: {auctionState.currentBid.toLocaleString()}</p>
-                            {auctionState.leadingClubName && <p className="text-emerald-400 text-[10px] font-bold">Leading: {auctionState.leadingClubName}</p>}
-                          </div>
-                        </div>
-                      )}
-                      {/* Reveal next card */}
-                      <div className="flex gap-2 mb-3">
-                        <select value={auctionRevealId} onChange={e => setAuctionRevealId(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none">
-                          <option value="">Select player to reveal...</option>
-                          {players.filter(p => !p.clubId).map(p => {
-                            // using import hack for getPlayerGrade just to avoid TS issue if not imported
-                            return <option key={p.id} value={p.id}>{p.name} ({p.ovr} OVR)</option>;
-                          })}
-                        </select>
-                        <button onClick={async () => {
-                          const p = players.find(pl => pl.id === auctionRevealId);
-                          if (!p) return;
-                          const { getPlayerGrade } = await import('../lib/utils');
-                          const { adminRevealCard } = await import('../lib/store');
-                          const grade = getPlayerGrade(p);
-                          const gradeBase: Record<string,number> = { S:2000000, A:1500000, B:1000000, C:750000, D:500000, E:300000 };
-                          await adminRevealCard({ id: p.id, name: p.name, image: p.image, ovr: p.ovr, currentClubId: p.clubId || null, currentClubName: p.clubName || null }, gradeBase[grade] || auctionBasePrice, auctionIncrement);
-                          setAuctionRevealId('');
-                        }} disabled={!auctionRevealId} className="px-4 py-2.5 bg-amber-500 text-black rounded-xl text-[10px] font-black uppercase hover:bg-amber-400 transition-all disabled:opacity-30">Reveal</button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button onClick={async () => {
-                          const winClub = auctionClubs.find(c => c.id === auctionState.leadingClubId);
-                          if (!winClub) { setAuctionMsg('No leading club.'); return; }
-                          if (!window.confirm(`Confirm sale to ${winClub.name} for ${auctionState.currentBid.toLocaleString()} coins?`)) return;
-                          await import('../lib/store').then(m => m.adminConfirmSold(auctionState, winClub));
-                          setAuctionMsg('Sold!');
-                        }} disabled={!auctionState.leadingClubId} className="py-3 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded-2xl text-[10px] font-black uppercase disabled:opacity-30 transition-all"><Hammer size={12} className="inline mr-1" />Confirm Sold</button>
-                        <button onClick={() => import('../lib/store').then(m => m.adminSkipPlayer())} className="py-3 bg-white/5 hover:bg-white/10 text-slate-400 rounded-2xl text-[10px] font-black uppercase transition-all">Skip Player</button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    {(!auctionState || auctionState.status === 'ended' || auctionState.status === 'idle') ? (
-                      <button onClick={async () => {
-                        if (!window.confirm('Start a new auction session? All clubs will be added to the bidding order.')) return;
-                        await import('../lib/store').then(m => m.adminStartAuction(auctionClubs.map(c => c.id), auctionIncrement, auctionBasePrice));
-                        const ownerIds = auctionClubs.map(c => c.ownerId).filter(Boolean);
-                        await import('../lib/store').then(m => m.broadcastToAllOwners(ownerIds, { type: 'auction_started', from: null, message: '🔨 The Club Zone Auction has started! Head to the Club Zone to place your bids.' }));
-                        setAuctionMsg('Auction started! All owners notified.');
-                      }} className="flex-1 py-3 bg-amber-500 text-black font-black text-xs uppercase rounded-2xl hover:bg-amber-400 transition-all">
-                        <Gavel size={14} className="inline mr-2" />Start Auction
-                      </button>
-                    ) : (
-                      <button onClick={async () => {
-                        if (!window.confirm('End the entire auction session?')) return;
-                        await import('../lib/store').then(m => m.adminEndAuction());
-                        setAuctionMsg('Auction ended.');
-                      }} className="flex-1 py-3 bg-red-500/10 text-red-400 font-black text-xs uppercase rounded-2xl hover:bg-red-500/20 transition-all">End Auction</button>
-                    )}
-                  </div>
-                  {auctionMsg && <p className="text-center text-xs font-bold text-amber-400 mt-3">{auctionMsg}</p>}
-
-                  {/* Bidding order preview */}
-                  <div className="mt-6">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Participating Clubs ({auctionClubs.length})</p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {auctionClubs.map(c => (
-                        <div key={c.id} className="flex items-center gap-2 p-3 bg-white/3 rounded-xl border border-white/5">
-                          <div className="w-4 h-4 rounded" style={{ background: c.primaryColor }} />
-                          <p className="text-xs font-bold text-white truncate">{c.name}</p>
-                          <p className="text-[9px] text-slate-500 ml-auto">{(c.budget/1000000).toFixed(1)}M</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* ─── PLAYER FORM GRADES REFERENCE ─── */}
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400"><Settings size={20} /></div>
-                    <h3 className="text-lg font-black text-white uppercase tracking-tight">Player Form Grades</h3>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-                    {[
-                      { grade: 'S', label: 'Superstar', winRate: '80%+', base: '2,000,000', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
-                      { grade: 'A', label: 'Elite', winRate: '65–80%', base: '1,500,000', color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' },
-                      { grade: 'B', label: 'Quality', winRate: '50–65%', base: '1,000,000', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-                      { grade: 'C', label: 'Average', winRate: '35–50%', base: '750,000', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' },
-                      { grade: 'D', label: 'Below Avg', winRate: '20–35%', base: '500,000', color: 'text-slate-300', bg: 'bg-white/5 border-white/10' },
-                      { grade: 'E', label: 'Developing', winRate: '<20%', base: '300,000', color: 'text-slate-500', bg: 'bg-white/3 border-white/5' },
-                    ].map(g => (
-                      <div key={g.grade} className={`p-4 rounded-2xl border ${g.bg}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={`text-2xl font-black ${g.color}`}>{g.grade}</span>
-                          <span className="text-xs font-black text-white">{g.label}</span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 font-bold">Win Rate: {g.winRate}</p>
-                        <p className="text-[10px] text-slate-400 font-bold">Base: {g.base} coins</p>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-slate-600 font-bold">Grade is calculated from: win rate (60%), OVR (20%), and goal difference (20%). Minimum 5 matches required for grading.</p>
-                </div>
-
-              </motion.div>
             ) : null}
             </AnimatePresence>
           )}
@@ -1671,7 +1462,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const [configSaving, setConfigSaving] = React.useState(false);
 
   // ── Match & Engine state (lazy-loaded, quota-safe) ──
-  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'config'|'history'>('clubs');
+  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'seasons'|'auction'|'config'|'history'>('clubs');
 
   // History state (3-layer navigation)
   const [hSeasons, setHSeasons] = React.useState<ClubSeason[]>([]);
@@ -2079,12 +1870,13 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     <div className="space-y-6">
       {/* SubTab Nav */}
       <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-2xl flex-wrap">
-        {(['clubs','tournaments','fixtures','matches','config','history'] as const).map(t => (
+        {(['clubs','tournaments','fixtures','matches','seasons','auction','config','history'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)}
             className={cn('flex-1 min-w-[100px] py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all',
               subTab === t ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
-            )}>
-            {t === 'clubs' ? '⚽ CLUBS' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : t === 'config' ? '⚙️ CONFIG' : '🕒 HISTORY'}
+            )}
+          >
+            {t === 'clubs' ? '⚽ CLUBS' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : t === 'seasons' ? '📅 SEASONS' : t === 'auction' ? '🔨 AUCTION' : t === 'config' ? '⚙️ CONFIG' : '🕒 HISTORY'}
           </button>
         ))}
       </div>
@@ -2559,6 +2351,226 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+
+      {/* ── SEASONS subtab ── */}
+      {subTab === 'seasons' && (
+        <div className="space-y-8">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400"><Calendar size={20} /></div>
+              <div>
+                <h3 className="text-lg font-black text-white uppercase tracking-tight">Internal Club Seasons</h3>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Global Season: {globalSeason}</p>
+              </div>
+            </div>
+
+            {/* Season history */}
+            <div className="space-y-3 mb-6">
+              {clubSeasons.length === 0 && <p className="text-slate-600 text-sm font-bold text-center py-4">No internal seasons started yet for {globalSeason}.</p>}
+              {clubSeasons.map(s => (
+                <div key={s.id} className={`flex items-center justify-between p-4 rounded-2xl border ${s.status === 'active' ? 'bg-emerald-500/5 border-emerald-500/20' : s.status === 'completed' ? 'bg-white/3 border-white/5' : 'bg-white/3 border-white/5'}`}>
+                  <div>
+                    <p className="font-black text-white text-sm">{s.label} <span className="text-[10px] font-bold text-slate-500 ml-2">{globalSeason}</span></p>
+                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">{s.status === 'active' ? `Started ${new Date(s.startedAt!).toLocaleDateString()}` : s.status === 'completed' ? `Ended ${new Date(s.endedAt!).toLocaleDateString()}` : 'Upcoming'}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${s.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : s.status === 'completed' ? 'bg-white/10 text-slate-500' : 'bg-white/5 text-slate-600'}`}>{s.status}</span>
+                    {s.status === 'active' && (
+                      <button onClick={async () => {
+                        if (!window.confirm('End this season? Final standings will be saved.')) return;
+                        await endClubSeason(s.id, {});
+                        await fetchClubSeasons(globalSeason).then(setClubSeasons);
+                        setSeasonMsg('Season ended and standings saved.');
+                      }} className="px-3 py-1 bg-red-500/10 text-red-400 rounded-full text-[9px] font-black uppercase hover:bg-red-500/20 transition-all">End Season</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={async () => {
+              const activeSeason = clubSeasons.find(s => s.status === 'active');
+              if (activeSeason) { setSeasonMsg('An active season already exists. End it first.'); return; }
+              const nextNum = clubSeasons.length + 1;
+              if (!window.confirm(`Start Season ${nextNum} under ${globalSeason}?`)) return;
+              await startClubSeason(globalSeason, nextNum);
+              await fetchClubSeasons(globalSeason).then(setClubSeasons);
+              // Broadcast to all club owners
+              const ownerIds = clubs.map(c => c.ownerId).filter(Boolean);
+              await broadcastToAllOwners(ownerIds, { type: 'system', from: null, message: `📅 Season ${nextNum} of ${globalSeason} has started! Good luck to all clubs.` });
+              setSeasonMsg(`Season ${nextNum} started!`);
+            }} className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+              + Start New Season
+            </button>
+            {seasonMsg && <p className="text-center text-xs font-bold text-emerald-400 mt-3">{seasonMsg}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* ── AUCTION subtab ── */}
+      {subTab === 'auction' && (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-xl font-black tracking-tight mb-1">LIVE AUCTION CONTROL</h3>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manage player distribution and live bidding sessions</p>
+            </div>
+            {auctionState && auctionState.status !== 'ended' && (
+              <button onClick={adminEndAuction} className="px-4 py-2 bg-red-500/10 text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">
+                End Session
+              </button>
+            )}
+          </div>
+
+          {!auctionState || auctionState.status === 'ended' ? (
+            <div className="text-center py-20 bg-black/20 rounded-3xl border border-white/5">
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 mx-auto mb-6">
+                <Gavel size={32} />
+              </div>
+              <h4 className="text-lg font-black text-white uppercase mb-2">No Active Session</h4>
+              <p className="text-slate-400 text-xs font-bold max-w-xs mx-auto mb-8">Set the base price and bid increment to start a new auction session for all clubs.</p>
+              
+              <div className="max-w-sm mx-auto grid grid-cols-2 gap-4 text-left">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Base Price</label>
+                  <input type="number" value={setupBasePrice} onChange={e => setSetupBasePrice(e.target.value)} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Increment</label>
+                  <input type="number" value={setupIncrement} onChange={e => setSetupIncrement(e.target.value)} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" />
+                </div>
+                <button 
+                  onClick={async () => {
+                    if (!clubs.length) { alert('No clubs found!'); return; }
+                    await adminStartAuction(clubs.map(c => c.id), Number(setupIncrement), Number(setupBasePrice));
+                    setMsg({ text: 'Auction session started!', type: 'success' });
+                  }}
+                  className="col-span-2 py-4 bg-amber-500 text-black font-black text-xs tracking-widest rounded-xl hover:scale-[1.02] active:scale-95 transition-all uppercase"
+                >
+                  Start Auction Session
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left: Player Reveal & Controls */}
+              <div className="space-y-6">
+                <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
+                  <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] mb-4">REVEAL PLAYER CARD</h4>
+                  <div className="flex gap-2 mb-4">
+                    <select 
+                      value={revealPlayerId} 
+                      onChange={e => setRevealPlayerId(e.target.value)}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-amber-500/50"
+                    >
+                      <option value="">Select a Free Agent...</option>
+                      {players.filter(p => !p.clubId || p.clubId === '').map(p => (
+                        <option key={p.id} value={p.id}>{p.name} ({p.ovr} OVR)</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={async () => {
+                        if (!revealPlayerId) return;
+                        const p = players.find(pl => pl.id === revealPlayerId)!;
+                        await adminRevealCard({ id: p.id, name: p.name, image: p.image, ovr: p.ovr, currentClubId: p.clubId || null, currentClubName: p.clubName || null }, Number(setupBasePrice), Number(setupIncrement));
+                        setRevealPlayerId('');
+                      }}
+                      className="px-6 bg-amber-500 text-black rounded-xl text-xs font-black uppercase hover:bg-amber-600 transition-all"
+                    >
+                      REVEAL
+                    </button>
+                  </div>
+                  
+                  {auctionState.currentPlayer ? (
+                    <div className="flex items-center gap-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                      <img src={auctionState.currentPlayer.image} className="w-16 h-16 rounded-xl object-cover" alt="" />
+                      <div>
+                        <p className="text-xs font-black text-white">{auctionState.currentPlayer.name}</p>
+                        <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">{auctionState.currentPlayer.ovr} OVR PLAYER</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-24 border-2 border-dashed border-white/10 rounded-2xl flex items-center justify-center text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                      Waiting to reveal...
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    disabled={!auctionState.leadingClubId || auctionState.status === 'sold'}
+                    onClick={async () => {
+                      const winningClub = clubs.find(c => c.id === auctionState.leadingClubId);
+                      if (winningClub) {
+                        await adminConfirmSold(auctionState, winningClub);
+                        setMsg({ text: 'Player SOLD successfully!', type: 'success' });
+                      }
+                    }}
+                    className="py-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all disabled:opacity-30"
+                  >
+                    Confirm Sold
+                  </button>
+                  <button 
+                    onClick={adminSkipPlayer}
+                    className="py-4 bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                  >
+                    Skip Player
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: Live Status */}
+              <div className="space-y-6">
+                <div className="p-6 bg-[#0a0a14] border border-amber-500/20 rounded-3xl">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">LIVE BID STATUS</p>
+                  <div className="flex items-baseline gap-3 mb-4">
+                    <span className="text-5xl font-black text-white">{(auctionState.currentBid / 1000).toFixed(0)}K</span>
+                    <span className="text-amber-500 font-black text-xs uppercase">Current Bid</span>
+                  </div>
+                  
+                  {auctionState.leadingClubId ? (
+                    <div className="flex items-center gap-3 p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                      <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
+                      <p className="text-xs font-black text-amber-500 uppercase tracking-widest">{auctionState.leadingClubName} IS LEADING</p>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest italic">Waiting for first bid...</p>
+                  )}
+                </div>
+
+                <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">BIDDING ORDER</p>
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto no-scrollbar">
+                    {auctionState.biddingOrder.map((clubId, idx) => {
+                      const club = clubs.find(c => c.id === clubId);
+                      const isFolded = auctionState.foldedClubs.includes(clubId);
+                      const isTurn = auctionState.biddingOrder[auctionState.currentTurnIndex % auctionState.biddingOrder.length] === clubId;
+                      return (
+                        <div key={clubId} className={cn("flex items-center justify-between p-3 rounded-xl border", isFolded ? "bg-white/5 border-white/5 opacity-50" : isTurn ? "bg-amber-500/20 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]" : "bg-white/5 border-white/10")}>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-black text-slate-500">{idx + 1}</span>
+                            <div className="w-6 h-6 rounded flex-shrink-0" style={{ background: club?.primaryColor || '#333' }} />
+                            <p className="text-xs font-black text-white">{club?.name}</p>
+                          </div>
+                          {isFolded ? (
+                            <span className="text-[10px] font-black text-red-400 uppercase">Folded</span>
+                          ) : isTurn ? (
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-500 text-black rounded text-[9px] font-black uppercase">
+                              <div className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+                              Bidding
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
