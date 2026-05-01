@@ -1038,26 +1038,6 @@ export async function deleteTournament(id: string) {
   }
 }
 
-// Bootstrap function
-export async function bootstrapData() {
-  const path = 'players';
-  try {
-    const q = query(collection(db, path), limit(1));
-    const playersSnap = await getDocs(q);
-    if (playersSnap.empty) {
-      const batch = writeBatch(db);
-      INITIAL_PLAYERS.forEach(p => {
-        batch.set(doc(db, 'players', p.id), p);
-      });
-      INITIAL_LEADERS.forEach(l => {
-        batch.set(doc(db, 'leaders', l.id), l);
-      });
-      await batch.commit();
-    }
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLUB ZONE STORE
