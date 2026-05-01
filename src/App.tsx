@@ -82,11 +82,6 @@ function AppContent() {
         </Routes>
       </main>
       <Footer />
-      {localStorage.getItem('adminLoggedIn') === 'true' && (
-        <div className="fixed bottom-0 right-0 bg-black/80 text-[8px] text-slate-500 p-1 px-2 z-[999] font-mono">
-          P:{rankedPlayers.length} | M:{matches.length} | L:{leaders.length} | DB:{firebaseConfig.firestoreDatabaseId || '(default)'}
-        </div>
-      )}
     </div>
   );
 }

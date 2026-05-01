@@ -377,9 +377,19 @@ export async function updatePlayerProfile(
 export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 100) {
   const path = 'players';
   let isUnsubscribed = false;
+  let lastFetchTime = 0;
+  const COOLDOWN = 5000; // 5 second quota protection cooldown
   
-  const fetch = async () => {
+  const fetch = async (isManual = false) => {
     if (isUnsubscribed) return;
+    
+    // Quota Shield: Prevent rapid-fire re-fetches
+    const now = Date.now();
+    if (!isManual && (now - lastFetchTime < COOLDOWN)) {
+      console.log('[Store] Fetch throttled to save quota...');
+      return;
+    }
+    lastFetchTime = now;
     try {
       const q = query(collection(db, path), orderBy('ovr', 'desc'), limit(limitCount));
       const snapshot = await getDocs(q);
@@ -414,7 +424,7 @@ export function subscribeToPlayers(callback: (players: Player[], hasPending: boo
     }
   };
 
-  fetch();
+  fetch(true);
   const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
 
   return () => {
@@ -427,8 +437,14 @@ export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boo
   const path = 'leaders';
   let isUnsubscribed = false;
 
-  const fetch = async () => {
+  let lastFetchTime = 0;
+  const COOLDOWN = 5000;
+  
+  const fetch = async (isManual = false) => {
     if (isUnsubscribed) return;
+    const now = Date.now();
+    if (!isManual && (now - lastFetchTime < COOLDOWN)) return;
+    lastFetchTime = now;
     try {
       const q = query(collection(db, path), limit(50));
       const snapshot = await getDocs(q);
@@ -439,7 +455,7 @@ export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boo
     }
   };
 
-  fetch();
+  fetch(true);
   const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
 
   return () => {
@@ -458,8 +474,14 @@ export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending
   const path = 'matches';
   let isUnsubscribed = false;
 
-  const fetch = async () => {
+  let lastFetchTime = 0;
+  const COOLDOWN = 5000;
+
+  const fetch = async (isManual = false) => {
     if (isUnsubscribed) return;
+    const now = Date.now();
+    if (!isManual && (now - lastFetchTime < COOLDOWN)) return;
+    lastFetchTime = now;
     try {
       const q = query(collection(db, path), orderBy('timestamp', 'desc'), limit(200));
       const snapshot = await getDocs(q);
@@ -470,7 +492,7 @@ export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending
     }
   };
 
-  fetch();
+  fetch(true);
   const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
 
   return () => {
@@ -504,8 +526,14 @@ export function subscribeToTournaments(callback: (tournaments: Tournament[], has
   const path = 'tournaments';
   let isUnsubscribed = false;
 
-  const fetch = async () => {
+  let lastFetchTime = 0;
+  const COOLDOWN = 5000;
+
+  const fetch = async (isManual = false) => {
     if (isUnsubscribed) return;
+    const now = Date.now();
+    if (!isManual && (now - lastFetchTime < COOLDOWN)) return;
+    lastFetchTime = now;
     try {
       const q = query(collection(db, path), orderBy('createdAt', 'desc'), limit(limitCount));
       const snapshot = await getDocs(q);
@@ -516,7 +544,7 @@ export function subscribeToTournaments(callback: (tournaments: Tournament[], has
     }
   };
 
-  fetch();
+  fetch(true);
   const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
 
   return () => {
