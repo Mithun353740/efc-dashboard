@@ -22,13 +22,23 @@ import { INITIAL_PLAYERS } from './lib/store';
 import ClubManager from './components/ClubManager';
 
 function Home() {
-  const { rankedPlayers, dbError } = useFirebase();
+  const { rankedPlayers, dbError, isLoading } = useFirebase();
 
-  const heroPlayer = rankedPlayers.length > 0 ? rankedPlayers[0] : INITIAL_PLAYERS[0];
+  // Safety: If we are not loading but have no players, something is wrong or empty
+  if (!isLoading && rankedPlayers.length === 0) {
+    return (
+      <div className="py-20 text-center">
+        <h2 className="text-2xl font-black text-slate-500 uppercase tracking-widest">NO DATA DETECTED</h2>
+        <p className="text-sm text-slate-400 mt-2">Please visit the Control Center to sync or seed the system.</p>
+      </div>
+    );
+  }
+
+  const heroPlayer = rankedPlayers.length > 0 ? rankedPlayers[0] : null;
 
   return (
     <>
-      <Hero player={heroPlayer} />
+      {heroPlayer && <Hero player={heroPlayer} />}
       <EliteRankings />
       <Leadership />
       <Legion />
