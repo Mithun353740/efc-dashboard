@@ -123,10 +123,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const unsubVersion = subscribeToAppVersion((version) => {
       if (mounted && version) {
         setAppVersion(version);
-        // Only trigger reload if version exists in DB AND is different
-        if (version !== '1.0.0' && version !== VERSION) {
-          window.location.reload();
-        }
+        // CRITICAL SAFETY: Only reload if the version is NEWER and it's not our first load
+        // For now, we disable auto-reload to break the current loop and allow the user to see their data.
+        console.log('[System] DB Version:', version, 'Code Version:', VERSION);
       }
     });
 
