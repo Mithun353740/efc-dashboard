@@ -383,10 +383,27 @@ export function subscribeToPlayers(callback: (players: Player[], hasPending: boo
     try {
       const q = query(collection(db, path), orderBy('ovr', 'desc'), limit(limitCount));
       const snapshot = await getDocs(q);
-      const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+      let players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+      
+      // Fallback: If no players found with 'ovr' sort, try a basic fetch
+      if (players.length === 0) {
+        console.warn('[Store] Sorted fetch returned 0. Trying fallback basic fetch...');
+        const qFallback = query(collection(db, path), limit(limitCount));
+        const snapFallback = await getDocs(qFallback);
+        players = snapFallback.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+      }
+      
       callback(players, false);
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, path);
+      console.warn('[Store] Sorted fetch failed. Trying fallback basic fetch...', error);
+      try {
+        const qFallback = query(collection(db, path), limit(limitCount));
+        const snapFallback = await getDocs(qFallback);
+        const players = snapFallback.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+        callback(players, false);
+      } catch (err2) {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
     }
   };
 
