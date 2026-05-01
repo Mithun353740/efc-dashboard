@@ -89,7 +89,6 @@ function AppContent() {
 export default function App() {
   return (
     <FirebaseProvider>
-      <AutoUpdater />
       <Router>
         <AppContent />
       </Router>
