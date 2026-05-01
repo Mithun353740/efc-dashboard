@@ -121,9 +121,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     // 1b. App Version — Real-time update monitoring
     const unsubVersion = subscribeToAppVersion((version) => {
-      if (mounted) {
+      if (mounted && version) {
         setAppVersion(version);
-        if (version !== VERSION) {
+        // Only trigger reload if version exists in DB AND is different
+        if (version !== '1.0.0' && version !== VERSION) {
           window.location.reload();
         }
       }
@@ -183,6 +184,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }, 10);
 
       setIsLoadingMatches(false);
+      setIsLoadingLeaders(false); // Leaders must also be set to false for guests if not already handled
+      setIsLoadingPlayers(false); // Safety
     }
 
     // Initialize cache on first success

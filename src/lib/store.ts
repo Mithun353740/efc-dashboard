@@ -1,4 +1,4 @@
-import { Player, PartialPlayerStats, Leader, MatchRecord, Tournament, AuctionState, ClubSeason, ClubInboxMessage, TransferThread, TransferOffer, ReleaseClause } from '../types';
+import { Player, PartialPlayerStats, Leader, MatchRecord, Tournament, AuctionState, ClubSeason, ClubInboxMessage, TransferThread, TransferOffer, ReleaseClause, Club } from '../types';
 import { db, auth } from '../firebase';
 import { resolveCanonicalTournamentName, getSeasonInfo } from './utils';
 import { 
@@ -97,6 +97,7 @@ export async function updateAppVersion(newVersion: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const META_DOC_PATH = 'settings/meta';
+const CACHE_DOC_PATH = 'settings/meta'; // Unified path for all cache invalidation
 
 /**
  * Called after every admin write to signal the last update time.
@@ -390,7 +391,7 @@ export function subscribeToPlayers(callback: (players: Player[], hasPending: boo
   };
 
   fetch();
-  const unsubMeta = onSnapshot(doc(db, 'metadata', 'cache'), () => { fetch(); });
+  const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
 
   return () => {
     isUnsubscribed = true;
@@ -415,7 +416,7 @@ export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boo
   };
 
   fetch();
-  const unsubMeta = onSnapshot(doc(db, 'metadata', 'cache'), () => { fetch(); });
+  const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
 
   return () => {
     isUnsubscribed = true;
@@ -446,7 +447,7 @@ export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending
   };
 
   fetch();
-  const unsubMeta = onSnapshot(doc(db, 'metadata', 'cache'), () => { fetch(); });
+  const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
 
   return () => {
     isUnsubscribed = true;
@@ -492,7 +493,7 @@ export function subscribeToTournaments(callback: (tournaments: Tournament[], has
   };
 
   fetch();
-  const unsubMeta = onSnapshot(doc(db, 'metadata', 'cache'), () => { fetch(); });
+  const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
 
   return () => {
     isUnsubscribed = true;
@@ -587,12 +588,26 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[], el
  * Fetches ALL matches from Firestore, recomputes every player from scratch,
  * and writes all Player documents atomically.
  */
-export async function recalculateAllStats(players: Player[]) {
+export async function recalculateAllStats(playersArg?: Player[]) {
   const batch = writeBatch(db);
+  
+  // Recovery: If no players provided, fetch them all from Firestore first
+  let playersToSync = playersArg || [];
+  if (playersToSync.length === 0) {
+    console.log('[Resync] No players provided, fetching all players from Firestore...');
+    const allPlayersSnap = await getDocs(collection(db, 'players'));
+    playersToSync = allPlayersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Player));
+  }
+
+  if (playersToSync.length === 0) {
+    console.warn('[Resync] No players found in database to resync.');
+    return;
+  }
+
   const fullMatchesSnap = await getDocs(query(collection(db, 'matches'), orderBy('timestamp', 'asc')));
   const allMatches = fullMatchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
   const elos = computeGlobalElo(players, allMatches);
-  players.forEach(p => {
+  playersToSync.forEach(p => {
     const updatedPlayer = computePlayerStats(p, allMatches, elos[p.id] || 1200);
     batch.set(doc(db, 'players', p.id), updatedPlayer);
   });
@@ -602,6 +617,27 @@ export async function recalculateAllStats(players: Player[]) {
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-recalculate-stats');
   }
+}
+
+/**
+ * Seeds the database with initial mock data.
+ * Useful for recovering an empty system.
+ */
+export async function seedDatabase() {
+  const { MOCK_PLAYERS, LEADERS } = await import('../mockData');
+  const batch = writeBatch(db);
+
+  MOCK_PLAYERS.forEach(p => {
+    batch.set(doc(db, 'players', p.id), { ...p, statsVersion: STATS_VERSION });
+  });
+
+  LEADERS.forEach(l => {
+    batch.set(doc(db, 'leaders', l.id), l);
+  });
+
+  await batch.commit();
+  await updateLastUpdated();
+  console.log('[Seed] Database seeded with mock players and leaders.');
 }
 
 export async function savePlayer(player: Player) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners, deleteClubSeason } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners, deleteClubSeason } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
 import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture, AuctionState, ClubSeason } from '../types';
@@ -454,6 +454,33 @@ export default function Admin() {
             {isResyncing ? 'SYNCING...' : 'FORCE FULL RESYNC'}
           </button>
           
+          <button 
+            onClick={async () => {
+              const confirm1 = window.confirm("CRITICAL: This will reset the system to MOCK DATA. All current players and leaders will be overwritten. Proceed?");
+              if (!confirm1) return;
+              
+              const confirm2 = window.prompt("To confirm this destructive recovery action, please type 'SEED' below:");
+              if (confirm2 !== 'SEED') {
+                alert('Confirmation failed. Seeding cancelled.');
+                return;
+              }
+
+              setIsResyncing(true);
+              try {
+                await seedDatabase();
+                alert('System seeded successfully. Refreshing page...');
+                window.location.reload();
+              } catch(e) {
+                alert('Failed to seed system.');
+              }
+              setIsResyncing(false);
+            }} 
+            disabled={isResyncing}
+            className="px-4 py-1.5 bg-brand-purple/10 hover:bg-brand-purple/20 text-brand-purple rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all disabled:opacity-50"
+          >
+            {isResyncing ? 'SEEDING...' : 'SEED SYSTEM (RECOVERY)'}
+          </button>
+
           <button onClick={() => navigate('/')} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 rounded-full text-[8px] md:text-[10px] font-black tracking-widest transition-all">
             HOME
           </button>

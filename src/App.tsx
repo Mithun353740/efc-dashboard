@@ -52,6 +52,12 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark transition-colors flex flex-col">
+      {dbError && (
+        <div className="bg-rose-600 text-white px-4 py-2 text-[10px] font-black tracking-widest text-center uppercase z-[100] flex items-center justify-center gap-4">
+          <span>⚠️ {dbError === 'QUOTA_EXCEEDED' ? 'SYSTEM LOCKED: FIRESTORE QUOTA EXCEEDED' : 'DATABASE OFFLINE: CONNECTION INTERRUPTED'}</span>
+          <button onClick={() => window.location.reload()} className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded transition-all">RETRY</button>
+        </div>
+      )}
       <Navbar />
       <main className="flex-grow">
         <Routes>
