@@ -62,7 +62,7 @@ function AppContent() {
   );
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark transition-colors flex flex-col">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-brand-dark transition-colors flex flex-col overflow-x-hidden">
       {dbError && (
         <div className="bg-rose-600 text-white px-4 py-2 text-[10px] font-black tracking-widest text-center uppercase z-[100] flex items-center justify-center gap-4">
           <span>⚠️ {dbError === 'QUOTA_EXCEEDED' ? 'SYSTEM LOCKED: FIRESTORE QUOTA EXCEEDED' : 'DATABASE OFFLINE: CONNECTION INTERRUPTED'}</span>

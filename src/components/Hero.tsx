@@ -51,10 +51,10 @@ export default function Hero({ player }: HeroProps) {
               </motion.div>
             )}
           </div>
-          <h1 className="text-4xl xs:text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white leading-none tracking-tighter mb-1 md:mb-2 uppercase break-words">
+          <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white leading-[0.9] tracking-tighter mb-1 md:mb-2 uppercase break-words">
             {firstName}
           </h1>
-          <h2 className="text-4xl xs:text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white/80 md:text-white/50 md:text-outline leading-none tracking-tighter mb-6 md:mb-8 uppercase break-words">
+          <h2 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white/80 md:text-white/50 md:text-outline leading-[0.9] tracking-tighter mb-6 md:mb-8 uppercase break-words">
             {lastName}
           </h2>
           

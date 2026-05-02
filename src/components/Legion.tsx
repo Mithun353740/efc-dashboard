@@ -5,13 +5,13 @@ export default function Legion() {
   const { players } = useFirebase();
 
   return (
-    <section className="py-20 px-8 max-w-7xl mx-auto">
+    <section className="py-20 px-4 sm:px-8 max-w-7xl mx-auto">
       <div className="flex items-center gap-6 mb-12">
-        <h2 className="text-4xl font-black text-brand-dark dark:text-white tracking-tighter whitespace-nowrap">CLUB MEMBERS</h2>
+        <h2 className="text-3xl sm:text-4xl font-black text-brand-dark dark:text-white tracking-tighter whitespace-nowrap">CLUB MEMBERS</h2>
         <div className="h-[2px] w-full bg-slate-200 dark:bg-white/10" />
       </div>
 
-      <div className="grid grid-cols-4 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-6">
+      <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-6">
         {players.map((player, index) => (
           <motion.div
             key={player.id}

@@ -26,6 +26,34 @@ import {
  * as stale and can be resynced by the admin via the Resync button.
  */
 export const STATS_VERSION = 2;
+export const MIN_MATCHES = 10;
+
+/**
+ * Calculates adjusted ranking stats for a player.
+ * Balancing performance (OVR), activity (Points), and sample size (Confidence).
+ */
+export function calculateRankingStats(player: Player) {
+  const matchesPlayed = (player.win || 0) + (player.loss || 0) + (player.draw || 0);
+  const points = (player.win || 0) * 3 + (player.draw || 0);
+  const winRate = matchesPlayed > 0 ? (player.win || 0) / matchesPlayed : 0;
+  
+  // Confidence factor: reaches ~50% at 20 matches, ~33% at 10 matches.
+  // Reduces the weight of high win-rates for low-match players.
+  const confidence = matchesPlayed / (matchesPlayed + 20);
+  const adjustedWinRate = winRate * confidence;
+  
+  // Formula: points (50%) + win rate (20%) + skill/elo (30%)
+  const finalScore = (points * 0.5) + (adjustedWinRate * 100 * 0.2) + (player.ovr * 0.3);
+  
+  return {
+    finalScore: Math.round(finalScore * 100) / 100,
+    isProvisional: matchesPlayed < MIN_MATCHES,
+    confidence: Math.round(confidence * 100),
+    adjustedWinRate: Math.round(adjustedWinRate * 100),
+    matchesPlayed,
+    points
+  };
+}
 
 export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>) => void) {
   const docRef = doc(db, 'settings', 'locks');
@@ -1345,23 +1373,26 @@ export function sortRankedPlayers(players: Player[]): Player[] {
     if (totalMatchesA === 0 && totalMatchesB > 0) return 1;
     if (totalMatchesB === 0 && totalMatchesA > 0) return -1;
 
-    // 2. OVR (Overall Rating is the true measure of skill for all-time global ranking)
+    // 2. Final Score (Primary ranking metric)
+    const statsA = calculateRankingStats(a);
+    const statsB = calculateRankingStats(b);
+    if (statsB.finalScore !== statsA.finalScore) return statsB.finalScore - statsA.finalScore;
+
+    // 3. OVR (Overall Rating tie-breaker)
     if (b.ovr !== a.ovr) return b.ovr - a.ovr;
 
-    // 3. Win Percentage (Tie breaker for same OVR)
-    const winPctA = totalMatchesA > 0 ? a.win / totalMatchesA : 0;
-    const winPctB = totalMatchesB > 0 ? b.win / totalMatchesB : 0;
-    if (winPctB !== winPctA) return winPctB - winPctA;
-
     // 4. Points
-    const pointsA = a.win * 3 + a.draw;
-    const pointsB = b.win * 3 + b.draw;
-    if (pointsB !== pointsA) return pointsB - pointsA;
+    if (statsB.points !== statsA.points) return statsB.points - statsA.points;
     
     // 5. Goal Difference
     const gdA = a.goalsScored - a.goalsConceded;
     const gdB = b.goalsScored - b.goalsConceded;
     if (gdB !== gdA) return gdB - gdA;
+
+    // 6. Win Percentage
+    const winPctA = totalMatchesA > 0 ? a.win / totalMatchesA : 0;
+    const winPctB = totalMatchesB > 0 ? b.win / totalMatchesB : 0;
+    if (winPctB !== winPctA) return winPctB - winPctA;
 
     // 6. Goals Scored
     if (b.goalsScored !== a.goalsScored) return b.goalsScored - a.goalsScored;

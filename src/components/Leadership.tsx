@@ -19,9 +19,9 @@ export default function Leadership() {
 
   return (
     <section className="py-20 bg-white dark:bg-brand-dark transition-colors">
-      <div className="max-w-7xl mx-auto px-8 grid grid-cols-1 lg:grid-cols-12 gap-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-4">
-          <h2 className="text-5xl font-black text-brand-dark dark:text-white tracking-tighter leading-[0.9] mb-6">
+          <h2 className="text-4xl sm:text-5xl font-black text-brand-dark dark:text-white tracking-tighter leading-[0.9] mb-6">
             QVC<br />LEADERSHIP
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-8">
@@ -29,7 +29,7 @@ export default function Leadership() {
           </p>
         </div>
 
-        <div className="lg:col-span-8 grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-12">
+        <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-12">
           {sortedLeaders.map((leader, index) => (
             <motion.div
               key={leader.id}

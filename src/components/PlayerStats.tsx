@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ChevronRight, Trophy, Target, Zap, Filter, ChevronDown, Info, X, Activity, Flame, Shield } from 'lucide-react';
+import { Search, ChevronRight, Trophy, Filter, ChevronDown, Info, X, Target, Zap, Activity, Flame, Shield, Percent } from 'lucide-react';
 import { useFirebase } from '../FirebaseContext';
 import { cn, getSeasonInfo, resolveCanonicalTournamentName } from '../lib/utils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
 import { Player } from '../types';
+import { calculateRankingStats } from '../lib/store';
 
 export default function PlayerStats() {
   const { rankedPlayers: players, matches, tournaments } = useFirebase();
@@ -59,38 +59,35 @@ export default function PlayerStats() {
   // Compute the displayed player stats — reads from pre-computed fields when available
   const computedPlayer = useMemo(() => {
     if (!selectedPlayer) return null;
-    // All-time view: use stored global stats directly
-    if (selectedSeason === 'All Time' && selectedTournament === 'All Tournaments') {
-      return selectedPlayer;
-    }
+    
+    let baseData = selectedPlayer;
+
     // Tournament-specific view: read from pre-computed tournamentStats
     if (selectedSeason !== 'All Time' && selectedTournament !== 'All Tournaments') {
       const canonical = resolveCanonicalTournamentName(selectedTournament);
       const key = `${selectedSeason}__${canonical}`;
       const s = selectedPlayer.tournamentStats?.[key];
       if (s) {
-        return { ...selectedPlayer, ...s, ovr: selectedPlayer.ovr };
+        baseData = { ...selectedPlayer, ...s, ovr: selectedPlayer.ovr };
+      } else {
+        baseData = { ...selectedPlayer, win: 0, loss: 0, draw: 0, goalsScored: 0, goalsConceded: 0, form: [] };
       }
-      // No data — return zeroed player
-      return { ...selectedPlayer, win: 0, loss: 0, draw: 0, goalsScored: 0, goalsConceded: 0, form: [] };
     }
     // Season-only view: read from pre-computed seasonStats
-    if (selectedSeason !== 'All Time') {
+    else if (selectedSeason !== 'All Time') {
       const s = selectedPlayer.seasonStats?.[selectedSeason];
       if (s) {
-        return { ...selectedPlayer, ...s, ovr: selectedPlayer.ovr };
+        baseData = { ...selectedPlayer, ...s, ovr: selectedPlayer.ovr };
+      } else {
+        baseData = { ...selectedPlayer, win: 0, loss: 0, draw: 0, goalsScored: 0, goalsConceded: 0, form: [] };
       }
-      return { ...selectedPlayer, win: 0, loss: 0, draw: 0, goalsScored: 0, goalsConceded: 0, form: [] };
     }
-    return selectedPlayer;
-  }, [selectedPlayer, selectedSeason, selectedTournament]);
 
-  const chartData = computedPlayer ? [
-    { name: 'WINS', value: computedPlayer.win, color: '#22c55e' },
-    { name: 'DRAWS', value: computedPlayer.draw, color: '#94a3b8' },
-    { name: 'LOSSES', value: computedPlayer.loss, color: '#ef4444' },
-    { name: 'GOALS', value: computedPlayer.goalsScored, color: '#38bdf8' },
-  ] : [];
+    return {
+      ...baseData,
+      rankingStats: calculateRankingStats(baseData)
+    };
+  }, [selectedPlayer, selectedSeason, selectedTournament]);
 
   return (
     <div className="min-h-[calc(100vh-80px)] bg-[#f8fafc] dark:bg-brand-dark flex flex-col lg:flex-row transition-colors isolate">
@@ -257,11 +254,19 @@ export default function PlayerStats() {
                       className="flex items-center gap-1.5 text-[9px] font-black tracking-widest text-white transition-colors bg-brand-gradient hover:scale-105 px-3 py-1 rounded-full shadow-lg shadow-brand-purple/20"
                     >
                       <Info size={10} />
-                      HOW OVR WORKS
+                      CALCULATION GUIDE
                     </button>
                   </div>
                   
-                  <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black tracking-tighter leading-none mb-6 break-words pr-4">{computedPlayer.name}</h1>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black tracking-tighter leading-none break-words pr-4">{computedPlayer.name}</h1>
+                    {computedPlayer.rankingStats.isProvisional && (
+                      <span className="bg-amber-500 text-brand-dark px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase shadow-lg shadow-amber-500/20">
+                        PROVISIONAL
+                      </span>
+                    )}
+                  </div>
+
                   <div className="flex flex-wrap gap-3 lg:gap-6 items-center">
                     <div className="bg-white/10 px-4 py-2 rounded-2xl lg:rounded-full backdrop-blur-md border border-white/10 shrink-0">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">JERSEY</p>
@@ -272,59 +277,56 @@ export default function PlayerStats() {
                       <p className="text-lg lg:text-xl font-black leading-none">{computedPlayer.device || 'N/A'}</p>
                     </div>
                     <div className="bg-brand-gradient px-6 py-2 rounded-2xl lg:rounded-full text-white shrink-0 shadow-lg shadow-brand-purple/20 border border-t-white/20 border-b-black/20">
-                      <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 leading-none mb-1">OVERALL</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 leading-none mb-1">FINAL SCORE</p>
+                      <p className="text-lg lg:text-xl font-black leading-none italic">{computedPlayer.rankingStats.finalScore}</p>
+                    </div>
+                    <div className="bg-brand-dark dark:bg-white/5 border border-white/10 px-6 py-2 rounded-2xl lg:rounded-full text-white shrink-0 shadow-xl">
+                      <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 leading-none mb-1 text-slate-400">OVR (ELO)</p>
                       <p className="text-lg lg:text-xl font-black leading-none">{computedPlayer.ovr}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="md:col-span-2 bg-white dark:bg-white/5 rounded-3xl p-8 border border-slate-100 dark:border-white/10 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors">
-                  <h3 className="text-lg font-black text-brand-dark dark:text-white mb-8 tracking-tight">PERFORMANCE METRICS</h3>
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" opacity={0.1} />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} />
-                        <Tooltip cursor={{ fill: '#f8fafc', opacity: 0.1 }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', backgroundColor: '#0f172a', color: '#fff' }} />
-                        <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={40}>
-                          {chartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
+              {/* Detailed Stats Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* 1. Activity & Outcomes */}
+                <StatCard icon={<Activity className="text-brand-purple" />} label="TOTAL MATCHES" value={computedPlayer.rankingStats.matchesPlayed} />
+                <StatCard icon={<Zap className="text-green-500" />} label="TOTAL WINS" value={computedPlayer.win} />
+                <StatCard icon={<X className="text-red-500" />} label="TOTAL LOSSES" value={computedPlayer.loss} />
+                <StatCard icon={<Activity className="text-slate-400" />} label="TOTAL DRAWS" value={computedPlayer.draw} />
+                
+                {/* 2. Success Rates */}
+                <StatCard icon={<Zap className="text-brand-purple" />} label="WIN RATE (RAW)" value={`${Math.round((computedPlayer.win / (computedPlayer.rankingStats.matchesPlayed || 1)) * 100)}%`} />
+                <StatCard icon={<Target className="text-brand-purple" />} label="ADJUSTED WINRATE" value={`${computedPlayer.rankingStats.adjustedWinRate}%`} tooltip="WinRate scaled by sample size" />
+                
+                {/* 3. Competitive Standing */}
+                <StatCard icon={<Trophy className="text-brand-purple" />} label="TOTAL POINTS" value={computedPlayer.rankingStats.points} />
+                <StatCard icon={<Percent className="text-brand-purple" />} label="CONFIDENCE INDEX" value={`${computedPlayer.rankingStats.confidence}%`} tooltip="Reaches 100% as matches increase" />
+                <StatCard icon={<Zap className="text-brand-purple" />} label="CURRENT OVR" value={computedPlayer.ovr} />
 
-                <div className="space-y-4">
-                  <StatCard icon={<Trophy className="text-brand-purple" />} label="POINTS" value={computedPlayer.win * 3 + computedPlayer.draw} />
-                  <StatCard icon={<Target className="text-brand-purple" />} label="GOAL DIFF" value={computedPlayer.goalsScored - computedPlayer.goalsConceded} />
-                  <StatCard icon={<Flame className="text-brand-purple" />} label="GOALS SCORED" value={computedPlayer.goalsScored} />
-                  <StatCard icon={<Activity className="text-brand-purple" />} label="MATCHES PLAYED" value={computedPlayer.win + computedPlayer.loss + computedPlayer.draw} />
-                  <StatCard icon={<Zap className="text-brand-purple" />} label="WIN RATE" value={`${Math.round((computedPlayer.win / (computedPlayer.win + computedPlayer.loss + computedPlayer.draw || 1)) * 100)}%`} />
-                </div>
+                {/* 4. Goal Contribution */}
+                <StatCard icon={<Flame className="text-brand-purple" />} label="GOALS SCORED" value={computedPlayer.goalsScored} />
+                <StatCard icon={<Shield className="text-brand-purple" />} label="GOALS CONCEDED" value={computedPlayer.goalsConceded} />
+                <StatCard icon={<Target className="text-brand-purple" />} label="GOAL DIFFERENCE" value={computedPlayer.goalsScored - computedPlayer.goalsConceded} />
               </div>
 
               {/* Form & Recent */}
-              <div className="bg-white dark:bg-white/5 rounded-3xl p-8 border border-slate-100 dark:border-white/10 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors">
+              <div className="bg-white dark:bg-white/5 rounded-3xl p-6 lg:p-8 border border-slate-100 dark:border-white/10 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors">
                 <h3 className="text-lg font-black text-brand-dark dark:text-white mb-6 tracking-tight">RECENT FORM</h3>
-                <div className="flex gap-4">
-                  {(computedPlayer.win > 0 || computedPlayer.loss > 0 || computedPlayer.draw > 0) && computedPlayer.form?.length ? computedPlayer.form.map((res, i) => (
+                <div className="grid grid-cols-5 gap-2 lg:gap-4">
+                  {(computedPlayer.win > 0 || computedPlayer.loss > 0 || computedPlayer.draw > 0) && computedPlayer.form?.length ? computedPlayer.form.slice(0, 5).map((res, i) => (
                     <div key={i} className={cn(
-                      "flex-1 py-4 rounded-2xl flex flex-col items-center justify-center border transition-all",
+                      "py-3 lg:py-4 rounded-xl lg:rounded-2xl flex flex-col items-center justify-center border transition-all",
                       res === 'W' ? "bg-brand-purple/10 border-brand-purple/20 text-brand-purple" :
                       res === 'L' ? "bg-red-500/10 border-red-500/20 text-red-500" :
                       "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400"
                     )}>
-                      <span className="text-xl font-black">{res}</span>
-                      <span className="text-[8px] font-black uppercase tracking-widest mt-1 opacity-60">MATCH {i + 1}</span>
+                      <span className="text-lg lg:text-xl font-black">{res}</span>
+                      <span className="text-[7px] lg:text-[8px] font-black uppercase tracking-widest mt-1 opacity-60">MATCH {i + 1}</span>
                     </div>
                   )) : (
-                    <div className="w-full py-12 text-center border-2 border-dashed border-slate-100 dark:border-white/10 rounded-2xl">
+                    <div className="col-span-5 py-12 text-center border-2 border-dashed border-slate-100 dark:border-white/10 rounded-2xl">
                       <p className="text-xs font-bold text-slate-400">NO RECENT MATCH DATA AVAILABLE</p>
                     </div>
                   )}
@@ -332,17 +334,17 @@ export default function PlayerStats() {
               </div>
             </motion.div>
           ) : (
-            <div className="h-full flex items-center justify-center text-slate-300 dark:text-slate-700 font-black text-2xl italic">
+            <div className="h-full flex items-center justify-center text-slate-300 dark:text-slate-700 font-black text-2xl italic text-center px-4">
               SELECT A PLAYER TO VIEW ANALYTICS
             </div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* OVR Info Modal */}
+      {/* Ranking System Modal */}
       <AnimatePresence>
         {isOvrModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -359,35 +361,62 @@ export default function PlayerStats() {
               <div className="p-6 md:p-8">
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h3 className="text-2xl font-black text-brand-dark dark:text-white tracking-tighter">OVR SYSTEM</h3>
-                    <p className="text-[10px] font-bold text-brand-purple tracking-widest mt-1">POWERED BY TRUE ELO</p>
+                    <h3 className="text-2xl font-black text-brand-dark dark:text-white tracking-tighter">SYSTEM TRANSPARENCY</h3>
+                    <p className="text-[10px] font-bold text-brand-purple tracking-widest mt-1 uppercase">CALCULATION & RANKING GUIDE</p>
                   </div>
                   <button onClick={() => setIsOvrModalOpen(false)} className="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
                     <X size={16} className="text-slate-500 dark:text-white" />
                   </button>
                 </div>
 
-                <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300 font-medium">
-                  <p>
-                    Your <strong className="text-brand-dark dark:text-white">Overall Rating (OVR)</strong> is now powered by a <strong className="text-brand-purple">Hybrid True ELO Engine</strong>. This ensures new players feel rewarded instantly, while long-term veterans scale accurately.
-                  </p>
-                  
-                  <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-100 dark:border-white/10 space-y-3 text-xs leading-relaxed">
-                    <p>
-                      <strong>1. Core Performance (Base Stats)</strong><br/>
-                      Your rating heavily factors in your total Win Percentage, Experience, and Goal Difference (+15 max). <em>(Example: Playing 1 match and winning 5-0 immediately boosts your OVR so you don't feel penalized as a rookie!)</em>
+                <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300 font-medium overflow-y-auto max-h-[60vh] pr-2 custom-scrollbar">
+                  <div className="bg-brand-purple/5 border border-brand-purple/20 p-4 rounded-2xl">
+                    <p className="text-[10px] font-black text-brand-purple uppercase tracking-widest mb-2">1. SKILL RATING (OVR CALCULATION)</p>
+                    <p className="text-[11px] leading-relaxed">
+                      Your <strong className="text-brand-dark dark:text-white">OVR</strong> is a dynamic skill value calculated using an <strong className="text-white">Adjusted ELO Algorithm</strong>. 
+                      Unlike total points, OVR changes based on the <strong className="text-white">Relative Strength</strong> of your opponents.
                     </p>
+                    <div className="mt-3 space-y-2 text-[10px] text-slate-500 dark:text-slate-400">
+                      <p>• <strong className="text-brand-purple">UPSIDE:</strong> Beating a highly-rated "Elite" player yields a massive OVR boost.</p>
+                      <p>• <strong className="text-brand-purple">DOWNSIDE:</strong> Losing to a lower-rated player results in a sharper rating penalty.</p>
+                      <p>• <strong className="text-brand-purple">EQUILIBRIUM:</strong> Draws against equally rated players result in minimal OVR movement.</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-100 dark:border-white/10 space-y-3 text-[11px] leading-relaxed">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">2. GLOBAL RANKING (FINAL SCORE)</p>
                     <p>
-                      <strong>2. The ELO Influence (Match Quality)</strong><br/>
-                      Under the hood, a chess-style engine tracks every game. Beating a 95 OVR "Giant" quietly feeds massive multipliers into your background ELO, raising your overall ceiling. On the flip side, losing to a 60 OVR player creates a sharp penalty.
+                      The <strong className="text-brand-purple">Final Score</strong> is used for leaderboard placement to reward consistency and activity.
+                    </p>
+                    <ul className="space-y-2">
+                      <li className="flex gap-2">
+                        <span className="text-brand-purple font-black">•</span>
+                        <span><strong className="text-white">50% ACTIVITY:</strong> Total points earned (3 for win, 1 for draw).</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-brand-purple font-black">•</span>
+                        <span><strong className="text-white">30% SKILL (ELO):</strong> Your baseline OVR provides a solid foundation.</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-brand-purple font-black">•</span>
+                        <span><strong className="text-white">20% RELIABILITY:</strong> Adjusted win rate using a confidence factor.</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-dashed border-slate-200 dark:border-white/10">
+                    <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">PROVISIONAL STATUS</p>
+                    <p className="text-[11px]">
+                      Players with <strong className="text-white">&lt; 10 matches</strong> have a "confidence penalty". This prevents short-term lucky streaks from dominating the rankings.
                     </p>
                   </div>
 
-                  <p className="text-[10px] text-slate-400 mt-4 leading-relaxed font-bold uppercase tracking-widest text-center">
-                    SHORT TERM FORM + LONG TERM ELO
+                  <p className="text-[10px] text-slate-400 mt-4 font-bold uppercase tracking-widest text-center">
+                    FAIRNESS • TRANSPARENCY • COMPETITION
                   </p>
                 </div>
               </div>
+
             </motion.div>
           </div>
         )}
@@ -396,16 +425,21 @@ export default function PlayerStats() {
   );
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+function StatCard({ icon, label, value, tooltip }: { icon: React.ReactNode; label: string; value: string | number; tooltip?: string }) {
   return (
-    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 p-6 rounded-3xl shadow-lg shadow-slate-200/40 dark:shadow-none flex items-center gap-4 transition-colors">
-      <div className="w-12 h-12 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center">
-        {icon}
+    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-3xl shadow-sm flex items-center gap-4 transition-all hover:scale-[1.01] relative group">
+      <div className="w-10 h-10 lg:w-12 lg:h-12 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center shrink-0">
+        <div className="scale-75 lg:scale-100">{icon}</div>
       </div>
-      <div>
-        <p className="text-[9px] font-black text-slate-400 tracking-widest uppercase">{label}</p>
-        <p className="text-2xl font-black text-brand-dark dark:text-white leading-none">{value}</p>
+      <div className="min-w-0">
+        <p className="text-[9px] font-black text-slate-400 tracking-widest uppercase truncate">{label}</p>
+        <p className="text-xl lg:text-2xl font-black text-brand-dark dark:text-white leading-none truncate">{value}</p>
       </div>
+      {tooltip && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 hidden group-hover:block bg-brand-dark text-white p-2 rounded-lg text-[8px] font-bold text-center border border-white/10 shadow-2xl z-20">
+          {tooltip}
+        </div>
+      )}
     </div>
   );
 }
