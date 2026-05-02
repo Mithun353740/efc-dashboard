@@ -1,5 +1,32 @@
-/**
- * A subset of player stats used for season/tournament breakdowns.
+export interface GlobalSeason {
+  id: string; // e.g. "2026_2027"
+  name: string; // e.g. "2026/2027"
+  status: 'active' | 'completed';
+  createdAt: number;
+  endedAt?: number;
+}
+
+export interface PlayerInboxMessage {
+  id: string;
+  recipientId: string;
+  senderId: string; // Owner ID or System
+  type: 'contract_renewal' | 'system' | 'news' | 'contract_response';
+  title: string;
+  body: string;
+  data?: {
+    salary?: number;
+    duration?: number;
+    clubId?: string;
+    clubName?: string;
+    accepted?: boolean;
+    playerName?: string;
+    playerId?: string;
+  };
+  status: 'unread' | 'read' | 'accepted' | 'rejected' | 'archived';
+  createdAt: number;
+}
+
+/** A subset of player stats used for season/tournament breakdowns.
  * Stored directly on the Player document — no match reads needed by the frontend.
  */
 export interface PartialPlayerStats {
@@ -95,8 +122,11 @@ export interface Club {
   logo?: string;        // base64 or URL (high quality)
   primaryColor: string;   // hex e.g. "#8b5cf6"
   secondaryColor: string; // hex e.g. "#f59e0b"
-  ownerId: string;\n  managerRating?: number;\n  activeObjective?: string | null;\n  objectiveReward?: number;        // Player ID of the club manager
+  ownerId: string | null;
   ownerName?: string;     // denormalized for display
+  managerRating?: number;
+  activeObjective?: string | null;
+  objectiveReward?: number;
   budget: number;         // virtual currency (e.g. 50_000_000)
   squadIds: string[];     // Player IDs in this club's squad
   shortlistedPlayerIds?: string[]; // Player IDs this club has shortlisted for transfer
@@ -153,6 +183,8 @@ export interface ClubSeason {
   status: 'upcoming' | 'active' | 'completed';
   startedAt: number | null;
   endedAt: number | null;
+  length?: number;             // duration in days
+  transferWindows?: number;    // number of transfer windows
   standingsSnapshot?: Record<string, {
     clubId: string;
     clubName: string;
@@ -246,10 +278,13 @@ export interface MatchdaySlot {
 export interface ClubTournament {
   id: string;
   name: string;      // e.g. "Vortex Winter Cup"
-  season: string;\n  deadlineDayActive?: boolean;    // e.g. "QVFC Club Season 2026/2027"
+  season: string;
+  type: 'league' | 'knockout' | 'group_knockout';
+  participatingClubIds: string[];
   status: 'active' | 'paused' | 'postponed' | 'completed';
   statusReason?: string;
   createdAt: number;
+  matchdayDeadlines?: Record<number, number>; // matchday -> timestamp
 }
 
 export interface ClubFixtureSubMatch {
@@ -266,6 +301,7 @@ export interface ClubFixture {
   id: string;
   tournamentId: string;
   tournamentName: string;
+  matchday?: number;
   homeClubId: string;
   awayClubId: string;
   homeClubName: string;
@@ -278,6 +314,7 @@ export interface ClubFixture {
   awayLineupIds: string[]; // players selected by Away owner
   subMatches: ClubFixtureSubMatch[]; // the actual 1v1 pairings
   createdAt: number;
+  deadline?: number; // specific fixture deadline
 }
 
 /** Club system global configuration (stored as settings/clubConfig). */
@@ -286,6 +323,8 @@ export interface ClubSystemConfig {
   startingBudget: number;          // default budget for new clubs
   transferWindowOpen: boolean;
   transferWindowCloseDate?: string; // ISO date string
+  deadlineDayActive?: boolean;      // true if "Deadline Day" mode is on
+  auctionActive?: boolean;         // true if live auction mode is on
   currentMatchday: number;
   totalMatchdays: number;
   matchdaySchedule: MatchdaySlot[];

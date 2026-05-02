@@ -1,4 +1,8 @@
-import { Player, PartialPlayerStats, Leader, MatchRecord, Tournament, AuctionState, ClubSeason, ClubInboxMessage, TransferThread, TransferOffer, ReleaseClause, Club } from '../types';
+import { 
+  Player, PartialPlayerStats, Leader, MatchRecord, Tournament, AuctionState, 
+  ClubSeason, ClubInboxMessage, TransferThread, TransferOffer, ReleaseClause, 
+  Club, GlobalSeason, PlayerInboxMessage, ClubSystemConfig, MarketListing, ClubTournament, ClubFixture
+} from '../types';
 import { db, auth } from '../firebase';
 import { resolveCanonicalTournamentName, getSeasonInfo } from './utils';
 import { 
@@ -568,7 +572,7 @@ export async function recalculateAllStats(playersArg?: Player[]) {
 
   const fullMatchesSnap = await getDocs(query(collection(db, 'matches'), orderBy('timestamp', 'asc')));
   const allMatches = fullMatchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
-  const elos = computeGlobalElo(players, allMatches);
+  const elos = computeGlobalElo(playersToSync, allMatches);
   playersToSync.forEach(p => {
     const updatedPlayer = computePlayerStats(p, allMatches, elos[p.id] || 1200);
     batch.set(doc(db, 'players', p.id), updatedPlayer);
@@ -980,8 +984,6 @@ export async function bootstrapData() {
 // page is actually open. Each visitor pays at most ~3 reads per page load.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Club, ClubSystemConfig, MarketListing } from '../types';
-
 /** Fetch the club system config (1 read). */
 export async function fetchClubConfig(): Promise<ClubSystemConfig | null> {
   try {
@@ -1021,10 +1023,20 @@ export async function fetchClubs(): Promise<Club[]> {
  */
 export async function saveClub(club: Club, previousOwnerId?: string): Promise<void> {
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  
+  // Check for duplicate names (case insensitive) if this is a new club
+  if (!club.id) {
+    const q = query(collection(db, 'clubs'), where('name', '==', club.name));
+    const snap = await getDocs(q);
+    if (!snap.empty) throw new Error('A club with this name already exists.');
+  }
+
   const batch = writeBatch(db);
+  const clubId = club.id || `club_${Date.now()}`;
+  const finalClub = { ...club, id: clubId };
 
   // Write club document
-  batch.set(doc(db, 'clubs', club.id), club);
+  batch.set(doc(db, 'clubs', clubId), finalClub);
 
   // If owner changed, clear old owner's flags
   if (previousOwnerId && previousOwnerId !== club.ownerId) {
@@ -1037,7 +1049,7 @@ export async function saveClub(club: Club, previousOwnerId?: string): Promise<vo
   // Set new owner's flags (denormalized for quota-free display)
   if (club.ownerId) {
     batch.update(doc(db, 'players', club.ownerId), {
-      clubId: club.id,
+      clubId: clubId,
       clubName: club.name,
       isClubOwner: true,
       primaryColor: club.primaryColor,
@@ -1049,7 +1061,7 @@ export async function saveClub(club: Club, previousOwnerId?: string): Promise<vo
   club.squadIds?.forEach(pid => {
     if (pid !== club.ownerId) {
       batch.update(doc(db, 'players', pid), {
-        clubId: club.id,
+        clubId: clubId,
         clubName: club.name,
         primaryColor: club.primaryColor,
         secondaryColor: club.secondaryColor,
@@ -1061,7 +1073,7 @@ export async function saveClub(club: Club, previousOwnerId?: string): Promise<vo
     await batch.commit();
     await updateLastUpdated();
   } catch (err) {
-    handleFirestoreError(err, OperationType.WRITE, `clubs/${club.id}`);
+    handleFirestoreError(err, OperationType.WRITE, `clubs/${clubId}`);
     throw err;
   }
 }
@@ -1805,7 +1817,7 @@ export async function fetchClubSeasons(globalSeason: string): Promise<ClubSeason
 }
 
 /** Admin: Start a new internal season. 1 write. */
-export async function startClubSeason(globalSeason: string, seasonNumber: number): Promise<ClubSeason> {
+export async function startClubSeason(globalSeason: string, seasonNumber: number, length?: number, transferWindows?: number): Promise<ClubSeason> {
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   const id = `${globalSeason.replace('/', '_')}__S${seasonNumber}`;
   const season: ClubSeason = {
@@ -1816,6 +1828,8 @@ export async function startClubSeason(globalSeason: string, seasonNumber: number
     status: 'active',
     startedAt: Date.now(),
     endedAt: null,
+    length,
+    transferWindows
   };
   await setDoc(doc(db, 'clubSeasons', id), season);
   // Update the active season reference in clubConfig
@@ -1929,4 +1943,107 @@ export async function deleteClubSeason(seasonId: string): Promise<void> {
     handleFirestoreError(err, OperationType.DELETE, `clubSeasons/${seasonId}`);
     throw err;
   }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// GLOBAL SEASONS
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function startGlobalSeason(name: string): Promise<GlobalSeason> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const id = name.replace(/\//g, '_');
+  const gs: GlobalSeason = { id, name, status: 'active', createdAt: Date.now() };
+  await setDoc(doc(db, 'globalSeasons', id), gs);
+  return gs;
+}
+
+export async function fetchGlobalSeasons(): Promise<GlobalSeason[]> {
+  const snap = await getDocs(query(collection(db, 'globalSeasons'), orderBy('createdAt', 'desc')));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as GlobalSeason));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// FRANCHISE REGISTRY (EMPTY CLUBS)
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function fetchAllClubs(): Promise<Club[]> {
+  const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc')));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
+}
+
+export async function unassignClubOwner(clubId: string): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  await setDoc(doc(db, 'clubs', clubId), { ownerId: null, ownerName: null }, { merge: true });
+  await updateLastUpdated();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PLAYER INBOX & CONTRACT NEGOTIATIONS
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function sendPlayerInboxMessage(message: Omit<PlayerInboxMessage, 'id' | 'createdAt' | 'status'>): Promise<void> {
+  if (isQuotaExceeded) return;
+  const id = `pmsg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const fullMsg: PlayerInboxMessage = {
+    ...message,
+    id,
+    status: 'unread',
+    createdAt: Date.now()
+  };
+  await setDoc(doc(db, 'playerInbox', id), fullMsg);
+}
+
+export function subscribeToPlayerInbox(recipientId: string, callback: (messages: PlayerInboxMessage[]) => void) {
+  const q = query(collection(db, 'playerInbox'), where('recipientId', '==', recipientId), orderBy('createdAt', 'desc'), limit(50));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as PlayerInboxMessage)));
+  }, (err) => handleFirestoreError(err, OperationType.LIST, `playerInbox/${recipientId}`));
+}
+
+export async function updatePlayerInboxStatus(msgId: string, status: PlayerInboxMessage['status']): Promise<void> {
+  if (isQuotaExceeded) return;
+  await setDoc(doc(db, 'playerInbox', msgId), { status }, { merge: true });
+}
+
+export async function respondToContractRenewal(msg: PlayerInboxMessage, accepted: boolean): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const batch = writeBatch(db);
+  const now = Date.now();
+
+  // 1. Update message status
+  batch.update(doc(db, 'playerInbox', msg.id), { status: accepted ? 'accepted' : 'rejected' });
+
+  // 2. Send response back to owner
+  if (msg.data?.clubId) {
+    const responseMsg: ClubInboxMessage = {
+      id: `msg_${now}`,
+      type: 'system',
+      from: null,
+      message: accepted 
+        ? `✅ ${msg.data.playerName} accepted the contract renewal for ${msg.data.clubName}!`
+        : `❌ ${msg.data.playerName} rejected the contract renewal proposal.`,
+      read: false,
+      createdAt: now
+    };
+    // We need the ownerId of the club to push to their inbox
+    const clubDoc = await getDoc(doc(db, 'clubs', msg.data.clubId));
+    if (clubDoc.exists() && clubDoc.data().ownerId) {
+      const ownerId = clubDoc.data().ownerId;
+      const ref = doc(db, 'clubInbox', ownerId);
+      batch.set(ref, { ownerId, messages: arrayUnion(responseMsg), unreadCount: increment(1) }, { merge: true });
+    }
+  }
+
+  // 3. If accepted, actually update the player's contract in their profile
+  if (accepted && msg.data?.playerId) {
+    batch.update(doc(db, 'players', msg.data.playerId), {
+      clubContract: {
+        type: 'matches',
+        amount: msg.data.duration || 10
+      }
+    });
+  }
+
+  await batch.commit();
+  await updateLastUpdated();
 }

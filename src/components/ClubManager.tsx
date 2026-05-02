@@ -8,14 +8,16 @@ import {
   subscribeToInbox, markInboxRead, subscribeToAuction,
   addToShortlist, removeFromShortlist, sendTransferProposal,
   setReleaseClause, removeReleaseClause, triggerReleaseClause,
-  calculatePlayerForm, calculateBasePrize, getFormGrade
+  calculatePlayerForm, calculateBasePrize, getFormGrade,
+  sendPlayerInboxMessage
 } from '../lib/store';
-import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture, AuctionState, ClubInboxMessage } from '../types';
+import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture, AuctionState, ClubInboxMessage, PlayerInboxMessage } from '../types';
 import { getPlayerGrade, GRADE_COLORS } from '../lib/utils';
-import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check, Bell, ArrowLeftRight, X } from 'lucide-react';
+import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check, Bell, ArrowLeftRight, X, PenTool } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClubAuction from './club/ClubAuction';
 import ClubInbox from './club/ClubInbox';
+import PlayerInbox from './club/PlayerInbox';
 
 // ─── Module-level cache (persists across route changes, cleared on write) ─────
 let _clubCache: { clubs: Club[]; config: ClubSystemConfig | null; listings: MarketListing[] } | null = null;
@@ -330,9 +332,10 @@ export default function ClubManager() {
   const [auctionLive, setAuctionLive] = useState(false);
   // Shortlist modal state
   const [shortlistPlayer, setShortlistPlayer] = useState<Player | null>(null);
-  const [proposalStep, setProposalStep] = useState<'shortlist' | 'offer' | null>(null);
+  const [proposalStep, setProposalStep] = useState<'shortlist' | 'offer' | 'renewal' | null>(null);
   const [offerType, setOfferType] = useState<'money' | 'swap'>('money');
   const [offerAmount, setOfferAmount] = useState('');
+  const [offerDuration, setOfferDuration] = useState('5');
   const [offerNote, setOfferNote] = useState('');
   const [releaseTarget, setReleaseTarget] = useState<Player | null>(null);
   const [releaseAmount, setReleaseAmount] = useState('');
@@ -540,10 +543,38 @@ export default function ClubManager() {
                 <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} config={config} />
               </motion.div>
             )}
-            {activeTab === 'inbox' && myClub && (
+            {activeTab === 'inbox' && (
               <motion.div key="inbox" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
-                <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden relative" style={{ minHeight: 500 }}>
-                  <ClubInbox ownerId={playerId} myClub={myClub} allClubs={clubs} allPlayers={players} />
+                <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden relative" style={{ minHeight: 600 }}>
+                  <div className="flex flex-col h-full">
+                    <div className="grid grid-cols-1 md:grid-cols-2 h-full">
+                      {/* Owner's Club Inbox */}
+                      {isOwner && myClub && (
+                        <div className="border-r border-white/10 flex flex-col h-[600px]">
+                          <div className="p-4 bg-brand-purple/10 border-b border-brand-purple/20">
+                            <h3 className="text-[10px] font-black text-brand-purple uppercase tracking-[0.2em] flex items-center gap-2">
+                              <Shield size={12} /> OWNER INBOX: {myClub.name}
+                            </h3>
+                          </div>
+                          <div className="flex-1 overflow-hidden">
+                            <ClubInbox ownerId={playerId} myClub={myClub} allClubs={clubs} allPlayers={players} />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Personal Player Inbox */}
+                      <div className={cn("flex flex-col h-[600px]", isOwner ? "" : "md:col-span-2")}>
+                        <div className="p-4 bg-amber-500/10 border-b border-amber-500/20">
+                          <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <PenTool size={12} /> PLAYER PORTAL: {myPlayer?.name}
+                          </h3>
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <PlayerInbox player={myPlayer!} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -557,6 +588,7 @@ export default function ClubManager() {
                   isOwner={isOwner}
                   isAdmin={isAdmin}
                   onShortlistPlayer={(p) => { setShortlistPlayer(p); setProposalStep('shortlist'); }}
+                  onRenewContract={(p) => { setShortlistPlayer(p); setProposalStep('renewal'); setOfferAmount('500000'); setOfferDuration('5'); }}
                   onSetReleaseClause={(p) => { setReleaseTarget(p); setReleaseAmount(String(p.releaseClause?.amount || '')); }}
                   setMsg={setMsg}
                   matches={matches}
@@ -577,7 +609,61 @@ export default function ClubManager() {
           </motion.div>
         )}
 
-        {/* ─── Send Proposal Modal ─── */}
+        {/* ─── Contract Renewal Modal ─── */}
+        <AnimatePresence>
+          {proposalStep === 'renewal' && shortlistPlayer && myClub && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+              <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0a14] border border-white/10 rounded-3xl p-8 z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <p className="text-[10px] font-black text-brand-purple uppercase tracking-[0.2em]">Contract Management</p>
+                    <h3 className="text-xl font-black text-white italic truncate uppercase">Renew {shortlistPlayer.name}</h3>
+                  </div>
+                  <button onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="p-2 text-slate-500 hover:text-white"><X size={20} /></button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Bonus Amount (VCC)</label>
+                    <input type="number" value={offerAmount} onChange={e => setOfferAmount(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-brand-purple" placeholder="e.g. 500,000" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Duration (Matches)</label>
+                    <select value={offerDuration} onChange={e => setOfferDuration(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-brand-purple">
+                      <option value="1">1 Match</option>
+                      <option value="3">3 Matches</option>
+                      <option value="5">5 Matches</option>
+                      <option value="10">10 Matches</option>
+                      <option value="25">FULL SEASON (25)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-8 grid grid-cols-2 gap-4">
+                  <button onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="py-4 bg-white/5 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Cancel</button>
+                  <button onClick={async () => {
+                    if (!offerAmount || !offerDuration) return;
+                    setLoading(true);
+                    try {
+                      await sendPlayerInboxMessage({
+                        recipientId: shortlistPlayer.id,
+                        senderId: playerId,
+                        type: 'contract_renewal',
+                        title: 'New Contract Offer Received',
+                        body: `Your club owner, ${myClub.ownerName}, has offered you a new contract renewal for ${offerDuration} matches with a ${Number(offerAmount).toLocaleString()} VCC bonus.`,
+                        data: { clubId: myClub.id, clubName: myClub.name, salary: Number(offerAmount), duration: Number(offerDuration) }
+                      });
+                      setMsg({ text: '✅ Renewal offer sent!', type: 'success' });
+                      setProposalStep(null); setShortlistPlayer(null);
+                    } catch(e: any) { setMsg({ text: '❌ ' + e.message, type: 'error' }); }
+                    finally { setLoading(false); }
+                  }} className="py-4 bg-brand-purple text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-purple/20 transition-all">Send Offer</button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
         <AnimatePresence>
           {proposalStep && shortlistPlayer && myClub && (() => {
             const sellerClub = clubs.find(c => c.squadIds?.includes(shortlistPlayer.id));
@@ -716,10 +802,11 @@ function NoClubScreen() {
 
 // ─── Squad Tab (with Shortlist + Release Clause) ──────────────────────────────
 
-function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, matches, onShortlistPlayer, onSetReleaseClause, setMsg }: {
+function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, matches, onShortlistPlayer, onRenewContract, onSetReleaseClause, setMsg }: {
   myClub: Club; squad: Player[]; allClubs: Club[]; allPlayers: Player[];
   isOwner: boolean; isAdmin: boolean; matches: MatchRecord[];
   onShortlistPlayer: (p: Player) => void;
+  onRenewContract: (p: Player) => void;
   onSetReleaseClause: (p: Player) => void;
   setMsg: (m: any) => void;
 }) {
@@ -801,11 +888,18 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, match
             const grade = getPlayerGrade(p);
             const gradeColor = GRADE_COLORS[grade];
             const total = p.win + p.loss + p.draw;
+            const matchesLeft = p.clubContract?.amount || 0;
+
             return (
-              <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all">
+              <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all group relative">
                 <div className="relative h-40 overflow-hidden">
                   <img src={p.image} className="w-full h-full object-cover object-top" alt={p.name} style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} />
-                  <div className="absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-black" style={{ background: gradeColor, color: '#000' }}>{grade}</div>
+                  <div className="absolute top-2 left-2 flex flex-col gap-1">
+                    <div className="px-2 py-1 rounded-lg text-[10px] font-black" style={{ background: gradeColor, color: '#000' }}>{grade}</div>
+                    <div className={cn("px-2 py-1 shadow-lg rounded-lg text-[9px] font-black uppercase tracking-widest", (matchesLeft > 2) ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-500 border border-red-500/30')}>
+                      {matchesLeft} MATCHES LEFT
+                    </div>
+                  </div>
                   <div className="absolute top-2 right-2 bg-black/60 rounded-lg px-2 py-1 text-[10px] font-black text-white">{p.ovr} OVR</div>
                   {p.releaseClause?.active && <div className="absolute bottom-2 left-2 bg-amber-500 text-black text-[8px] font-black px-2 py-0.5 rounded-full">RC Active</div>}
                 </div>
@@ -817,11 +911,14 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, match
                     <span className="text-[10px] font-bold text-amber-400">D{p.draw}</span>
                     <span className="text-[10px] font-bold text-slate-500">{total}MP</span>
                   </div>
-                  {(isOwner || isAdmin) && (
-                    <button onClick={() => onSetReleaseClause(p)} className={`w-full py-2 rounded-xl text-[9px] font-black uppercase transition-all ${p.releaseClause?.active ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-white/5 text-slate-500 hover:bg-white/10'}`}>
-                      {p.releaseClause?.active ? `RC: ${(p.releaseClause.amount/1000).toFixed(0)}K — Edit` : 'Set Release Clause'}
+                  <div className="flex gap-2">
+                    <button onClick={() => onRenewContract(p)} className="flex-1 py-2.5 bg-brand-purple text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-brand-purple/10 hover:bg-brand-purple/80 transition-all">
+                      RENEW
                     </button>
-                  )}
+                    <button onClick={() => onSetReleaseClause(p)} className={cn("px-3 py-2.5 rounded-xl transition-all border", p.releaseClause?.active ? 'bg-amber-500/10 border-amber-500/30 text-amber-500' : 'bg-white/5 border-white/10 text-slate-500 hover:text-white')}>
+                      <Zap size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

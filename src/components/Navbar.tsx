@@ -155,6 +155,15 @@ export default function Navbar() {
         
         {(isAdmin || isPlayer) ? (
           <div className="relative flex items-center gap-4">
+            {isPlayer && (
+              <Link 
+                to="/inbox" 
+                className="p-2 text-slate-400 hover:text-brand-purple transition-all relative group"
+              >
+                <Bell size={20} className="group-hover:rotate-12 transition-transform" />
+                <div className="absolute top-2 right-2 w-2 h-2 bg-brand-purple rounded-full shadow-[0_0_10px_rgba(139,92,246,0.8)]" />
+              </Link>
+            )}
             {isPlayer ? (
               <div className="flex items-center gap-3">
                 <button 

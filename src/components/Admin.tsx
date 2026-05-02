@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings } from 'lucide-react';
+import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners, deleteClubSeason } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, fetchGlobalSeasons, fetchAllClubs, startGlobalSeason } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
-import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture, AuctionState, ClubSeason } from '../types';
+import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture, AuctionState, ClubSeason, GlobalSeason } from '../types';
 import { getSeasonInfo, cn, getPlayerGrade } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
 import { auth, loginAnonymously, db } from '../firebase';
@@ -95,6 +95,8 @@ export default function Admin() {
   const [auctionIncrement, setAuctionIncrement] = useState(100000);
   const [auctionRevealId, setAuctionRevealId] = useState('');
   const [auctionMsg, setAuctionMsg] = useState('');
+  const [setupBasePrice, setSetupBasePrice] = useState('500000');
+  const [setupIncrement, setSetupIncrement] = useState('100000');
   // ── Club Season State ────────────────────────────────────────────────────
   const [clubSeasons, setClubSeasons] = useState<ClubSeason[]>([]);
   const [globalSeason, setGlobalSeason] = useState(() => getSeasonInfo(new Date()).name);
@@ -967,8 +969,8 @@ export default function Admin() {
                       </div>
                       <button 
                         onClick={async () => {
-                          if (!clubs.length) { alert('No clubs found! Create clubs first.'); return; }
-                          await import('../lib/store').then(m => m.adminStartAuction(clubs.map(c => c.id), Number(setupIncrement), Number(setupBasePrice)));
+                          if (!auctionClubs.length) { alert('No clubs found! Create clubs first.'); return; }
+                          await import('../lib/store').then(m => m.adminStartAuction(auctionClubs.map(c => c.id), Number(setupIncrement), Number(setupBasePrice)));
                           setSeasonMsg('Auction session started! You can now switch to the Club Zone to operate the live auction.');
                         }}
                         className="col-span-1 md:col-span-2 py-4 bg-amber-500 text-black font-black text-xs tracking-widest rounded-xl hover:scale-[1.02] active:scale-95 transition-all uppercase flex items-center justify-center gap-2"
@@ -1488,17 +1490,134 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const [config, setConfig] = React.useState<ClubSystemConfig>(DEFAULT_CFG);
   const [configSaving, setConfigSaving] = React.useState(false);
 
-  // ── Match & Engine state (lazy-loaded, quota-safe) ──
-  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'seasons'|'auction'|'config'|'history'>('clubs');
+  // ── Navigation State ──
+  // flow: landing -> season_management | global_history | franchise_registry
+  const [viewState, setViewState] = React.useState<'landing' | 'season_management' | 'global_history' | 'franchise_registry'>('landing');
+  const [selectedSeason, setSelectedSeason] = React.useState<ClubSeason | null>(null);
+  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'auction'|'config'|'seasons'|'history'|'franchise'>('clubs');
 
   // History state (3-layer navigation)
   const [hSeasons, setHSeasons] = React.useState<ClubSeason[]>([]);
   const [hMatches, setHMatches] = React.useState<MatchRecord[]>([]);
+  const [gSeasons, setGSeasons] = React.useState<GlobalSeason[]>([]);
+  const [selectedGlobalId, setSelectedGlobalId] = React.useState<string | null>(null);
   const [hSelectedSeasonId, setHSelectedSeasonId] = React.useState<string | null>(null);
   const [hSelectedTournament, setHSelectedTournament] = React.useState<string | null>(null);
   const [hLoading, setHLoading] = React.useState(false);
   const [hEditingMatch, setHEditingMatch] = React.useState<MatchRecord | null>(null);
   const [hEditForm, setHEditForm] = React.useState({ p1Score: '0', p2Score: '0', tournament: '', matchday: '1' });
+
+  // Franchise Registry state
+  const [fClubs, setFClubs] = React.useState<Club[]>([]);
+  const [showFForm, setShowFForm] = React.useState(false);
+  const [fLogoFile, setFLogoFile] = React.useState<string | null>(null);
+  const [fFormExtended, setFFormExtended] = React.useState({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b' });
+
+  // Start New Season Form
+  const [showNewSeasonForm, setShowNewSeasonForm] = React.useState(false);
+  const [newSeasonForm, setNewSeasonForm] = React.useState({
+    globalSeason: getSeasonInfo(new Date()).name,
+    seasonNumber: 1,
+    length: 10,
+    transferWindows: 2
+  });
+
+  const loadAllSeasons = async () => {
+    setHLoading(true);
+    try {
+      const activeGlobal = gSeasons.find(g => g.status === 'active')?.name || newSeasonForm.globalSeason;
+      const ss = await fetchClubSeasons(activeGlobal);
+      setHSeasons(ss);
+    } catch (e) { console.error(e); }
+    finally { setHLoading(false); }
+  };
+
+  const loadGlobalSeasons = async () => {
+    try {
+      const gs = await fetchGlobalSeasons();
+      setGSeasons(gs);
+      if (gs.length > 0 && !selectedGlobalId) {
+        const active = gs.find(g => g.status === 'active');
+        setSelectedGlobalId(active?.id || gs[0].id);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const loadRegistry = async () => {
+    try {
+      const cs = await fetchAllClubs();
+      setFClubs(cs);
+    } catch (e) { console.error(e); }
+  };
+
+  React.useEffect(() => {
+    loadGlobalSeasons();
+    loadRegistry();
+  }, []);
+
+  React.useEffect(() => {
+    if (gSeasons.length > 0) loadAllSeasons();
+  }, [newSeasonForm.globalSeason, gSeasons]);
+
+  const handleStartNewSeason = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const season = await startClubSeason(
+        newSeasonForm.globalSeason, 
+        newSeasonForm.seasonNumber,
+        newSeasonForm.length,
+        newSeasonForm.transferWindows
+      );
+      setMsg({ text: `✅ ${season.label} started!`, type: 'success' });
+      setShowNewSeasonForm(false);
+      loadAllSeasons();
+    } catch (e: any) {
+      setMsg({ text: '❌ ' + e.message, type: 'error' });
+    } finally { setLoading(false); }
+  };
+
+  const handleGoToSeason = (season: ClubSeason) => {
+    setSelectedSeason(season);
+    setViewState('season_management');
+    setSubTab('clubs');
+  };
+
+  const handleEndSeason = async () => {
+    if (!selectedSeason) return;
+    const confirm = window.confirm("⚠️ WARNING: You are about to end this season. Standings will be snapshotted and the season will be marked as COMPLETED. Re-confirm?");
+    if (!confirm) return;
+    
+    setLoading(true);
+    try {
+      await endClubSeason(selectedSeason.id, {});
+      
+      // Automatic rollover check
+      const currentGlobal = gSeasons.find(g => g.name === selectedSeason.globalSeason);
+      if (currentGlobal) {
+        const confirmGlobal = window.confirm(`🌍 The Global Season ${currentGlobal.name} is now concluding its internal cycles. Would you like to ARCHIVE this global season and prepare for the next year? This will reset active states.`);
+        if (confirmGlobal) {
+          // Logic for rollover:
+          // 1. Mark current global as completed
+          // 2. Start a new Global Season automatically
+          const nextYearStart = Number(currentGlobal.name.split('/')[0]) + 1;
+          const nextYearEnd = Number(currentGlobal.name.split('/')[1]) + 1;
+          const nextGlobalName = `${nextYearStart}/${nextYearEnd}`;
+          
+          await startGlobalSeason(nextGlobalName);
+          setMsg({ text: `🚀 Rollover Complete! ${nextGlobalName} is now the active Global Season.`, type: 'success' });
+          await loadGlobalSeasons();
+        }
+      }
+
+      setMsg({ text: '✅ Season ended successfully.', type: 'success' });
+      setViewState('landing');
+      setSelectedSeason(null);
+      loadAllSeasons();
+    } catch (e: any) {
+      setMsg({ text: '❌ ' + e.message, type: 'error' });
+    } finally { setLoading(false); }
+  };
 
   // Auction Admin state
   const [auctionState, setAuctionState] = React.useState<AuctionState | null>(null);
@@ -1530,7 +1649,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const loadHistory = async () => {
     setHLoading(true);
     try {
-      const ss = await fetchClubSeasons();
+      const ss = await fetchClubSeasons(newSeasonForm.globalSeason);
       setHSeasons(ss);
       if (ss.length > 0 && !hSelectedSeasonId) {
         setHSelectedSeasonId(ss[0].id);
@@ -1612,7 +1731,8 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const [fForm, setFForm] = React.useState({ 
     tournamentId: '', homeClubId: '', awayClubId: '', 
     matchupType: 'home_away' as 'home_away'|'random', 
-    lineupSize: '4', subLimit: '2' 
+    lineupSize: '4', subLimit: '2',
+    matchday: '1', deadlineDate: '', deadlineTime: '23:59', extension: '0'
   });
   const [clubMatches, setClubMatches] = React.useState<MatchRecord[]>([]);
   const [matchesLoaded, setMatchesLoaded] = React.useState(false);
@@ -1681,6 +1801,53 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     await reload();
   };
 
+  const handleCreateRegistryClub = async () => {
+    if (!fFormExtended.name) return;
+    setLoading(true);
+    try {
+      const nc: Club = {
+        id: `club_${Date.now()}`,
+        name: fFormExtended.name.toUpperCase(),
+        shortName: fFormExtended.shortName.toUpperCase().slice(0,3),
+        primaryColor: fFormExtended.primaryColor,
+        secondaryColor: fFormExtended.secondaryColor,
+        logo: fLogoFile || undefined,
+        ownerId: null,
+        ownerName: null,
+        budget: 50000000,
+        squadIds: [],
+        createdAt: Date.now()
+      };
+      await saveClub(nc);
+      setMsg({ text: '✅ Empty club added to franchise registry', type: 'success' });
+      setShowFForm(false);
+      setFFormExtended({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b' });
+      setFLogoFile(null);
+      loadRegistry();
+    } catch (e: any) {
+      setMsg({ text: '❌ ' + e.message, type: 'error' });
+    } finally { setLoading(false); }
+  };
+
+  const handleRemoveFranchiseOwner = async (club: Club) => {
+    if (!window.confirm(`⚠️ WARNING: You are about to remove ${club.ownerName} as the owner of ${club.name}. This will clear their access to this club. Proceed?`)) return;
+    setLoading(true);
+    try {
+      await unassignClubOwner(club.id);
+      setMsg({ text: `✅ Owner removed from ${club.name}`, type: 'success' });
+      loadRegistry();
+    } catch (e: any) {
+      setMsg({ text: '❌ ' + e.message, type: 'error' });
+    } finally { setLoading(false); }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setFLogoFile(reader.result as string);
+    reader.readAsDataURL(file);
+  };
   const handleSaveConfig = async () => {
     setConfigSaving(true);
     try {
@@ -1766,20 +1933,27 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     finally { setMatchBusy(false); }
   };
 
+  const [tSetupForm, setTSetupForm] = React.useState({ name: '', type: 'league' as any, participatingClubIds: [] as string[] });
+  const [showTSetup, setShowTSetup] = React.useState(false);
+
   const handleAddTournament = async () => {
-    if (!tFormName) return;
+    if (!tSetupForm.name) return;
     setMatchBusy(true);
     try {
       const nt: ClubTournament = {
         id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
-        name: tFormName.toUpperCase(),
-        season: config.season,
+        name: tSetupForm.name.toUpperCase(),
+        season: selectedSeason?.id || config.season,
+        type: tSetupForm.type,
+        participatingClubIds: tSetupForm.participatingClubIds,
         status: 'active',
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        matchdayDeadlines: {}
       };
       await saveClubTournament(nt);
       setTournaments([nt, ...tournaments]);
-      setTFormName('');
+      setShowTSetup(false);
+      setTSetupForm({ name: '', type: 'league', participatingClubIds: [] });
       flashMatch('✅ Tournament created', true);
     } catch (e: any) { flashMatch('❌ ' + e.message, false); }
     finally { setMatchBusy(false); }
@@ -1816,6 +1990,19 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     const ac = clubs.find(c => c.id === fForm.awayClubId);
     if (!t || !hc || !ac || hc.id === ac.id) { flashMatch('❌ Invalid selection', false); return; }
     
+    let deadline: number | undefined = undefined;
+    if (fForm.deadlineDate) {
+      // Base deadline at 11:59 PM
+      const baseDate = new Date(`${fForm.deadlineDate}T23:59:00`);
+      deadline = baseDate.getTime();
+      
+      // Add extension hours if any
+      const extHrs = Number(fForm.extension) || 0;
+      if (extHrs > 0) {
+        deadline += extHrs * 60 * 60 * 1000;
+      }
+    }
+
     setMatchBusy(true);
     try {
       const nf: ClubFixture = {
@@ -1828,11 +2015,33 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
         subLimit: Number(fForm.subLimit) || 2,
         status: 'scheduled',
         homeLineupIds: [], awayLineupIds: [], subMatches: [],
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        matchday: Number(fForm.matchday) || 1,
+        deadline
       };
       await saveClubFixture(nf);
       setFixtures([nf, ...fixtures]);
       flashMatch('✅ Fixture Scheduled', true);
+    } catch (e: any) { flashMatch('❌ ' + e.message, false); }
+    finally { setMatchBusy(false); }
+  };
+
+  const [editingFixtureId, setEditingFixtureId] = React.useState<string|null>(null);
+  const [fEditForm, setFEditForm] = React.useState({ deadlineDate: '', extension: '0', matchday: '1' });
+
+  const handleUpdateFixture = async (f: ClubFixture) => {
+    setMatchBusy(true);
+    try {
+      let deadline = f.deadline;
+      if (fEditForm.deadlineDate) {
+        const baseDate = new Date(`${fEditForm.deadlineDate}T23:59:00`);
+        deadline = baseDate.getTime() + (Number(fEditForm.extension) || 0) * 60 * 60 * 1000;
+      }
+      const nf = { ...f, deadline, matchday: Number(fEditForm.matchday) || f.matchday };
+      await saveClubFixture(nf);
+      setFixtures(prev => prev.map(x => x.id === f.id ? nf : x));
+      setEditingFixtureId(null);
+      flashMatch('✅ Fixture updated', true);
     } catch (e: any) { flashMatch('❌ ' + e.message, false); }
     finally { setMatchBusy(false); }
   };
@@ -1893,20 +2102,118 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const ownerPlayer = players.find(p => p.id === form.ownerId);
   const filteredOwners = players.filter(p => p.name.toLowerCase().includes(ownerSearch.toLowerCase())).slice(0, 6);
 
+  if (viewState === 'landing') {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <button onClick={() => setShowNewSeasonForm(true)} className="group bg-white/5 border border-white/10 p-8 rounded-3xl hover:border-amber-500/50 transition-all text-left">
+            <h3 className="text-2xl font-black mb-2 group-hover:text-amber-500">START NEW SEASON</h3>
+            <p className="text-xs text-slate-400 font-bold">Initialize a fresh club season cycle.</p>
+          </button>
+          
+          <div className="bg-white/5 border border-white/10 p-8 rounded-3xl">
+            <h3 className="text-2xl font-black mb-4">SEASONS</h3>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto no-scrollbar">
+              {hSeasons.filter(s => s.status === 'active' || s.status === 'upcoming').map(s => (
+                <button key={s.id} onClick={() => handleGoToSeason(s)} className="w-full p-4 bg-white/5 rounded-2xl flex items-center justify-between hover:bg-white/10 transition-colors">
+                  <div className="text-left min-w-0">
+                    <p className="text-sm font-black truncate">{s.label}</p>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-tight">{s.status} &bull; {s.globalSeason}</p>
+                  </div>
+                  <span className="text-amber-500 shrink-0 ml-2">&rarr;</span>
+                </button>
+              ))}
+              {hSeasons.filter(s => s.status === 'active' || s.status === 'upcoming').length === 0 && (
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center py-4">No active seasons.</p>
+              )}
+            </div>
+          </div>
+
+          <button onClick={() => { setViewState('franchise_registry'); setSubTab('franchise'); }} className="group bg-white/5 border border-white/10 p-8 rounded-3xl text-left hover:bg-white/10 transition-all border-violet-500/20">
+            <h3 className="text-2xl font-black mb-2 group-hover:text-violet-400">REGISTRY</h3>
+            <p className="text-xs text-slate-400 font-bold">Manage the Franchise Club Registry & Assignments.</p>
+          </button>
+
+          <button onClick={() => { setViewState('global_history'); setSubTab('history'); }} className="group bg-white/5 border border-white/10 p-8 rounded-3xl text-left hover:bg-white/10 transition-all border-amber-500/20">
+            <h3 className="text-2xl font-black mb-2 group-hover:text-amber-500 text-amber-500/80">HISTORY</h3>
+            <p className="text-xs text-slate-400 font-bold">Explore archives and global season records.</p>
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {showNewSeasonForm && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
+              <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="w-full max-w-md bg-[#0f172a] border border-white/10 rounded-3xl p-8 shadow-2xl">
+                <h2 className="text-2xl font-black mb-6">START NEW SEASON</h2>
+                <form onSubmit={handleStartNewSeason} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-500">GLOBAL SEASON</label>
+                    <input value={newSeasonForm.globalSeason} onChange={e => setNewSeasonForm({...newSeasonForm, globalSeason: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-bold" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-500">SEASON NUMBER</label>
+                    <input type="number" value={newSeasonForm.seasonNumber} onChange={e => setNewSeasonForm({...newSeasonForm, seasonNumber: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-bold" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500">LENGTH (DAYS)</label>
+                      <input type="number" value={newSeasonForm.length} onChange={e => setNewSeasonForm({...newSeasonForm, length: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-bold" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500">XFER WINDOWS</label>
+                      <input type="number" value={newSeasonForm.transferWindows} onChange={e => setNewSeasonForm({...newSeasonForm, transferWindows: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-bold" />
+                    </div>
+                  </div>
+                  <div className="pt-4 flex gap-3">
+                    <button type="button" onClick={() => setShowNewSeasonForm(false)} className="flex-1 py-4 bg-white/5 rounded-xl text-[10px] font-black">CANCEL</button>
+                    <button type="submit" disabled={loading} className="flex-1 py-4 bg-amber-500 text-black rounded-xl text-[10px] font-black shadow-lg shadow-amber-500/20 uppercase">
+                      {loading ? 'STARTING...' : 'CONFIRM START'}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* SubTab Nav */}
-      <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-2xl flex-wrap">
-        {(['clubs','tournaments','fixtures','matches','seasons','auction','config','history'] as const).map(t => (
-          <button key={t} onClick={() => setSubTab(t)}
-            className={cn('flex-1 min-w-[100px] py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all',
-              subTab === t ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
-            )}
-          >
-            {t === 'clubs' ? '⚽ CLUBS' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : t === 'seasons' ? '📅 SEASONS' : t === 'auction' ? '🔨 AUCTION' : t === 'config' ? '⚙️ CONFIG' : '🕒 HISTORY'}
+      <div className="flex items-center justify-between bg-white/5 border border-white/10 p-4 rounded-2xl">
+        <div className="flex items-center gap-4">
+          <button onClick={() => { setViewState('landing'); setSelectedSeason(null); }} className="text-xs font-black text-slate-400 hover:text-white px-3 py-1 bg-white/5 rounded-lg">&larr; BACK</button>
+          <div>
+            <h2 className="text-lg font-black uppercase tracking-tight">
+              {viewState === 'franchise_registry' ? 'FRANCHISE REGISTRY' : viewState === 'global_history' ? 'GLOBAL HISTORY' : selectedSeason?.label || 'SEASON MANAGEMENT'}
+            </h2>
+            <p className="text-[10px] text-slate-500 font-bold uppercase">
+              {viewState === 'global_history' ? (gSeasons.find(g => g.id === selectedGlobalId)?.name || 'ALL SEASONS') : (selectedSeason?.globalSeason || 'SYSTEM')} &bull; {selectedSeason?.status || 'BROWSE'}
+            </p>
+          </div>
+        </div>
+        {selectedSeason?.status === 'active' && viewState === 'season_management' && (
+          <button onClick={handleEndSeason} className="px-6 py-2.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-[10px] font-black hover:bg-red-500/20 transition-all uppercase">
+            End Season
           </button>
-        ))}
+        )}
       </div>
+
+      {/* SubTab Nav - Only show in Season Management mode */}
+      {viewState === 'season_management' && (
+        <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-2xl flex-wrap">
+          {(['clubs','franchise','tournaments','fixtures','matches','auction','config','seasons','history'] as const).map(t => (
+            <button key={t} onClick={() => setSubTab(t)}
+              className={cn('flex-1 min-w-[100px] py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all',
+                subTab === t ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
+              )}
+            >
+              {t === 'clubs' ? '⚽ ASSIGN' : t === 'franchise' ? '🏢 REGISTRY' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : t === 'auction' ? '🔨 AUCTION' : t === 'config' ? '⚙️ CONFIG' : t === 'seasons' ? '📅 SEASONS' : '🕒 HISTORY'}
+            </button>
+          ))}
+        </div>
+      )}
 
       {subTab === 'clubs' && (
         <div className="space-y-8">
@@ -2058,36 +2365,146 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
         </div>
       )}
 
-      {/* ── TOURNAMENTS subtab ── */}
+      {/* ── FRANCHISE subtab (Empty Clubs) ── */}
+      {subTab === 'franchise' && (
+        <div className="space-y-8">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-black tracking-tight mb-1 uppercase">Franchise Registry</h3>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Create and manage empty clubs for seasonal assignment</p>
+            </div>
+            <button onClick={() => setShowFForm(true)} className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl transition-all uppercase">
+              CREATE EMPTY CLUB
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {fClubs.map(club => (
+              <div key={club.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 relative group overflow-hidden">
+                <div className="flex items-center gap-4 mb-6">
+                  {club.logo ? (
+                    <img src={club.logo} className="w-16 h-16 rounded-2xl object-contain bg-white/5 p-2 shadow-lg" alt="" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg uppercase" style={{ background: `linear-gradient(135deg, ${club.primaryColor}, ${club.secondaryColor})` }}>
+                      {club.shortName}
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="text-xl font-black text-white uppercase">{club.name}</h4>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{club.shortName} &bull; FRANCHISE</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="p-4 bg-black/20 rounded-2xl border border-white/5">
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Status</p>
+                    {club.ownerId ? (
+                      <div>
+                        <p className="text-sm font-black text-emerald-400 uppercase">ASSIGNED</p>
+                        <p className="text-[10px] font-bold text-slate-300 mt-0.5">{club.ownerName}</p>
+                        <button onClick={() => handleRemoveFranchiseOwner(club)} className="mt-3 text-[9px] font-black text-red-500 hover:text-red-400 uppercase tracking-widest transition-colors flex items-center gap-1">
+                          REMOVE OWNER <Trash2 size={10} />
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-black text-slate-500 uppercase">UNASSIGNED</p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <div className="w-full h-1 rounded-full" style={{ background: club.primaryColor }}></div>
+                    <div className="w-full h-1 rounded-full" style={{ background: club.secondaryColor }}></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <AnimatePresence>
+            {showFForm && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-md">
+                <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="w-full max-w-lg bg-[#0f172a] border border-white/10 rounded-3xl p-8 shadow-2xl relative">
+                  <button onClick={() => setShowFForm(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors">
+                    <X size={24} />
+                  </button>
+                  <h2 className="text-2xl font-black mb-8 uppercase tracking-tight">Create Franchise Club</h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Logo Upload</label>
+                        <label className="block w-full h-32 bg-white/5 border border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-amber-500/50 transition-all overflow-hidden relative group">
+                          {fLogoFile ? (
+                            <img src={fLogoFile} className="w-full h-full object-contain p-4" alt="Logo" />
+                          ) : (
+                            <>
+                              <Upload className="text-slate-500 group-hover:text-amber-500 transition-colors" />
+                              <span className="text-[10px] font-black text-slate-500 mt-2 uppercase">PNG/JPG</span>
+                            </>
+                          )}
+                          <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Club Name</label>
+                        <input value={fFormExtended.name} onChange={e => setFFormExtended({...fFormExtended, name: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-bold text-white outline-none focus:border-amber-500 uppercase" placeholder="e.g. Real Madrid" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Short Code (3)</label>
+                        <input value={fFormExtended.shortName} maxLength={3} onChange={e => setFFormExtended({...fFormExtended, shortName: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-bold text-white outline-none focus:border-amber-500 uppercase" placeholder="RMA" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Primary Color</label>
+                      <input type="color" value={fFormExtended.primaryColor} onChange={e => setFFormExtended({...fFormExtended, primaryColor: e.target.value})} className="w-full h-12 bg-white/5 border border-white/10 rounded-xl cursor-pointer" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Secondary Color</label>
+                      <input type="color" value={fFormExtended.secondaryColor} onChange={e => setFFormExtended({...fFormExtended, secondaryColor: e.target.value})} className="w-full h-12 bg-white/5 border border-white/10 rounded-xl cursor-pointer" />
+                    </div>
+                  </div>
+
+                  <button onClick={handleCreateRegistryClub} disabled={loading} className="w-full py-5 bg-amber-500 text-black font-black rounded-2xl shadow-lg shadow-amber-500/20 uppercase tracking-widest transition-all">
+                    {loading ? 'CREATING...' : 'CONFIRM REGISTRATION'}
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
       {subTab === 'tournaments' && (
         <div className="space-y-6">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-            <h3 className="text-xl font-black tracking-tight mb-1">CREATE CLUB TOURNAMENT</h3>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-5">
-              Season: <span className="text-amber-400">{config.season}</span>
-            </p>
-            <div className="flex gap-4">
-              <input value={tFormName} onChange={e => setTFormName(e.target.value)} placeholder="e.g. VORTEX WINTER CUP"
-                className="flex-1 bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none uppercase" />
-              <button onClick={handleAddTournament} disabled={matchBusy || !tFormName}
-                className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl disabled:opacity-50 transition-all uppercase">
-                {matchBusy ? 'CREATING...' : 'CREATE'}
-              </button>
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-black tracking-tight mb-1">TOURNAMENTS</h3>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                Active in <span className="text-amber-400 font-black">{selectedSeason?.label || config.season}</span>
+              </p>
             </div>
-            {matchMsg.text && <p className={cn('text-[10px] font-bold mt-3', matchMsg.ok ? 'text-emerald-400' : 'text-red-400')}>{matchMsg.text}</p>}
+            <button onClick={() => setShowTSetup(true)} className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl shadow-lg shadow-amber-500/20 transition-all uppercase">
+              CREATE NEW TOURNAMENT
+            </button>
           </div>
           
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-            <h3 className="text-xl font-black tracking-tight mb-6">ACTIVE TOURNAMENTS ({tournaments.length})</h3>
+            <h3 className="text-xl font-black tracking-tight mb-6 uppercase">Active Tournaments ({tournaments.length})</h3>
             {!tLoaded ? <p className="text-slate-500 text-xs font-bold animate-pulse">Loading...</p> : tournaments.length === 0 ? <p className="text-slate-500 text-xs font-bold">No club tournaments created for this season.</p> : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tournaments.map(t => (
-                  <div key={t.id} className="bg-[#0f172a] rounded-xl border border-white/10 p-4 flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <p className="font-black text-sm text-white uppercase">{t.name}</p>
-                          <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded",
+                  <div key={t.id} className="group bg-[#0f172a] rounded-2xl border border-white/10 p-6 flex flex-col gap-4 relative overflow-hidden">
+                    <div className="relative z-10">
+                      <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">{t.type.replace('_',' ')}</p>
+                      <h4 className="font-black text-lg text-white uppercase mb-2">{t.name}</h4>
+                      <div className="flex items-center gap-3 mb-4">
+                         <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded",
                             t.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
                             t.status === 'paused' ? 'bg-amber-500/20 text-amber-400' :
                             t.status === 'postponed' ? 'bg-red-500/20 text-red-400' :
@@ -2095,38 +2512,85 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                           )}>
                             {t.status}
                           </span>
-                        </div>
-                        <p className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">{new Date(t.createdAt).toLocaleDateString()}</p>
-                        {t.statusReason && <p className="text-[10px] font-bold text-slate-400 mt-1 italic">"{t.statusReason}"</p>}
+                          <span className="text-[10px] text-slate-500 font-bold">{t.participatingClubIds?.length || 0} CLUBS</span>
                       </div>
-                      <div className="flex gap-2 shrink-0">
+                      <div className="flex gap-2">
                         <button onClick={() => {
-                          if (editingTId === t.id) setEditingTId(null);
-                          else { setEditingTId(t.id); setTStatusForm({ status: t.status || 'active', reason: t.statusReason || '' }); }
-                        }} className="px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl transition-all text-[10px] font-black uppercase">
-                          {editingTId === t.id ? 'CANCEL' : 'EDIT'}
-                        </button>
-                        <button onClick={() => handleDelTournament(t.id)} disabled={matchBusy} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all disabled:opacity-50"><Trash2 size={14} /></button>
+                          setEditingTId(t.id); 
+                          setTStatusForm({ status: t.status || 'active', reason: t.statusReason || '' });
+                        }} className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl text-[10px] font-black uppercase transition-all">EDIT STATUS</button>
+                        <button onClick={() => handleDelTournament(t.id)} className="px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all"><Trash2 size={16} /></button>
                       </div>
                     </div>
-                    {editingTId === t.id && (
-                      <div className="pt-3 border-t border-white/5 flex flex-wrap gap-3">
-                        <select value={tStatusForm.status} onChange={e => setTStatusForm({...tStatusForm, status: e.target.value})} className="bg-black/50 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none">
-                          <option value="active">ACTIVE</option>
-                          <option value="paused">PAUSED</option>
-                          <option value="postponed">POSTPONED</option>
-                          <option value="completed">COMPLETED</option>
-                        </select>
-                        <input value={tStatusForm.reason} onChange={e => setTStatusForm({...tStatusForm, reason: e.target.value})} placeholder="Reason (optional)..."
-                          className="flex-1 bg-black/50 border border-white/10 p-2 rounded text-xs font-bold focus:border-amber-500 outline-none" />
-                        <button onClick={() => handleUpdateTournamentStatus(t.id)} disabled={matchBusy} className="px-4 py-2 bg-amber-500 text-black text-[10px] font-black rounded uppercase">Save</button>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          <AnimatePresence>
+            {showTSetup && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl overflow-y-auto">
+                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-2xl bg-[#0f172a] border border-white/10 rounded-3xl p-8 shadow-2xl my-auto">
+                  <h2 className="text-3xl font-black mb-6 uppercase">NEW TOURNAMENT SETUP</h2>
+                  
+                  <div className="space-y-6">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tournament Name</label>
+                      <input value={tSetupForm.name} onChange={e => setTSetupForm({...tSetupForm, name: e.target.value})} className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl text-lg font-black focus:border-amber-500 outline-none transition-all uppercase" placeholder="e.g. CHAMPIONS LEAGUE" />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tournament Type</label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {(['league','knockout','group_knockout'] as const).map(type => (
+                          <button key={type} onClick={() => setTSetupForm({...tSetupForm, type})} className={cn('p-4 rounded-xl border font-black text-[10px] uppercase transition-all',
+                            tSetupForm.type === type ? 'bg-amber-500 border-amber-500 text-black' : 'bg-white/5 border-white/10 text-slate-400 hover:border-white/20'
+                          )}>
+                            {type.replace('_',' ')}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center justify-between">
+                        SELECT PARTICIPATING CLUBS
+                        <span className="text-amber-500">{tSetupForm.participatingClubIds.length} SELECTED</span>
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto p-2 bg-black/20 rounded-2xl custom-scrollbar">
+                        {clubs.map(c => {
+                          const isSel = tSetupForm.participatingClubIds.includes(c.id);
+                          return (
+                            <button key={c.id} onClick={() => {
+                              const news = isSel ? tSetupForm.participatingClubIds.filter(id => id !== c.id) : [...tSetupForm.participatingClubIds, c.id];
+                              setTSetupForm({...tSetupForm, participatingClubIds: news});
+                            }} className={cn('p-3 rounded-xl border flex items-center gap-3 transition-all text-left group',
+                              isSel ? 'bg-white/10 border-amber-500/50' : 'bg-white/5 border-white/10 hover:border-white/20'
+                            )}>
+                              <div className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center font-black text-[10px] text-white shadow-md" style={{ background: `linear-gradient(135deg, ${c.primaryColor}, ${c.secondaryColor})` }}>
+                                {c.shortName}
+                              </div>
+                              <span className={cn('text-[10px] font-black uppercase truncate flex-1', isSel ? 'text-amber-400' : 'text-slate-400 group-hover:text-white')}>
+                                {c.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="pt-6 flex gap-4">
+                      <button onClick={() => setShowTSetup(false)} className="flex-1 py-5 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black tracking-widest uppercase transition-all">CANCEL</button>
+                      <button onClick={handleAddTournament} disabled={matchBusy || !tSetupForm.name || tSetupForm.participatingClubIds.length < 2} className="flex-1 py-5 bg-amber-500 hover:bg-amber-400 text-black rounded-2xl text-[10px] font-black tracking-widest uppercase shadow-xl shadow-amber-500/20 disabled:opacity-50 transition-all">
+                        {matchBusy ? 'CREATING...' : 'CREATE TOURNAMENT'}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
@@ -2136,9 +2600,9 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
             <h3 className="text-xl font-black tracking-tight mb-1">SCHEDULE CLUB FIXTURE</h3>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-5">
-              Season: <span className="text-amber-400">{config.season}</span>
+              Season: <span className="text-amber-400">{selectedSeason?.label || config.season}</span>
             </p>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div className="space-y-1">
                 <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Tournament</label>
                 <select value={fForm.tournamentId} onChange={e => setFForm({...fForm, tournamentId: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none">
@@ -2162,84 +2626,151 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Matchup Logic</label>
-                  <select value={fForm.matchupType} onChange={e => setFForm({...fForm, matchupType: e.target.value as 'home_away'|'random'})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none">
-                    <option value="home_away" className="text-black">Home Advantage (Manual)</option>
-                    <option value="random" className="text-black">Neutral (Random)</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Lineup Size</label>
-                  <input type="number" min="1" value={fForm.lineupSize} onChange={e => setFForm({...fForm, lineupSize: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Sub Limit</label>
-                  <input type="number" min="0" value={fForm.subLimit} onChange={e => setFForm({...fForm, subLimit: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
-                </div>
-              </div>
-              <button onClick={handleAddFixture} disabled={matchBusy || !fForm.tournamentId || !fForm.homeClubId || !fForm.awayClubId}
-                className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl disabled:opacity-50 transition-all uppercase mt-2">
-                {matchBusy ? 'SCHEDULING...' : 'SCHEDULE FIXTURE'}
-              </button>
-              {matchMsg.text && <p className={cn('text-[10px] font-bold mt-3 text-center', matchMsg.ok ? 'text-emerald-400' : 'text-red-400')}>{matchMsg.text}</p>}
             </div>
+            {/* Additional scheduling options */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+               <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Matchday #</label>
+                  <input type="number" value={fForm.matchday} onChange={e => setFForm({...fForm, matchday: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Deadline Date</label>
+                  <input type="date" value={fForm.deadlineDate} onChange={e => setFForm({...fForm, deadlineDate: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Fixed Time</label>
+                  <input value="11:59 PM" disabled className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-slate-500 outline-none cursor-not-allowed" title="Deadline time is fixed to 11:59 PM" />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Extension (Hours)</label>
+                  <input type="number" value={fForm.extension} onChange={e => setFForm({...fForm, extension: e.target.value})} placeholder="0" className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
+               </div>
+            </div>
+
+            <button onClick={handleAddFixture} disabled={matchBusy || !fForm.tournamentId || !fForm.homeClubId || !fForm.awayClubId}
+              className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl disabled:opacity-50 transition-all uppercase mt-2 shadow-lg shadow-amber-500/20">
+              {matchBusy ? 'SCHEDULING...' : 'SCHEDULE FIXTURE'}
+            </button>
+            {matchMsg.text && <p className={cn('text-[10px] font-bold mt-3 text-center', matchMsg.ok ? 'text-emerald-400' : 'text-red-400')}>{matchMsg.text}</p>}
           </div>
           
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-            <h3 className="text-xl font-black tracking-tight mb-6">SCHEDULED FIXTURES ({fixtures.length})</h3>
+            <h3 className="text-xl font-black tracking-tight mb-6 uppercase">Scheduled Fixtures ({fixtures.length})</h3>
             {!fLoaded ? <p className="text-slate-500 text-xs font-bold animate-pulse">Loading...</p> : fixtures.length === 0 ? <p className="text-slate-500 text-xs font-bold">No fixtures scheduled.</p> : (
               <div className="space-y-3">
                 {fixtures.map(f => (
-                  <div key={f.id} className="bg-[#0f172a] rounded-xl border border-white/10 p-4 flex flex-col gap-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                      <div className="flex-1 min-w-0">
+                  <div key={f.id} className="bg-[#0f172a] rounded-2xl border border-white/10 p-6 flex flex-col gap-6 group hover:border-white/20 transition-all">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
                         <p className="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-1">{f.tournamentName}</p>
-                        <div className="flex items-center gap-3 text-sm font-black text-white">
+                        <div className="flex items-center gap-4 text-xl font-black text-white">
                           <span className="truncate">{f.homeClubName}</span>
-                          <span className="text-slate-500 text-[10px] px-2 py-0.5 bg-white/5 rounded">VS</span>
+                          <span className="text-slate-600 text-[10px] px-3 py-1 bg-white/5 rounded-full border border-white/10 font-black">VS</span>
                           <span className="truncate">{f.awayClubName}</span>
                         </div>
-                        <p className="text-[9px] text-slate-500 mt-2 uppercase tracking-widest">
-                          {f.matchupType === 'home_away' ? 'HOME ADVANTAGE' : 'RANDOM'} &bull; {f.lineupSize}v{f.lineupSize} &bull; {f.subLimit} SUBS &bull; 
-                          <span className={cn('ml-2', f.status === 'scheduled' ? 'text-amber-400' : f.status === 'completed' ? 'text-emerald-400' : 'text-blue-400')}>
+                        <div className="flex items-center gap-2 mt-3 overflow-x-auto no-scrollbar">
+                           <span className={cn('text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-tighter', f.status === 'scheduled' ? 'bg-amber-500/10 text-amber-500' : f.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500')}>
                             {f.status.replace('_', ' ')}
                           </span>
-                        </p>
+                          <span className="text-[9px] text-slate-500 font-bold uppercase whitespace-nowrap bg-white/5 px-2 py-0.5 rounded">
+                            {f.lineupSize}v{f.lineupSize} {f.matchupType.replace('_',' ')}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-bold uppercase whitespace-nowrap bg-white/5 px-2 py-0.5 rounded">
+                            DEADLINE: TODAY 11:59 PM
+                          </span>
+                        </div>
                       </div>
-                      <button onClick={() => handleDelFixture(f.id)} disabled={matchBusy} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all disabled:opacity-50 h-fit"><Trash2 size={14} /></button>
+                      <div className="flex items-center gap-2">
+                         <button onClick={() => {
+                           setEditingFixtureId(f.id);
+                           const d = f.deadline ? new Date(f.deadline) : new Date();
+                           setFEditForm({ 
+                             deadlineDate: d.toISOString().split('T')[0], 
+                             extension: '0',
+                             matchday: String(f.matchday || 1)
+                           });
+                         }} className="p-3 bg-white/5 hover:bg-white/10 text-slate-400 rounded-xl transition-all border border-white/10"><Pencil size={16} /></button>
+                         <button onClick={() => handleDelFixture(f.id)} disabled={matchBusy} className="p-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all disabled:opacity-50 h-fit border border-red-500/10"><Trash2 size={16} /></button>
+                      </div>
                     </div>
 
-                    {/* Sub-Matches */}
-                    {(f.status === 'active' || f.status === 'completed') && (
-                      <div className="pt-3 border-t border-white/5 space-y-2">
-                        <p className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Matchups</p>
-                        {f.subMatches.map((sm, i) => (
-                          <div key={sm.id} className="flex items-center justify-between gap-2 p-2 bg-white/5 rounded-lg">
-                            <span className="text-[10px] font-bold text-white flex-1 truncate text-right">{sm.p1Name}</span>
-                            
-                            {sm.p1Score !== null && sm.p2Score !== null ? (
-                              <div className="flex items-center gap-2 px-2">
-                                <span className="text-xs font-black text-amber-400 w-4 text-center">{sm.p1Score}</span>
-                                <span className="text-[8px] text-slate-500">-</span>
-                                <span className="text-xs font-black text-amber-400 w-4 text-center">{sm.p2Score}</span>
-                              </div>
-                            ) : scoringSubMatch?.subMatchId === sm.id ? (
-                              <div className="flex items-center gap-1">
-                                <input type="number" min="0" value={smScores.s1} onChange={e => setSmScores({...smScores, s1: e.target.value})} className="w-8 p-1 bg-black text-white text-xs font-black text-center rounded border border-white/10 outline-none focus:border-amber-500" />
-                                <span className="text-[8px] text-slate-500">-</span>
-                                <input type="number" min="0" value={smScores.s2} onChange={e => setSmScores({...smScores, s2: e.target.value})} className="w-8 p-1 bg-black text-white text-xs font-black text-center rounded border border-white/10 outline-none focus:border-amber-500" />
-                                <button onClick={() => handleScoreSubMatch(f, sm)} disabled={matchBusy} className="ml-2 px-2 py-1 bg-amber-500 text-black text-[9px] font-black rounded uppercase">Save</button>
-                                <button onClick={() => setScoringSubMatch(null)} className="px-2 py-1 bg-white/10 text-slate-400 hover:text-white text-[9px] font-black rounded uppercase">Cancel</button>
-                              </div>
-                            ) : (
-                              <button onClick={() => setScoringSubMatch({ fixtureId: f.id, subMatchId: sm.id })} className="px-3 py-1 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-[9px] font-black rounded uppercase">Record</button>
-                            )}
-                            
-                            <span className="text-[10px] font-bold text-white flex-1 truncate">{sm.p2Name}</span>
+                    {editingFixtureId === f.id && (
+                      <div className="p-6 bg-amber-500/5 border border-amber-500/20 rounded-2xl space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase">Matchday #</label>
+                            <input type="number" value={fEditForm.matchday} onChange={e => setFEditForm({...fEditForm, matchday: e.target.value})} className="w-full bg-black/20 border border-white/10 p-3 rounded-lg text-xs font-bold text-white outline-none focus:border-amber-500" />
                           </div>
-                        ))}
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase">Deadline Date</label>
+                            <input type="date" value={fEditForm.deadlineDate} onChange={e => setFEditForm({...fEditForm, deadlineDate: e.target.value})} className="w-full bg-black/20 border border-white/10 p-3 rounded-lg text-xs font-bold text-white outline-none focus:border-amber-500" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase">Ext (Hrs)</label>
+                            <input type="number" value={fEditForm.extension} onChange={e => setFEditForm({...fEditForm, extension: e.target.value})} className="w-full bg-black/20 border border-white/10 p-3 rounded-lg text-xs font-bold text-white outline-none focus:border-amber-500" />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                           <button onClick={() => handleUpdateFixture(f)} className="flex-1 py-3 bg-amber-500 text-black font-black text-[10px] rounded-xl hover:bg-amber-400 transition-all uppercase">SAVE CHANGES</button>
+                           <button onClick={() => setEditingFixtureId(null)} className="px-6 py-3 bg-white/5 text-slate-400 font-black text-[10px] rounded-xl hover:bg-white/10 transition-all uppercase">CANCEL</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sub-Matches */}
+                    {(f.status === 'active' || f.status === 'completed' || f.status === 'scheduled') && (
+                      <div className="pt-5 border-t border-white/5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black tracking-widest text-slate-500 uppercase">INDIVIDUAL MATCHUPS</p>
+                          <span className="text-[9px] font-bold text-slate-600 italic">Scores trigger global rankings</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {f.subMatches.length === 0 ? (
+                            <p className="text-[10px] text-slate-600 font-bold col-span-full py-4 text-center border border-dashed border-white/5 rounded-2xl">Lineups and matchups pending...</p>
+                          ) : f.subMatches.map((sm, i) => (
+                            <div key={sm.id} className="flex items-center justify-between gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 hover:border-white/20 transition-all">
+                              <div className="flex-1 min-w-0 text-right">
+                                <span className="text-xs font-black text-white truncate block">{sm.p1Name}</span>
+                                <span className="text-[8px] text-slate-500 font-bold">HOME</span>
+                              </div>
+                              
+                              <div className="flex items-center gap-3">
+                                {scoringSubMatch?.subMatchId === sm.id ? (
+                                  <div className="flex items-center gap-2 bg-black/40 p-1 rounded-xl border border-amber-500/30">
+                                    <input type="number" min="0" value={smScores.s1} onChange={e => setSmScores({...smScores, s1: e.target.value})} className="w-10 h-10 bg-white/5 text-white text-sm font-black text-center rounded-lg border border-white/10 outline-none focus:border-amber-500" />
+                                    <span className="text-xs font-black text-slate-500">–</span>
+                                    <input type="number" min="0" value={smScores.s2} onChange={e => setSmScores({...smScores, s2: e.target.value})} className="w-10 h-10 bg-white/5 text-white text-sm font-black text-center rounded-lg border border-white/10 outline-none focus:border-amber-500" />
+                                    <button onClick={() => handleScoreSubMatch(f, sm)} disabled={matchBusy} className="p-2 bg-amber-500 text-black text-[10px] font-black rounded-lg hover:bg-amber-400 transition-all"><Check size={16} /></button>
+                                    <button onClick={() => setScoringSubMatch(null)} className="p-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all"><X size={16} /></button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-3">
+                                      <span className={cn('text-2xl font-black w-8 text-center', sm.p1Score !== null ? 'text-amber-400' : 'text-slate-700')}>
+                                        {sm.p1Score ?? 0}
+                                      </span>
+                                      <span className="text-xs font-black text-slate-700">:</span>
+                                      <span className={cn('text-2xl font-black w-8 text-center', sm.p2Score !== null ? 'text-amber-400' : 'text-slate-700')}>
+                                        {sm.p2Score ?? 0}
+                                      </span>
+                                    </div>
+                                    <button onClick={() => {
+                                      setScoringSubMatch({ fixtureId: f.id, subMatchId: sm.id });
+                                      setSmScores({ s1: String(sm.p1Score ?? 0), s2: String(sm.p2Score ?? 0) });
+                                    }} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-slate-400 hover:text-amber-400 transition-all group">
+                                      <Pencil size={14} className="group-hover:scale-110 transition-transform" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0 text-left">
+                                <span className="text-xs font-black text-white truncate block">{sm.p2Name}</span>
+                                <span className="text-[8px] text-slate-500 font-bold uppercase">Away</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2381,59 +2912,73 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
         </div>
       )}
 
-
       {/* ── SEASONS subtab ── */}
       {subTab === 'seasons' && (
-        <div className="space-y-8">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-xl">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400"><Calendar size={20} /></div>
-              <div>
-                <h3 className="text-lg font-black text-white uppercase tracking-tight">Internal Club Seasons</h3>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Global Season: {globalSeason}</p>
-              </div>
+        <div className="space-y-6">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-black tracking-tight mb-1">ALL SEASONS</h3>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Switch between active and completed seasons</p>
             </div>
-
-            {/* Season history */}
-            <div className="space-y-3 mb-6">
-              {clubSeasons.length === 0 && <p className="text-slate-600 text-sm font-bold text-center py-4">No internal seasons started yet for {globalSeason}.</p>}
-              {clubSeasons.map(s => (
-                <div key={s.id} className={`flex items-center justify-between p-4 rounded-2xl border ${s.status === 'active' ? 'bg-emerald-500/5 border-emerald-500/20' : s.status === 'completed' ? 'bg-white/3 border-white/5' : 'bg-white/3 border-white/5'}`}>
-                  <div>
-                    <p className="font-black text-white text-sm">{s.label} <span className="text-[10px] font-bold text-slate-500 ml-2">{globalSeason}</span></p>
-                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">{s.status === 'active' ? `Started ${new Date(s.startedAt!).toLocaleDateString()}` : s.status === 'completed' ? `Ended ${new Date(s.endedAt!).toLocaleDateString()}` : 'Upcoming'}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${s.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : s.status === 'completed' ? 'bg-white/10 text-slate-500' : 'bg-white/5 text-slate-600'}`}>{s.status}</span>
-                    {s.status === 'active' && (
-                      <button onClick={async () => {
-                        if (!window.confirm('End this season? Final standings will be saved.')) return;
-                        await endClubSeason(s.id, {});
-                        await fetchClubSeasons(globalSeason).then(setClubSeasons);
-                        setSeasonMsg('Season ended and standings saved.');
-                      }} className="px-3 py-1 bg-red-500/10 text-red-400 rounded-full text-[9px] font-black uppercase hover:bg-red-500/20 transition-all">End Season</button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button onClick={async () => {
-              const activeSeason = clubSeasons.find(s => s.status === 'active');
-              if (activeSeason) { setSeasonMsg('An active season already exists. End it first.'); return; }
-              const nextNum = clubSeasons.length + 1;
-              if (!window.confirm(`Start Season ${nextNum} under ${globalSeason}?`)) return;
-              await startClubSeason(globalSeason, nextNum);
-              await fetchClubSeasons(globalSeason).then(setClubSeasons);
-              // Broadcast to all club owners
-              const ownerIds = clubs.map(c => c.ownerId).filter(Boolean);
-              await broadcastToAllOwners(ownerIds, { type: 'system', from: null, message: `📅 Season ${nextNum} of ${globalSeason} has started! Good luck to all clubs.` });
-              setSeasonMsg(`Season ${nextNum} started!`);
-            }} className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
-              + Start New Season
+            <button onClick={() => setShowNewSeasonForm(true)} className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl transition-all uppercase">
+              NEW SEASON
             </button>
-            {seasonMsg && <p className="text-center text-xs font-bold text-emerald-400 mt-3">{seasonMsg}</p>}
           </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {hSeasons.map(s => (
+              <button key={s.id} onClick={() => handleGoToSeason(s)} className={cn("p-6 rounded-2xl border transition-all text-left group", 
+                selectedSeason?.id === s.id ? "bg-amber-500/10 border-amber-500" : "bg-white/5 border-white/10 hover:border-white/20"
+              )}>
+                <div className="flex justify-between items-start mb-4">
+                  <span className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest", 
+                    s.status === 'active' ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-500/20 text-slate-400"
+                  )}>
+                    {s.status}
+                  </span>
+                  {selectedSeason?.id === s.id && <span className="text-amber-500 text-[10px] font-black uppercase tracking-widest">Active Now</span>}
+                </div>
+                <h4 className="text-xl font-black text-white group-hover:text-amber-400 transition-colors uppercase">{s.label}</h4>
+                <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">{s.globalSeason} &bull; {s.length || 0} DAYS</p>
+              </button>
+            ))}
+          </div>
+
+          <AnimatePresence>
+            {showNewSeasonForm && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-md">
+                <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="w-full max-w-md bg-[#0f172a] border border-white/10 rounded-3xl p-8 shadow-2xl">
+                  <h2 className="text-2xl font-black mb-6">START NEW SEASON</h2>
+                  <form onSubmit={handleStartNewSeason} className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Season Filter</label>
+                      <input value={newSeasonForm.globalSeason} onChange={e => setNewSeasonForm({...newSeasonForm, globalSeason: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-bold text-white outline-none focus:border-amber-500" placeholder="e.g. 2026/2027" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Season Number</label>
+                      <input type="number" value={newSeasonForm.seasonNumber} onChange={e => setNewSeasonForm({...newSeasonForm, seasonNumber: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-bold text-white outline-none focus:border-amber-500" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Length (Days)</label>
+                        <input type="number" value={newSeasonForm.length} onChange={e => setNewSeasonForm({...newSeasonForm, length: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-bold text-white outline-none focus:border-amber-500" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Xfer Windows</label>
+                        <input type="number" value={newSeasonForm.transferWindows} onChange={e => setNewSeasonForm({...newSeasonForm, transferWindows: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-sm font-bold text-white outline-none focus:border-amber-500" />
+                      </div>
+                    </div>
+                    <div className="pt-4 flex gap-3">
+                      <button type="button" onClick={() => setShowNewSeasonForm(false)} className="flex-1 py-4 bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest">CANCEL</button>
+                      <button type="submit" disabled={loading} className="flex-1 py-4 bg-amber-500 text-black rounded-xl text-[10px] font-black shadow-lg shadow-amber-500/20 uppercase tracking-widest">
+                        {loading ? 'STARTING...' : 'CONFIRM'}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
@@ -2695,22 +3240,55 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
       {/* ── HISTORY subtab ── */}
       {subTab === 'history' && (
         <div className="space-y-6">
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-2 flex-1">
-              {hSeasons.map(s => (
-                <button key={s.id} onClick={() => setHSelectedSeasonId(s.id)} 
-                  className={cn("px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap", 
-                    hSelectedSeasonId === s.id ? "bg-brand-purple text-white shadow-lg shadow-brand-purple/25" : "bg-white/5 text-slate-500 hover:text-white"
-                  )}>
-                  {s.id.replace('__', ' ')}
-                </button>
-              ))}
+          <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-10 backdrop-blur-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-8 pb-8 border-b border-white/5">
+              <div>
+                <h3 className="text-3xl font-black tracking-tighter uppercase italic mb-2">CLUB HISTORY</h3>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">
+                  Historical match records under <span className="text-white">{gSeasons.find(g => g.id === selectedGlobalId)?.name || 'Archive'}</span>
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="space-y-1 w-full sm:w-auto">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Global Year</label>
+                  <div className="flex gap-1.5 p-1 bg-black/40 rounded-xl border border-white/5">
+                    {gSeasons.map(g => (
+                      <button key={g.id} onClick={() => setSelectedGlobalId(g.id)}
+                        className={cn('px-4 py-2 rounded-lg text-[10px] font-black transition-all whitespace-nowrap',
+                          selectedGlobalId === g.id ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-white'
+                        )}
+                      >
+                        {g.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {hSelectedSeasonId && (
+                  <button onClick={handleDeleteSeason} className="w-full sm:w-auto px-6 py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-[9px] font-black uppercase hover:bg-red-500/20 transition-all flex items-center justify-center gap-2">
+                    <Trash2 size={14} /> DELETE RECORD
+                  </button>
+                )}
+              </div>
             </div>
-            {hSelectedSeasonId && (
-              <button onClick={handleDeleteSeason} className="px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl text-[9px] font-black tracking-widest transition-all uppercase whitespace-nowrap">
-                🗑️ DELETE SEASON
-              </button>
-            )}
+
+            <div className="space-y-6">
+              <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] mb-4">SELECT MINI SEASON</p>
+              <div className="flex flex-wrap gap-2">
+                {hSeasons.filter(s => s.globalSeason === gSeasons.find(g => g.id === selectedGlobalId)?.name).map(s => (
+                  <button key={s.id} onClick={() => setHSelectedSeasonId(s.id)} 
+                    className={cn("px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all uppercase border", 
+                      hSelectedSeasonId === s.id ? "bg-amber-500 border-amber-500 text-black shadow-xl shadow-amber-500/20" : "bg-white/5 border-white/10 text-slate-500 hover:text-white"
+                    )}>
+                    {s.label}
+                  </button>
+                ))}
+                {hSeasons.filter(s => s.globalSeason === gSeasons.find(g => g.id === selectedGlobalId)?.name).length === 0 && (
+                  <div className="w-full py-12 text-center border-2 border-dashed border-white/5 rounded-[2rem]">
+                    <p className="text-xs text-slate-600 font-black uppercase tracking-widest">No seasons recorded for this global cycle</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">

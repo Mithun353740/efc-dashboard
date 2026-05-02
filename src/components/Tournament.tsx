@@ -36,7 +36,7 @@ export default function Tournament() {
           let hasPlayed = false;
           
           if (player.tournamentStats) {
-            Object.entries(player.tournamentStats).forEach(([key, stats]) => {
+            Object.entries(player.tournamentStats).forEach(([key, stats]: [string, any]) => {
               if (key.includes(`__${selectedTournament}`)) {
                 tWin += stats.win;
                 tLoss += stats.loss;
