@@ -373,143 +373,16 @@ export async function updatePlayerProfile(
 }
 
 
-// Real-time listeners
-export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 100) {
-  const path = 'players';
-  let isUnsubscribed = false;
-  let lastFetchTime = 0;
-  const COOLDOWN = 5000; // 5 second quota protection cooldown
-  
-  const fetch = async (isManual = false) => {
-    if (isUnsubscribed) return;
-    
-    // Quota Shield: Prevent rapid-fire re-fetches
-    const now = Date.now();
-    if (!isManual && (now - lastFetchTime < COOLDOWN)) {
-      console.log('[Store] Fetch throttled to save quota...');
-      return;
-    }
-    lastFetchTime = now;
-    try {
-      const q = query(collection(db, path), orderBy('ovr', 'desc'), limit(limitCount));
-      const snapshot = await getDocs(q);
-      let players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
-      
-      // Fallback 1: If no players found with 'ovr' sort, try a basic fetch with limit
-      if (players.length === 0) {
-        console.warn('[Store] Sorted fetch returned 0. Trying fallback basic fetch...');
-        const qFallback = query(collection(db, path), limit(limitCount));
-        const snapFallback = await getDocs(qFallback);
-        players = snapFallback.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
-      }
-
-      // Fallback 2: If STILL nothing, try a completely raw fetch (no limit, no filters)
-      if (players.length === 0) {
-        console.warn('[Store] Critical fallback: Trying raw collection fetch...');
-        const qRaw = collection(db, path);
-        const snapRaw = await getDocs(qRaw);
-        players = snapRaw.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
-      }
-      
-      callback(players, false);
-    } catch (error) {
-      console.warn('[Store] Query failed. Trying raw fallback...', error);
-      try {
-        const snapRaw = await getDocs(collection(db, path));
-        const players = snapRaw.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
-        callback(players, false);
-      } catch (err2) {
-        handleFirestoreError(error, OperationType.GET, path);
-      }
-    }
-  };
-
-  fetch(true);
-  const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
-
-  return () => {
-    isUnsubscribed = true;
-    unsubMeta();
-  };
-}
-
-export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boolean) => void) {
-  const path = 'leaders';
-  let isUnsubscribed = false;
-
-  let lastFetchTime = 0;
-  const COOLDOWN = 5000;
-  
-  const fetch = async (isManual = false) => {
-    if (isUnsubscribed) return;
-    const now = Date.now();
-    if (!isManual && (now - lastFetchTime < COOLDOWN)) return;
-    lastFetchTime = now;
-    try {
-      const q = query(collection(db, path), limit(50));
-      const snapshot = await getDocs(q);
-      const leaders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
-      callback(leaders, false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.GET, path);
-    }
-  };
-
-  fetch(true);
-  const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
-
-  return () => {
-    isUnsubscribed = true;
-    unsubMeta();
-  };
-}
-
-/**
- * Real-time match listener.
- * The listener is used ONLY for the admin match history view.
- * Public users never subscribe to matches — they read pre-computed stats
- * from the Player documents instead. Limit keeps the listener cheap.
- */
-export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending: boolean) => void) {
-  const path = 'matches';
-  let isUnsubscribed = false;
-
-  let lastFetchTime = 0;
-  const COOLDOWN = 5000;
-
-  const fetch = async (isManual = false) => {
-    if (isUnsubscribed) return;
-    const now = Date.now();
-    if (!isManual && (now - lastFetchTime < COOLDOWN)) return;
-    lastFetchTime = now;
-    try {
-      const q = query(collection(db, path), orderBy('timestamp', 'desc'), limit(200));
-      const snapshot = await getDocs(q);
-      const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
-      callback(matches, false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.GET, path);
-    }
-  };
-
-  fetch(true);
-  const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
-
-  return () => {
-    isUnsubscribed = true;
-    unsubMeta();
-  };
-}
-
 /**
  * Fetches ALL matches for a specific player from Firestore.
  * Uses two queries (p1Id and p2Id) since Firestore doesn't support OR on different fields.
- * Called during stat computation — only the admin pays this cost on each write.
+ * Limited to 100 most recent for performance, but used specifically for 
+ * recomputing stats during admin writes.
  */
 async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]> {
   const [snap1, snap2] = await Promise.all([
-    getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId), orderBy('timestamp', 'desc'), limit(50))),
-    getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId), orderBy('timestamp', 'desc'), limit(50))),
+    getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId), orderBy('timestamp', 'desc'), limit(100))),
+    getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId), orderBy('timestamp', 'desc'), limit(100))),
   ]);
   const seen = new Set<string>();
   const results: MatchRecord[] = [];
@@ -522,35 +395,44 @@ async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]
   return results.sort((a, b) => a.timestamp - b.timestamp);
 }
 
+export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 100) {
+  const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
+  return onSnapshot(q, (snapshot) => {
+    const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+    callback(players, snapshot.metadata.hasPendingWrites);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, 'players');
+  });
+}
+
+export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boolean) => void) {
+  const q = query(collection(db, 'leaders'), orderBy('points', 'desc'), limit(50));
+  return onSnapshot(q, (snapshot) => {
+    const leaders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
+    callback(leaders, snapshot.metadata.hasPendingWrites);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, 'leaders');
+  });
+}
+
+export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending: boolean) => void) {
+  const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(200));
+  return onSnapshot(q, (snapshot) => {
+    const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
+    callback(matches, snapshot.metadata.hasPendingWrites);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, 'matches');
+  });
+}
+
 export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void, limitCount = 100) {
-  const path = 'tournaments';
-  let isUnsubscribed = false;
-
-  let lastFetchTime = 0;
-  const COOLDOWN = 5000;
-
-  const fetch = async (isManual = false) => {
-    if (isUnsubscribed) return;
-    const now = Date.now();
-    if (!isManual && (now - lastFetchTime < COOLDOWN)) return;
-    lastFetchTime = now;
-    try {
-      const q = query(collection(db, path), orderBy('createdAt', 'desc'), limit(limitCount));
-      const snapshot = await getDocs(q);
-      const tournaments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
-      callback(tournaments, false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.GET, path);
-    }
-  };
-
-  fetch(true);
-  const unsubMeta = onSnapshot(doc(db, CACHE_DOC_PATH), () => { fetch(); });
-
-  return () => {
-    isUnsubscribed = true;
-    unsubMeta();
-  };
+  const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(limitCount));
+  return onSnapshot(q, (snapshot) => {
+    const tournaments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
+    callback(tournaments, snapshot.metadata.hasPendingWrites);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, 'tournaments');
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -772,25 +654,29 @@ export async function addMatch(
     batch.set(doc(db, 'players', p2.id), updatedP2);
   }
 
-  // 5. Dynamic Manager Rating updates
   try {
-    const allClubsSnap = await getDocs(collection(db, 'clubs'));
-    const allClubs = allClubsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Club));
+    // 5. Dynamic Manager Rating updates - OPTIMIZED: only fetch relevant clubs
+    const p1ClubQuery = query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1.id));
+    const p1ClubSnap = await getDocs(p1ClubQuery);
     
-    const p1Club = allClubs.find(c => c.squadIds?.includes(p1.id));
-    const p2Club = p2 ? allClubs.find(c => c.squadIds?.includes(p2.id)) : undefined;
+    let p2ClubSnap: any = { docs: [] };
+    if (p2 && p2.id !== p1.id) {
+      const p2ClubQuery = query(collection(db, 'clubs'), where('squadIds', 'array-contains', p2.id));
+      p2ClubSnap = await getDocs(p2ClubQuery);
+    }
 
-    let p1Change = 0;
-    let p2Change = 0;
+    let p1Change = 0, p2Change = 0;
     if (p1Score > p2Score) { p1Change = 2; p2Change = -2; }
     else if (p2Score > p1Score) { p1Change = -2; p2Change = 2; }
-    else { p1Change = 1; p2Change = 1; } // Draw gives +1 for effort
+    else { p1Change = 1; p2Change = 1; }
 
-    if (p1Club) {
+    if (!p1ClubSnap.empty) {
+      const p1Club = { id: p1ClubSnap.docs[0].id, ...p1ClubSnap.docs[0].data() } as Club;
       const newRating = Math.max(0, Math.min(100, (p1Club.managerRating || 80) + p1Change));
       batch.update(doc(db, 'clubs', p1Club.id), { managerRating: newRating });
     }
-    if (p2Club) {
+    if (p2 && !p2ClubSnap.empty) {
+      const p2Club = { id: p2ClubSnap.docs[0].id, ...p2ClubSnap.docs[0].data() } as Club;
       const newRating = Math.max(0, Math.min(100, (p2Club.managerRating || 80) + p2Change));
       batch.update(doc(db, 'clubs', p2Club.id), { managerRating: newRating });
     }
@@ -1925,6 +1811,27 @@ export async function broadcastToAllOwners(ownerIds: string[], message: Omit<Clu
 /**
  * Calculates a player's form (A-E) based on their last 5 matches.
  */
+export async function fetchPlayerMatches(playerId: string, limitCount = 50): Promise<MatchRecord[]> {
+  try {
+    const [snap1, snap2] = await Promise.all([
+      getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId), orderBy('timestamp', 'desc'), limit(limitCount))),
+      getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId), orderBy('timestamp', 'desc'), limit(limitCount)))
+    ]);
+    const seen = new Set<string>();
+    const results: MatchRecord[] = [];
+    [...snap1.docs, ...snap2.docs].forEach(d => {
+      if (!seen.has(d.id)) {
+        seen.add(d.id);
+        results.push({ id: d.id, ...d.data() } as MatchRecord);
+      }
+    });
+    return results.sort((a, b) => b.timestamp - a.timestamp);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, `matches/player/${playerId}`);
+    return [];
+  }
+}
+
 export function calculatePlayerForm(matches: MatchRecord[], playerId: string): 'A' | 'B' | 'C' | 'D' | 'E' {
   const recent = matches
     .filter(m => m.p1Id === playerId || m.p2Id === playerId)
@@ -1944,6 +1851,27 @@ export function calculatePlayerForm(matches: MatchRecord[], playerId: string): '
     else if (myScore === oppScore) draws++;
   });
 
+  const winRate = wins / recent.length;
+  if (winRate >= 0.8) return 'A';
+  if (winRate >= 0.6) return 'B';
+  if (winRate >= 0.4 || draws >= 2) return 'C';
+  if (winRate >= 0.2) return 'D';
+  return 'E';
+}
+
+/**
+ * Converts a raw form array ['W', 'L', 'D'] into a letter grade A-E.
+ * Used for components that rely on pre-computed form stored in Player doc.
+ */
+export function getFormGrade(form: string[]): 'A' | 'B' | 'C' | 'D' | 'E' {
+  if (!form || form.length === 0) return 'C';
+  const recent = form.slice(0, 5);
+  let wins = 0;
+  let draws = 0;
+  recent.forEach(res => {
+    if (res === 'W') wins++;
+    else if (res === 'D') draws++;
+  });
   const winRate = wins / recent.length;
   if (winRate >= 0.8) return 'A';
   if (winRate >= 0.6) return 'B';

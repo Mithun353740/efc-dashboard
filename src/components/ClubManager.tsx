@@ -8,7 +8,7 @@ import {
   subscribeToInbox, markInboxRead, subscribeToAuction,
   addToShortlist, removeFromShortlist, sendTransferProposal,
   setReleaseClause, removeReleaseClause, triggerReleaseClause,
-  calculatePlayerForm, calculateBasePrize
+  calculatePlayerForm, calculateBasePrize, getFormGrade
 } from '../lib/store';
 import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture, AuctionState, ClubInboxMessage } from '../types';
 import { getPlayerGrade, GRADE_COLORS } from '../lib/utils';
@@ -50,8 +50,8 @@ function ovrColor(ovr: number) {
 
 // ─── FIFA Player Card ─────────────────────────────────────────────────────────
 
-function FifaCard({ player, club, size = 'md', matches = [] }: { player: Player; club?: Club; size?: 'sm' | 'md' | 'lg', matches?: MatchRecord[] }) {
-  const form = calculatePlayerForm(matches, player.id);
+function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; size?: 'sm' | 'md' | 'lg' }) {
+  const form = getFormGrade(player.form || []);
   const formColor = { 'A': '#4ade80', 'B': '#84cc16', 'C': '#eab308', 'D': '#f97316', 'E': '#ef4444' }[form];
   const dims = size === 'lg' ? 'w-36 h-48 md:w-44 md:h-60' : size === 'md' ? 'w-28 h-36 md:w-36 md:h-48' : 'w-24 h-32 md:w-28 md:h-36';
   const pri = club?.primaryColor || '#8b5cf6';
@@ -751,10 +751,10 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, match
                   <div className="absolute top-2 left-2 flex gap-1">
                     <div className="px-2 py-1 rounded-lg text-[10px] font-black" style={{ background: gradeColor, color: '#000' }}>{grade}</div>
                     <div className="px-2 py-1 rounded-lg text-[10px] font-black" style={{ 
-                      background: { 'A': '#4ade80', 'B': '#84cc16', 'C': '#eab308', 'D': '#f97316', 'E': '#ef4444' }[calculatePlayerForm(matches, p.id)], 
+                      background: { 'A': '#4ade80', 'B': '#84cc16', 'C': '#eab308', 'D': '#f97316', 'E': '#ef4444' }[getFormGrade(p.form || [])], 
                       color: '#000' 
                     }}>
-                      {calculatePlayerForm(matches, p.id)}
+                      {getFormGrade(p.form || [])}
                     </div>
                   </div>
                   <div className="absolute top-2 right-2 bg-black/60 rounded-lg px-2 py-1 text-[10px] font-black text-white">{p.ovr} OVR</div>
@@ -945,7 +945,7 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
               {listingPlayerId && (() => {
                 const p = players.find(x => x.id === listingPlayerId);
                 if (!p) return null;
-                const suggestion = calculateBasePrize(p.ovr, calculatePlayerForm(matches, p.id));
+                const suggestion = calculateBasePrize(p.ovr, getFormGrade(p.form || []));
                 return (
                   <button 
                     onClick={() => setListPrice(String(suggestion))}
@@ -971,7 +971,8 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
               const fromClub = clubs.find(c => c.id === l.fromClubId);
               const isMine = myClub?.id === l.fromClubId;
               const canAfford = myClub && myClub.budget >= l.price;
-              const form = calculatePlayerForm(matches, l.playerId);
+              const player = players.find(p => p.id === l.playerId);
+              const form = getFormGrade(player?.form || []);
               const formColor = { 'A': '#4ade80', 'B': '#84cc16', 'C': '#eab308', 'D': '#f97316', 'E': '#ef4444' }[form];
               return (
                 <motion.div key={l.id} whileHover={{ scale: 1.01 }} className="bg-[#0f172a] border border-white/10 rounded-2xl p-4 flex items-center gap-4">

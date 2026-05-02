@@ -16,36 +16,67 @@ export default function Tournament() {
 
   const availableSeasons = useMemo(() => {
     const seasons = new Set<string>();
-    matches.forEach(m => {
-      seasons.add(getSeasonInfo(new Date(m.timestamp)).name);
+    rankedPlayers.forEach(p => {
+      if (p.seasonStats) Object.keys(p.seasonStats).forEach(s => seasons.add(s));
     });
     seasons.add(getSeasonInfo(new Date()).name);
     return Array.from(seasons).sort().reverse();
-  }, [matches]);
+  }, [rankedPlayers]);
 
   // Compute standings for the selected tournament
-  const { elos } = useFirebase();
   const standings = useMemo(() => {
-    let tournamentMatches = matches.filter(m => m.tournament === selectedTournament);
+    if (rankedPlayers.length === 0) return [];
     
-    if (selectedSeason !== 'All Time') {
-      tournamentMatches = tournamentMatches.filter(m => {
-        return getSeasonInfo(new Date(m.timestamp)).name === selectedSeason;
-      });
-    }
-
-    // Compute stats for all players using ONLY the tournament matches
-    const unsortedTournamentPlayers = rankedPlayers
+    // Read from pre-computed tournamentStats — zero match reads required
+    const tournamentStandings = rankedPlayers
       .map(player => {
-        const stats = computePlayerStats(player, tournamentMatches, elos[player.id] || 1200);
-        // FORCE GIT SYNC: Lock the universal All-Time OVR into the tournament stats
-        stats.ovr = player.ovr;
-        return stats;
+        // If All Time + Tournament, we sum up across seasons for this tournament
+        if (selectedSeason === 'All Time') {
+          let tWin = 0, tLoss = 0, tDraw = 0, tGS = 0, tGC = 0;
+          let hasPlayed = false;
+          
+          if (player.tournamentStats) {
+            Object.entries(player.tournamentStats).forEach(([key, stats]) => {
+              if (key.includes(`__${selectedTournament}`)) {
+                tWin += stats.win;
+                tLoss += stats.loss;
+                tDraw += stats.draw;
+                tGS += stats.goalsScored;
+                tGC += stats.goalsConceded;
+                hasPlayed = true;
+              }
+            });
+          }
+          
+          if (!hasPlayed) return null;
+          return {
+            ...player,
+            win: tWin,
+            loss: tLoss,
+            draw: tDraw,
+            goalsScored: tGS,
+            goalsConceded: tGC,
+          } as Player;
+        }
+
+        // Season specific + Tournament specific
+        const key = `${selectedSeason}__${selectedTournament}`;
+        const s = player.tournamentStats?.[key];
+        if (!s || (s.win === 0 && s.loss === 0 && s.draw === 0)) return null;
+        
+        return {
+          ...player,
+          win: s.win,
+          loss: s.loss,
+          draw: s.draw,
+          goalsScored: s.goalsScored,
+          goalsConceded: s.goalsConceded,
+        } as Player;
       })
-      .filter(p => p.win > 0 || p.loss > 0 || p.draw > 0); // Only show players who played in this tournament
+      .filter(Boolean) as Player[];
       
-    return sortRankedPlayers(unsortedTournamentPlayers);
-  }, [rankedPlayers, matches, selectedTournament, selectedSeason, elos]);
+    return sortRankedPlayers(tournamentStandings);
+  }, [rankedPlayers, selectedTournament, selectedSeason]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] flex flex-col items-center p-8 transition-colors">

@@ -129,7 +129,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // 2. Leaders — Always needed for Home Page (small collection)
+    // 2. Leaders — Always needed for Home Page (small set)
     unsubLeaders = subscribeToLeaders((data, pending) => {
       if (!mounted) return;
       setLeaders(data);
@@ -139,9 +139,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     });
 
     // 3. Conditional Heavy Data (Matches, Players, Tournaments)
-    // - Members (Admins & Players): Get the "Advanced" full firehose.
-    // - Guests: Get the "Fast" optimized view to save your daily quota.
-    if (isAdmin || isPlayer) {
+    // - Admins: Get the "Full" history for management.
+    // - Players/Guests: Get the "Lite" optimized view (matches are pre-computed in player docs).
+    if (isAdmin) {
       unsubMatches = subscribeToMatches((data, pending) => {
         if (mounted) {
           setMatches(data);
@@ -162,19 +162,22 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return;
         setTournaments(data);
         if (_globalCache) _globalCache.tournaments = data;
-      });
+      }, 50);
     } else {
+      // NON-ADMINS: Save massive reads by not downloading the matches collection.
+      // Player stats are already embedded in the Player documents.
+      setMatches([]);
       setIsLoadingMatches(false);
-      // FOR GUESTS (The Free Tier protection):
+
+      const playerLimit = isPlayer ? 60 : 24;
       unsubPlayers = subscribeToPlayers((data) => {
         if (mounted) {
           setPlayers(data);
           setIsLoadingPlayers(false);
           if (_globalCache) _globalCache.players = data;
         }
-      }, 15);
+      }, playerLimit);
 
-      // Guests now use a limited real-time subscription instead of an unbounded fetch
       unsubTournaments = subscribeToTournaments((data) => {
         if (mounted) {
           setTournaments(data);
@@ -182,9 +185,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }
       }, 10);
 
-      setIsLoadingMatches(false);
-      setIsLoadingLeaders(false); // Leaders must also be set to false for guests if not already handled
-      setIsLoadingPlayers(false); // Safety
+      setIsLoadingPlayers(false);
+      setIsLoadingLeaders(false);
     }
 
     // Initialize cache on first success
