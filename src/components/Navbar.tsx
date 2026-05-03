@@ -20,11 +20,14 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Derive player image from live Firestore data — never localStorage.
-  // This ensures the avatar is always current and never hits the quota limit.
-  const playerImage = useMemo(() => {
-    if (!loggedInPlayerId || !isPlayer) return '';
-    return players.find(p => p.id === loggedInPlayerId)?.image || '';
+  // Derive player image and club owner status from live Firestore data
+  const { playerImage, isClubOwner } = useMemo(() => {
+    if (!loggedInPlayerId || !isPlayer) return { playerImage: '', isClubOwner: false };
+    const p = players.find(p => p.id === loggedInPlayerId);
+    return { 
+      playerImage: p?.image || '', 
+      isClubOwner: p?.isClubOwner === true 
+    };
   }, [players, loggedInPlayerId, isPlayer]);
 
   useEffect(() => {
@@ -79,9 +82,9 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="flex items-center justify-between px-4 md:px-8 py-4 bg-white dark:bg-brand-dark border-b border-slate-100 dark:border-white/10 sticky top-0 z-[110] transition-colors">
-      <Link to="/" className="flex items-center gap-2">
-        <div className="w-10 h-10 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-[#0f172a] dark:bg-[#020617] border border-brand-purple/40 shadow-[0_0_30px_rgba(139,92,246,0.6)] transition-all hover:shadow-[0_0_40px_rgba(139,92,246,0.8)]">
+    <nav className="flex items-center justify-between px-3 md:px-8 py-3 md:py-4 bg-white dark:bg-brand-dark border-b border-slate-100 dark:border-white/10 sticky top-0 z-[110] transition-colors overflow-hidden">
+      <Link to="/" className="flex items-center gap-1.5 md:gap-2 shrink-0">
+        <div className="w-9 h-9 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-[#0f172a] dark:bg-[#020617] border border-brand-purple/40 shadow-[0_0_20px_rgba(139,92,246,0.4)] transition-all">
           <img 
             src={CLUB_LOGO}
             alt={CLUB_NAME} 
@@ -93,14 +96,14 @@ export default function Navbar() {
               const parent = target.parentElement;
               if (parent && !parent.querySelector('.fallback-v')) {
                 const fallback = document.createElement('div');
-                fallback.className = "fallback-v w-full h-full flex items-center justify-center text-white dark:text-brand-purple font-bold italic text-lg lg:text-2xl";
+                fallback.className = "fallback-v w-full h-full flex items-center justify-center text-white dark:text-brand-purple font-bold italic text-sm lg:text-2xl";
                 fallback.innerText = "QV";
                 parent.appendChild(fallback);
               }
             }}
           />
         </div>
-        <span className="font-black italic tracking-tighter text-base sm:text-2xl md:text-3xl lg:text-4xl text-transparent bg-clip-text bg-brand-gradient whitespace-nowrap truncate max-w-[140px] sm:max-w-none">
+        <span className="font-black italic tracking-tighter text-sm sm:text-2xl md:text-3xl lg:text-4xl text-transparent bg-clip-text bg-brand-gradient whitespace-nowrap truncate max-w-[100px] xs:max-w-[130px] sm:max-w-none">
           {CLUB_NAME}
         </span>
       </Link>
@@ -111,7 +114,7 @@ export default function Navbar() {
           { label: 'RANKINGS', path: '/rankings' },
           { label: 'ANALYTICS', path: '/stats' },
           { label: 'TOURNAMENTS', path: '/tournament' },
-          ...((!systemLocks?.clubManager || isAdmin) && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
+          ...((!systemLocks?.clubManager || isAdmin || isClubOwner) && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
           ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
         ].map((item: any) => (
           item.externalUrl ? (
@@ -142,38 +145,38 @@ export default function Navbar() {
         ))}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-1.5 md:gap-4 shrink-0">
         <div className="hidden md:block">
           <InstallButton />
         </div>
         <button 
           onClick={toggleDark}
-          className="p-2 text-slate-400 hover:text-brand-dark dark:hover:text-brand-purple transition-colors"
+          className="p-1.5 md:p-2 text-slate-400 hover:text-brand-dark dark:hover:text-brand-purple transition-colors"
         >
-          {isDark ? <Sun size={20} /> : <Moon size={20} />}
+          {isDark ? <Sun size={18} className="md:w-5 md:h-5" /> : <Moon size={18} className="md:w-5 md:h-5" />}
         </button>
         
         {(isAdmin || isPlayer) ? (
-          <div className="relative flex items-center gap-4">
+          <div className="relative flex items-center gap-1.5 md:gap-4">
             {isPlayer && (
               <Link 
                 to="/inbox" 
-                className="p-2 text-slate-400 hover:text-brand-purple transition-all relative group"
+                className="p-1.5 md:p-2 text-slate-400 hover:text-brand-purple transition-all relative group"
               >
-                <Bell size={20} className="group-hover:rotate-12 transition-transform" />
-                <div className="absolute top-2 right-2 w-2 h-2 bg-brand-purple rounded-full shadow-[0_0_10px_rgba(139,92,246,0.8)]" />
+                <Bell size={18} className="md:w-5 md:h-5 group-hover:rotate-12 transition-transform" />
+                <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 w-1.5 h-1.5 md:w-2 md:h-2 bg-brand-purple rounded-full shadow-[0_0_10px_rgba(139,92,246,0.8)]" />
               </Link>
             )}
             {isPlayer ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 md:gap-3">
                 <button 
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center gap-2 group transition-all"
+                  className="flex items-center gap-1.5 md:gap-2 group transition-all"
                 >
-                  <div className="w-9 h-9 rounded-full border-2 border-brand-purple/30 group-hover:border-brand-purple overflow-hidden shadow-lg shadow-brand-purple/10 transition-all">
+                  <div className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-brand-purple/30 group-hover:border-brand-purple overflow-hidden shadow-lg shadow-brand-purple/10 transition-all">
                     <img src={playerImage} alt={playerName} className="w-full h-full object-cover" />
                   </div>
-                  <ChevronDown size={14} className={`text-slate-400 group-hover:text-brand-purple transition-all ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown size={12} className={`text-slate-400 group-hover:text-brand-purple transition-all hidden xs:block ${isDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 <AnimatePresence>
@@ -244,7 +247,7 @@ export default function Navbar() {
 
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden p-2.5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-xl hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/10"
+          className="md:hidden p-2 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-xl hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/10 shrink-0"
           aria-label="Toggle menu"
         >
           {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -266,7 +269,7 @@ export default function Navbar() {
                 { label: 'RANKINGS', path: '/rankings' },
                 { label: 'ANALYTICS', path: '/stats' },
                 { label: 'TOURNAMENTS', path: '/tournament' },
-                ...((!systemLocks?.clubManager || isAdmin) && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
+                ...((!systemLocks?.clubManager || isAdmin || isClubOwner) && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
                 ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
               ].map((item: any) => (
                 item.externalUrl ? (

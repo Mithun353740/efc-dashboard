@@ -178,7 +178,11 @@ function ClubStatBar({ label, val, icon }: { label: string; val: string | number
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ myClub, squad, allClubs, config, matches }: { myClub: Club; squad: Player[]; allClubs: Club[]; config: ClubSystemConfig | null; matches: MatchRecord[] }) {
+function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, setActiveTab }: { 
+  myClub: Club; squad: Player[]; allClubs: Club[]; config: ClubSystemConfig | null; matches: MatchRecord[];
+  inboxUnread: number;
+  setActiveTab: (t: 'overview' | 'squad' | 'market' | 'auction' | 'tournaments' | 'inbox' | 'player_inbox') => void;
+}) {
   const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
   
   return (
@@ -693,7 +697,15 @@ export default function ClubManager() {
             {activeTab === 'overview' && (
               <motion.div key="overview" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
                 {myClub ? (
-                  <OverviewTab myClub={myClub} squad={squad} allClubs={clubs} config={config} matches={matches} />
+                  <OverviewTab 
+                    myClub={myClub} 
+                    squad={squad} 
+                    allClubs={clubs} 
+                    config={config} 
+                    matches={matches} 
+                    inboxUnread={inboxUnread}
+                    setActiveTab={setActiveTab}
+                  />
                 ) : (
                   <NoClubScreen />
                 )}
