@@ -82,6 +82,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
       if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
         setDbError('QUOTA_EXCEEDED');
+      } else if (errStr.includes('offline')) {
+        // Log but don't show the red banner for transient offline status
+        console.warn('[Firebase] Client reported offline');
       } else {
         setDbError('DATABASE_ERROR');
       }

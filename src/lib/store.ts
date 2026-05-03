@@ -219,7 +219,7 @@ export async function testFirestoreConnection() {
   } catch (error: any) {
     _connectionTested = false; // allow retry if it was a transient failure
     if (error?.message?.includes('the client is offline')) {
-      console.error("Firestore is offline. Please check your Firebase configuration.");
+      console.warn("Firestore is offline. Retrying in background...");
     } else if (error?.code === 'resource-exhausted' || String(error).toLowerCase().includes('quota') || String(error).toLowerCase().includes('resource-exhausted')) {
       console.warn("Quota exceeded detected during connection test.");
       const errInfo: FirestoreErrorInfo = {
@@ -1007,6 +1007,16 @@ export async function saveClubConfig(config: ClubSystemConfig): Promise<void> {
 }
 
 /** Fetch all clubs (1 read per club doc — very small collection). */
+export function subscribeToClubs(callback: (clubs: Club[]) => void) {
+  const q = query(collection(db, 'clubs'), orderBy('name', 'asc'));
+  return onSnapshot(q, (snapshot) => {
+    const clubs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Club));
+    callback(clubs);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, 'clubs');
+  });
+}
+
 export async function fetchClubs(): Promise<Club[]> {
   try {
     const snap = await getDocs(query(collection(db, 'clubs'), limit(100)));
@@ -1969,6 +1979,22 @@ export async function fetchGlobalSeasons(): Promise<GlobalSeason[]> {
 export async function fetchAllClubs(): Promise<Club[]> {
   const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc')));
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
+}
+
+export async function assignClubOwner(clubId: string, player: Player): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'clubs', clubId), { 
+    ownerId: player.id, 
+    ownerName: player.name 
+  });
+  batch.update(doc(db, 'players', player.id), { 
+    clubId, 
+    clubName: (await getDoc(doc(db, 'clubs', clubId))).data()?.name || 'Club',
+    isClubOwner: true 
+  });
+  await batch.commit();
+  await updateLastUpdated();
 }
 
 export async function unassignClubOwner(clubId: string): Promise<void> {

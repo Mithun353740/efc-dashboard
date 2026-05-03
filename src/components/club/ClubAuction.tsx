@@ -19,14 +19,19 @@ interface ClubAuctionProps {
   allClubs: Club[];
   allPlayers: Player[];
   isAdmin: boolean;
+  loggedInPlayerId?: string;
   config: ClubSystemConfig | null;
 }
 
-export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, config }: ClubAuctionProps) {
+export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, loggedInPlayerId, config }: ClubAuctionProps) {
   const [auctionState, setAuctionState] = useState<AuctionState | null>(null);
   const [prevBid, setPrevBid] = useState(0);
   const [isBidding, setIsBidding] = useState(false);
   const [error, setError] = useState('');
+
+  // Role detection
+  const isDedicatedAuctionAdmin = config?.auctionAdminId && loggedInPlayerId === config.auctionAdminId;
+  const canOperateControls = isAdmin || isDedicatedAuctionAdmin;
 
   // Admin setup
   const [revealPlayerId, setRevealPlayerId] = useState('');
@@ -34,6 +39,35 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, con
   // Confetti state
   const [showSold, setShowSold] = useState(false);
   const prevStatusRef = useRef<string>('');
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!config?.auctionStartTime || (auctionState?.status !== 'idle' && auctionState?.status !== 'ended')) {
+      setTimeLeft(null);
+      return;
+    }
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const diff = config.auctionStartTime! - now;
+      if (diff <= 0) {
+        setTimeLeft(0);
+        clearInterval(interval);
+      } else {
+        setTimeLeft(diff);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [config?.auctionStartTime, auctionState?.status]);
+
+  const formatTime = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const d = Math.floor(h / 24);
+    if (d > 0) return `${d}d ${h % 24}h ${m % 60}m`;
+    if (h > 0) return `${h}h ${m % 60}m ${s % 60}s`;
+    return `${m % 60}m ${s % 60}s`;
+  };
 
   // Subscribe to the live auction doc — 1 read per user total
   useEffect(() => {
@@ -130,11 +164,32 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, con
           <div className="lg:col-span-1 flex flex-col items-center justify-center">
             <AnimatePresence mode="wait">
               {auctionState.status === 'idle' ? (
-                <motion.div key="waiting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
-                  <div className="w-48 h-64 rounded-3xl bg-white/5 border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-slate-600 mx-auto">
-                    <Gavel size={40} />
-                    <p className="text-xs font-black uppercase tracking-widest">Next player is<br/>going to be shown</p>
+                <motion.div key="waiting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center w-full">
+                  <div className="w-full max-w-[280px] aspect-[3/4] rounded-[2.5rem] bg-[#0f172a] border border-white/10 flex flex-col items-center justify-center gap-6 text-slate-500 mx-auto relative overflow-hidden shadow-2xl">
+                    <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/5 via-transparent to-amber-500/5" />
+                    <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform">
+                      <Gavel size={32} />
+                    </div>
+                    <div>
+                      {timeLeft && timeLeft > 0 ? (
+                        <div className="space-y-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500">Scheduled Auction</p>
+                          <p className="text-3xl font-black text-white italic tracking-tighter leading-none">{formatTime(timeLeft)}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{config?.auctionSchedule || 'Starting soon'}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">SESSION IDLE</p>
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed px-8">The auction admin has not revealed the first player card yet.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  {timeLeft && timeLeft > 0 && (
+                    <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                      Prepare your budget. The session begins automatically.
+                    </motion.p>
+                  )}
                 </motion.div>
               ) : auctionState.currentPlayer ? (
                 <motion.div
@@ -221,8 +276,8 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, con
               ) : null}
             </AnimatePresence>
 
-            {/* Admin controls below card */}
-            {isAdmin && (
+            {/* Admin/Auction Admin controls below card */}
+            {canOperateControls && (
               <div className="mt-6 w-full space-y-3">
                 {/* Reveal next card */}
                 <div className="flex gap-2">
@@ -304,7 +359,7 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, con
             </div>
 
             {/* My bid/fold buttons */}
-            {myClub && !isAdmin && auctionState.status === 'active' && !iAmFolded && (
+            {myClub && auctionState.status === 'active' && !iAmFolded && (
               <div className="grid grid-cols-2 gap-3">
                 <button
                   disabled={!isMyTurn || isBidding || (myClub.budget < auctionState.minNextBid)}

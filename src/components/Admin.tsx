@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, fetchGlobalSeasons, fetchAllClubs, startGlobalSeason } from '../lib/store';
+import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, fetchAllClubs, startGlobalSeason } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
 import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture, AuctionState, ClubSeason, GlobalSeason } from '../types';
@@ -1485,7 +1485,18 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   const [msg, setMsg] = React.useState({ text: '', type: '' });
   const [ownerSearch, setOwnerSearch] = React.useState('');
   const [showOwnerDrop, setShowOwnerDrop] = React.useState(false);
-  const [form, setForm] = React.useState({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b', ownerId: '', budget: '5000000', managerRating: '80', activeObjective: '' });
+  const [form, setForm] = React.useState({ 
+    name: '', 
+    shortName: '', 
+    primaryColor: '#8b5cf6', 
+    secondaryColor: '#f59e0b', 
+    ownerId: '', 
+    budget: '5000000', 
+    managerRating: '80', 
+    activeObjective: '',
+    logo: '' 
+  });
+  const [logoFile, setLogoFile] = React.useState<string | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [config, setConfig] = React.useState<ClubSystemConfig>(DEFAULT_CFG);
   const [configSaving, setConfigSaving] = React.useState(false);
@@ -1762,8 +1773,37 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   React.useEffect(() => { reload(); }, []);
 
   const resetForm = () => {
-    setForm({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b', ownerId: '', budget: '5000000', managerRating: '80', activeObjective: '' });
+    setForm({ 
+      name: '', 
+      shortName: '', 
+      primaryColor: '#8b5cf6', 
+      secondaryColor: '#f59e0b', 
+      ownerId: '', 
+      budget: '5000000', 
+      managerRating: '80', 
+      activeObjective: '',
+      logo: ''
+    });
+    setLogoFile(null);
     setEditingId(null); setOwnerSearch(''); setShowOwnerDrop(false);
+  };
+
+  const handleClubLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        let base64Image = reader.result as string;
+        // Basic check for size (under 1MB for Firestore base64)
+        if (file.size > 800 * 1024) {
+          setMsg({ text: '❌ Logo too large (max 800KB for base64)', type: 'error' });
+          return;
+        }
+        setLogoFile(base64Image);
+        setForm(prev => ({ ...prev, logo: base64Image }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSave = async () => {
@@ -1775,6 +1815,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
       shortName: form.shortName.toUpperCase().slice(0, 3),
       primaryColor: form.primaryColor,
       secondaryColor: form.secondaryColor,
+      logo: form.logo || existing?.logo || null,
       ownerId: form.ownerId,
       ownerName: players.find(p => p.id === form.ownerId)?.name,
       budget: Number(form.budget) || 5000000,
@@ -2179,6 +2220,33 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     );
   }
 
+  const currentAdminPlayerId = localStorage.getItem('playerId');
+  const isSuperAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+  const canModifyAuctionAdmin = !config.auctionAdminId || 
+                                config.auctionAdminId === currentAdminPlayerId || 
+                                (isSuperAdmin && !players.some(p => p.id === config.auctionAdminId));
+
+  const ClubLogoComp = ({ club, size = 'sm' }: { club: Club; size?: 'sm' | 'md' }) => {
+    const dim = size === 'sm' ? 'w-10 h-10' : 'w-16 h-16';
+    const rounded = size === 'sm' ? 'rounded-xl' : 'rounded-2xl';
+    
+    if (club.logo) {
+      return (
+        <div className={`${dim} ${rounded} overflow-hidden bg-white/5 border border-white/10 shrink-0`}>
+          <img src={club.logo} className="w-full h-full object-contain p-1" alt="" />
+        </div>
+      );
+    }
+    return (
+      <div 
+        className={`${dim} ${rounded} flex items-center justify-center text-white font-black shrink-0`}
+        style={{ background: `linear-gradient(135deg, ${club.primaryColor}, ${club.secondaryColor})` }}
+      >
+        <span className={size === 'sm' ? 'text-[10px]' : 'text-sm'}>{club.shortName}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between bg-white/5 border border-white/10 p-4 rounded-2xl">
@@ -2226,6 +2294,36 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Left col */}
           <div className="space-y-4">
+            {/* Logo Upload */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Club Logo (Optional)</label>
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center overflow-hidden shrink-0">
+                  {form.logo ? (
+                    <img src={form.logo} className="w-full h-full object-contain p-2" alt="Preview" />
+                  ) : (
+                    <div className="text-[8px] font-bold text-slate-600 uppercase text-center p-2">No Logo</div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <input 
+                    type="file" 
+                    id="club-logo-upload"
+                    accept="image/*"
+                    className="hidden" 
+                    onChange={handleClubLogoUpload} 
+                  />
+                  <label 
+                    htmlFor="club-logo-upload"
+                    className="inline-block px-6 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black tracking-widest hover:bg-white/10 cursor-pointer transition-all uppercase"
+                  >
+                    Select Logo
+                  </label>
+                  <p className="text-[8px] font-bold text-slate-500 mt-2 uppercase tracking-tight">Best: Square, Transparent PNG (Max 800KB)</p>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-1">
               <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Club Name</label>
               <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="e.g. VORTEX UNITED" />
@@ -2298,9 +2396,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
             </div>
             {/* Preview card */}
             <div className="rounded-xl border p-4 flex items-center gap-4 transition-all" style={{ borderColor: form.primaryColor + '50', background: form.primaryColor + '12' }}>
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-black text-lg shrink-0 shadow-lg" style={{ background: `linear-gradient(135deg, ${form.primaryColor}, ${form.secondaryColor})` }}>
-                {form.shortName || '??'}
-              </div>
+              <ClubLogoComp club={{ name: form.name, shortName: form.shortName, primaryColor: form.primaryColor, secondaryColor: form.secondaryColor, logo: form.logo } as Club} size="md" />
               <div>
                 <p className="font-black text-white">{form.name || 'CLUB NAME'}</p>
                 <p className="text-[9px] text-slate-400 mt-0.5">Manager: {ownerPlayer?.name || 'Unassigned'}</p>
@@ -2327,15 +2423,30 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
             {clubs.map(club => {
               const owner = players.find(p => p.id === club.ownerId);
               return (
-                <div key={club.id} className="bg-[#0f172a] rounded-xl border border-white/10 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: `linear-gradient(135deg, ${club.primaryColor}, ${club.secondaryColor})` }}>
-                    {club.shortName}
+                <div key={club.id} className="relative group bg-[#0f172a] hover:bg-slate-900 rounded-[2rem] border border-white/5 hover:border-brand-purple/30 p-6 flex flex-col sm:flex-row sm:items-center gap-6 transition-all">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-purple/5 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ClubLogoComp club={club} size="md" />
+                  <div className="flex-1 min-w-0 relative z-10">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-black text-xl text-white tracking-tighter uppercase italic">{club.name}</p>
+                      <span className="text-[10px] font-black px-2 py-0.5 bg-white/10 rounded-full text-slate-400">{club.shortName}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <Users size={12} className="text-brand-purple" />
+                        Manager: <span className="text-white">{club.ownerName || owner?.name || 'NONE'}</span>
+                      </p>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <Trophy size={12} className="text-amber-500" />
+                        Squad: <span className="text-white">{club.squadIds?.length || 0} PLAYERS</span>
+                      </p>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <DollarSign size={12} className="text-emerald-500" />
+                        Budget: <span className="text-white">VCC {Number(club.budget || 0).toLocaleString()}</span>
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-black text-sm text-white truncate">{club.name}</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Manager: {club.ownerName || owner?.name || 'None'} &bull; Squad: {club.squadIds?.length || 0} players &bull; Budget: VCC {(club.budget || 0).toLocaleString()}</p>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex gap-2 shrink-0 relative z-10 sm:ml-auto">
                     <button
                       onClick={() => {
                         setEditingId(club.id);
@@ -2407,7 +2518,37 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                         </button>
                       </div>
                     ) : (
-                      <p className="text-sm font-black text-slate-500 uppercase">UNASSIGNED</p>
+                      <div className="space-y-3">
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">UNASSIGNED</p>
+                        <div className="relative">
+                          <input 
+                            placeholder="Assign owner..." 
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-bold text-white outline-none focus:border-amber-500"
+                            onChange={(e) => {
+                              const val = e.target.value.toLowerCase();
+                              if (!val) { resetForm(); return; }
+                              // We'll reuse the owner search logic if possible or just do a simple inline one
+                            }}
+                            onFocus={() => setShowOwnerDrop(true)}
+                          />
+                          <div className="mt-2 space-y-1 max-h-32 overflow-y-auto no-scrollbar">
+                            {players.filter(p => !p.isClubOwner).slice(0, 5).map(p => (
+                              <button key={p.id} onClick={async () => {
+                                if (!window.confirm(`Assign ${p.name} as owner of ${club.name}?`)) return;
+                                try {
+                                  setLoading(true);
+                                  await assignClubOwner(club.id, p);
+                                  setMsg({ text: `✅ ${p.name} assigned to ${club.name}`, type: 'success' });
+                                  loadRegistry();
+                                } catch (err: any) { setMsg({ text: err.message, type: 'error' }); }
+                                finally { setLoading(false); }
+                              }} className="w-full text-left p-2 hover:bg-white/5 rounded text-[10px] font-black text-slate-400 hover:text-white border border-white/5 uppercase">
+                                + {p.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -3186,9 +3327,40 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
               </div>
               
               <div className="space-y-1">
-                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Next Auction Schedule</label>
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Auction Start Time (Countdown)</label>
+                <input 
+                  type="datetime-local"
+                  value={config.auctionStartTime ? new Date(config.auctionStartTime).toISOString().slice(0, 16) : ''} 
+                  onChange={e => setConfig({...config, auctionStartTime: new Date(e.target.value).getTime()})} 
+                  className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" 
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Next Auction Schedule (Text)</label>
                 <input value={config.auctionSchedule || ''} onChange={e => setConfig({...config, auctionSchedule: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" placeholder="e.g. Sunday, 8:00 PM PST" />
                 <p className="text-[8px] font-bold text-slate-500 mt-1">This will be displayed in the Club Zone when no auction is active.</p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Auction Admin (Controls Auction)</label>
+                <select 
+                  value={config.auctionAdminId || ''} 
+                  disabled={!canModifyAuctionAdmin}
+                  onChange={e => setConfig({...config, auctionAdminId: e.target.value})}
+                  className={cn(
+                    "w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none",
+                    !canModifyAuctionAdmin && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <option value="">Admin Only (Default)</option>
+                  {players.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {!canModifyAuctionAdmin && (
+                  <p className="text-[8px] font-bold text-red-400 mt-1 uppercase italic">Only the current Auction Admin or Super Admin can reassign this role.</p>
+                )}
               </div>
 
               <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-4 mt-4">
@@ -3225,7 +3397,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
               <div className="p-4 bg-[#0f172a] rounded-xl border border-white/5 space-y-1">
                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Config Summary</p>
                 <p className="text-xs font-bold text-white">{config.season}</p>
-                <p className="text-[10px] text-slate-400">Matchday {config.currentMatchday} / {config.totalMatchdays} &bull; Budget VCC {config.startingBudget.toLocaleString()}</p>
+                <p className="text-[10px] text-slate-400">Matchday {config.currentMatchday || 0} / {config.totalMatchdays || 0} &bull; Budget VCC {Number(config.startingBudget || 0).toLocaleString()}</p>
                 <p className="text-[10px] text-slate-400">Contracts: <span className={config.contractsActive ? 'text-emerald-400' : 'text-red-400'}>{config.contractsActive ? `${config.defaultContractAmount} ${config.defaultContractType}` : 'OFF'}</span></p>
                 <p className="text-[10px] text-slate-400">Transfer Window: <span className={config.transferWindowOpen ? 'text-emerald-400' : 'text-red-400'}>{config.transferWindowOpen ? 'OPEN' : 'CLOSED'}</span></p>
               </div>

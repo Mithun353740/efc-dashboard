@@ -333,6 +333,8 @@ export interface ClubSystemConfig {
   defaultContractType: 'matches' | 'days';
   defaultContractAmount: number;    // matches or days
   auctionSchedule?: string;         // e.g. "Sunday, 8:00 PM PST"
+  auctionAdminId?: string;          // Assigned player ID to run the auction
+  auctionStartTime?: number;        // Unix timestamp (ms)
 }
 
 /** A player listing on the transfer market. */

@@ -9,11 +9,11 @@ import {
   addToShortlist, removeFromShortlist, sendTransferProposal,
   setReleaseClause, removeReleaseClause, triggerReleaseClause,
   calculatePlayerForm, calculateBasePrize, getFormGrade,
-  sendPlayerInboxMessage
+  sendPlayerInboxMessage, subscribeToClubs
 } from '../lib/store';
 import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture, AuctionState, ClubInboxMessage, PlayerInboxMessage } from '../types';
 import { getPlayerGrade, GRADE_COLORS } from '../lib/utils';
-import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check, Bell, ArrowLeftRight, X, PenTool } from 'lucide-react';
+import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check, Bell, ArrowLeftRight, X, PenTool, LayoutDashboard } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClubAuction from './club/ClubAuction';
 import ClubInbox from './club/ClubInbox';
@@ -50,6 +50,31 @@ function ovrColor(ovr: number) {
   return '#64748b';
 }
 
+// ─── Club Logo component ──────────────────────────────────────────────────────
+
+function ClubLogo({ club, size = 'md' }: { club: Club; size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
+  const dim = { 'xs': 'w-6 h-6', 'sm': 'w-10 h-10', 'md': 'w-16 h-16', 'lg': 'w-24 h-24', 'xl': 'w-32 h-32' }[size];
+  const text = { 'xs': 'text-[8px]', 'sm': 'text-[10px]', 'md': 'text-sm', 'lg': 'text-xl', 'xl': 'text-3xl' }[size];
+  const rounded = size === 'xs' ? 'rounded' : size === 'sm' ? 'rounded-lg' : 'rounded-2xl';
+
+  if (club.logo) {
+    return (
+      <div className={`${dim} ${rounded} overflow-hidden bg-white/5 border border-white/10 shrink-0`}>
+        <img src={club.logo} alt={club.name} className="w-full h-full object-contain p-1" />
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className={`${dim} ${rounded} flex items-center justify-center font-black text-white shrink-0 shadow-lg`}
+      style={{ background: `linear-gradient(135deg, ${club.primaryColor}, ${club.secondaryColor})` }}
+    >
+      <span className={`${text} tracking-tighter italic uppercase`}>{club.shortName}</span>
+    </div>
+  );
+}
+
 // ─── FIFA Player Card ─────────────────────────────────────────────────────────
 
 function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; size?: 'sm' | 'md' | 'lg' }) {
@@ -82,10 +107,10 @@ function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; 
         </div>
       </div>
 
-      {/* Club short name */}
+      {/* Club logo/short name */}
       {club && (
-        <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 z-20 text-[6px] md:text-[8px] font-black tracking-widest px-1 md:px-1.5 py-0.5 rounded" style={{ background: pri + '30', color: pri, border: `1px solid ${pri}50` }}>
-          {club.shortName}
+        <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 z-20">
+          <ClubLogo club={club} size="xs" />
         </div>
       )}
 
@@ -157,159 +182,281 @@ function OverviewTab({ myClub, squad, allClubs, config, matches }: { myClub: Clu
   const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
   
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 md:auto-rows-[160px]">
-      {/* MANAGER RATING / BOARD WIDGET */}
-      <div className="relative group overflow-hidden rounded-[1.5rem] md:rounded-[2rem] bg-[#0f172a] border border-white/10 p-6 flex flex-col justify-between transition-all hover:border-violet-500/50">
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-transparent" />
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-violet-500" />
-            <p className="text-[9px] font-black tracking-[0.2em] text-violet-400 uppercase">Manager Rating</p>
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:auto-rows-[200px]">
+      {/* ── MAIN HUB WIDGET (FIFA 24 STYLE) ── */}
+      <div className="md:col-span-4 lg:col-span-3 row-span-2 relative group overflow-hidden rounded-[2.5rem] bg-[#020617] border border-white/5 p-8 md:p-12 flex flex-col justify-between transition-all shadow-2xl hover:border-amber-500/30">
+        {/* Dynamic Background FX */}
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/20 via-transparent to-amber-500/10 opacity-40 group-hover:opacity-60 transition-opacity" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-brand-purple/20 blur-[120px] rounded-full -mr-32 -mt-32 animate-pulse" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-500/10 blur-[100px] rounded-full -ml-32 -mb-32" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row items-start justify-between gap-8 h-full">
+          <div className="flex-1">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+              <p className="text-[10px] md:text-[12px] font-black tracking-[0.5em] text-amber-500 uppercase mb-4 drop-shadow-lg">VORTEX ELITE FRANCHISE</p>
+              <div className="flex items-center gap-6">
+                <ClubLogo club={myClub} size="xl" />
+                <h2 className="text-5xl md:text-8xl font-black text-white tracking-tighter uppercase italic leading-none truncate max-w-2xl select-none">
+                  {myClub.name}
+                </h2>
+              </div>
+              
+              <div className="flex flex-wrap gap-4 mt-10">
+                <div className="px-6 py-3 bg-white/5 border border-white/10 rounded-full flex items-center gap-3 group-hover:bg-white/10 transition-all cursor-default">
+                  <Shield size={16} className="text-amber-500" />
+                  <span className="text-[11px] font-black text-white uppercase tracking-[0.2em]">{myClub.shortName}</span>
+                </div>
+                <div className="px-6 py-3 bg-white/5 border border-white/10 rounded-full flex items-center gap-3">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full shadow-lg" style={{ background: myClub.primaryColor }} />
+                    <div className="w-3 h-3 rounded-full shadow-lg" style={{ background: myClub.secondaryColor }} />
+                  </div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">COLORS</span>
+                </div>
+                {myClub.managerRating && (
+                  <div className="px-6 py-3 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center gap-3">
+                    <Zap size={16} className="text-amber-500" />
+                    <span className="text-xs font-black text-amber-500 uppercase tracking-widest">MR {myClub.managerRating}</span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </div>
-          <div className="flex items-end gap-2">
-            <h2 className="text-4xl font-black text-white tracking-tighter">{myClub.managerRating || 80}</h2>
-            <span className={`text-[10px] font-black uppercase mb-1.5 ${(!myClub.managerRating || myClub.managerRating >= 80) ? 'text-green-400' : myClub.managerRating >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
-              {(!myClub.managerRating || myClub.managerRating >= 80) ? 'Excellent' : myClub.managerRating >= 50 ? 'Average' : 'Critical'}
-            </span>
-          </div>
-          <div className="w-full bg-white/10 h-1.5 rounded-full mt-3 overflow-hidden">
-            <div className={`h-full ${(!myClub.managerRating || myClub.managerRating >= 80) ? 'bg-green-500' : myClub.managerRating >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${myClub.managerRating || 80}%` }} />
-          </div>
-          {myClub.activeObjective ? (
-            <div className="mt-3 p-2 bg-white/5 rounded-lg border border-white/5">
-              <p className="text-[8px] text-amber-500 font-black uppercase tracking-widest">BOARD OBJECTIVE</p>
-              <p className="text-[10px] text-white font-bold leading-tight mt-0.5">{myClub.activeObjective}</p>
+
+          {/* Large Vertical Ratings */}
+          <div className="flex flex-row md:flex-col gap-8 md:gap-12 shrink-0 md:text-right">
+            <div className="group/ovr">
+              <p className="text-[10px] font-black text-slate-500 tracking-[0.3em] uppercase mb-1 group-hover/ovr:text-white transition-colors">AVG RATING</p>
+              <p className="text-7xl md:text-9xl font-black text-white leading-none tracking-tighter italic drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]" style={{ color: ovrColor(avgOvr) }}>{avgOvr}</p>
             </div>
-          ) : (
-            <p className="text-[9px] text-slate-500 font-bold mt-3 uppercase tracking-widest">No active board objectives.</p>
-          )}
+            <div>
+              <p className="text-[10px] font-black text-slate-500 tracking-[0.3em] uppercase mb-1">SQUAD POWER</p>
+              <div className="flex items-baseline md:justify-end gap-2 leading-none">
+                <p className="text-5xl md:text-6xl font-black text-white tracking-tighter italic">{squad.length}</p>
+                <span className="text-xl font-black text-slate-700 italic">/25</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Global Footer Bar */}
+        <div className="relative z-10 mt-12 pt-10 border-t border-white/5 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+          <div className="space-y-6 flex-1">
+            <div className="flex items-center gap-4">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+              <div>
+                <p className="text-[11px] font-black text-white uppercase tracking-widest leading-none">Board Objective Active</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase italic tracking-wide">{myClub.activeObjective || 'Maintain elite performance standards'}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mr-2">RECENT FORM</span>
+              {matches.slice(0, 5).reverse().map((m, i) => {
+                const win = (m.p1Id === myClub.ownerId && m.p1Score > m.p2Score) || (m.p2Id === myClub.ownerId && m.p2Score > m.p1Score);
+                const draw = m.p1Score === m.p2Score;
+                return (
+                  <div key={i} className={cn("w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black shadow-lg", 
+                    win ? 'bg-emerald-500 text-black' : draw ? 'bg-amber-500 text-black' : 'bg-red-500 text-white'
+                  )}>
+                    {win ? 'W' : draw ? 'D' : 'L'}
+                  </div>
+                );
+              })}
+              {matches.length === 0 && <span className="text-[9px] font-bold text-slate-700 uppercase italic">No data recorded</span>}
+            </div>
+          </div>
+
+          <motion.button 
+            whileHover={{ scale: 1.05 }} 
+            whileTap={{ scale: 0.95 }}
+            className="px-10 py-5 bg-white text-black rounded-[1.5rem] font-black text-xs tracking-[0.2em] uppercase italic shadow-2xl flex items-center gap-4"
+          >
+            ENTER TEAM HUB <ArrowLeft size={16} className="rotate-180" />
+          </motion.button>
         </div>
       </div>
 
-      {/* PLAY MATCH / NEXT FIXTURE (Large) */}
-      <div className="md:col-span-2 lg:col-span-2 row-span-2 relative group overflow-hidden rounded-[1.5rem] md:rounded-[2rem] bg-[#0f172a] border border-white/10 p-6 md:p-8 flex flex-col justify-between transition-all hover:scale-[1.01] hover:border-amber-500/50">
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-transparent" />
+      {/* ── FINANCE WIDGET (FIFA STYLE) ── */}
+      <div className="md:col-span-2 lg:col-span-1 row-span-1 rounded-[2.5rem] bg-amber-500 p-8 flex flex-col justify-between shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent" />
+        <DollarSign className="absolute top-[-10px] right-[-10px] text-black/10 group-hover:scale-110 transition-transform duration-500" size={120} />
+        
         <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-3 md:mb-4">
-            <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-amber-500 animate-pulse" />
-            <p className="text-[9px] md:text-[10px] font-black tracking-[0.3em] text-amber-500 uppercase">NEXT MATCH</p>
+          <p className="text-[11px] font-black text-black/70 uppercase tracking-[0.3em] mb-4">TRANSFER BUDGET</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg font-black text-black/50">VCC</span>
+            <h3 className="text-4xl md:text-5xl font-black text-black tracking-tighter italic leading-none">{(myClub.budget || 0).toLocaleString()}</h3>
           </div>
-          <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase italic leading-none">PLAY MATCH</h2>
-          <p className="text-slate-400 font-bold text-[10px] md:text-xs mt-2 uppercase tracking-widest">{config?.season || 'Active Season'}</p>
         </div>
         
-        <div className="relative z-10 flex items-center justify-between gap-4 mt-6 md:mt-0">
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center text-white font-black text-sm md:text-xl shadow-2xl"
-              style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}, ${myClub.secondaryColor})` }}>
-              {myClub.shortName}
-            </div>
-            <p className="text-[8px] md:text-[10px] font-black text-white uppercase">{myClub.shortName}</p>
+        <div className="relative z-10 flex items-center justify-between border-t border-black/10 pt-4 mt-4">
+          <div className="flex -space-x-2">
+            {[...Array(3)].map((_, i) => <div key={i} className="w-5 h-5 rounded-full bg-white/30 border border-amber-500" />)}
           </div>
-          <div className="text-xl md:text-2xl font-black text-slate-700 uppercase italic">VS</div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-500 font-black text-sm md:text-xl">
-              ?
-            </div>
-            <p className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase">TBD</p>
+          <span className="text-[9px] font-black text-black/80 uppercase tracking-widest">Active Negotiations &rarr;</span>
+        </div>
+      </div>
+
+      {/* ── MATCHDAY WIDGET ── */}
+      <div className="md:col-span-2 lg:col-span-1 row-span-1 rounded-[2.5rem] bg-[#020617] border border-white/10 p-8 flex flex-col justify-between shadow-2xl relative group hover:bg-[#0f172a] transition-all">
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="flex items-center justify-between relative z-10">
+          <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-amber-500 border border-white/10 group-hover:border-amber-500/30 transition-all">
+            <Calendar size={24} />
+          </div>
+          <div className="px-5 py-2 bg-amber-500/10 border border-amber-500/20 rounded-full text-[10px] font-black text-amber-500 uppercase tracking-widest">
+            MD {config?.currentMatchday || 1}
+          </div>
+        </div>
+        <div className="relative z-10">
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-2">NEXT FIXTURE</p>
+          <p className="text-2xl font-black text-white italic line-clamp-1 leading-none uppercase">{config?.season || 'Season Management'}</p>
+          <div className="flex items-center gap-2 mt-4 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-lg w-max">
+            <Lock size={10} className="text-slate-500" /> System Locked
           </div>
         </div>
       </div>
 
-      {/* MINI STANDINGS / RUMOR MILL (Square) */}
+      {/* MINI STANDINGS / RUMOR MILL (Square) ── */}
       <div className={cn(
-        "row-span-2 border rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 flex flex-col transition-all",
-        config?.deadlineDayActive ? "bg-red-950/20 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.1)]" : "bg-[#0f172a] border-white/10 hover:border-amber-500/50"
+        "row-span-2 border rounded-[2.5rem] p-8 flex flex-col transition-all relative overflow-hidden group",
+        config?.deadlineDayActive ? "bg-red-950/20 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.1)]" : "bg-[#020617] border-white/10 hover:border-amber-500/30"
       )}>
-        <div className="flex items-center gap-2 mb-4">
-          {config?.deadlineDayActive ? <Zap size={14} className="text-red-500 animate-pulse" /> : <Trophy size={14} className="text-amber-500" />}
-          <p className={cn("text-[9px] md:text-[10px] font-black tracking-widest uppercase", config?.deadlineDayActive ? "text-red-500" : "text-slate-500")}>
-            {config?.deadlineDayActive ? "RUMOR MILL" : "STANDINGS"}
-          </p>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            {config?.deadlineDayActive ? <Zap size={18} className="text-red-500 animate-pulse" /> : <Trophy size={18} className="text-amber-500" />}
+            <p className={cn("text-[10px] md:text-[12px] font-black tracking-[0.2em] uppercase", config?.deadlineDayActive ? "text-red-500" : "text-white")}>
+              {config?.deadlineDayActive ? "TRANSFER RUMORS" : "STANDINGS"}
+            </p>
+          </div>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{config?.season}</p>
         </div>
         
         {config?.deadlineDayActive ? (
-          <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
+          <div className="flex-1 space-y-4 overflow-y-auto no-scrollbar">
             {[
-              { t: "BREAKING", m: "Big budget bid reported for " + (squad[0]?.name || "top players") },
-              { t: "RUMOR", m: "Several clubs eyeing swap deals before the window slams shut." },
-              { t: "LIVE", m: "Last minute negotiations are underway in the Transfer Hub." }
+              { t: "BREAKING", m: "Mega-bid incoming for " + (squad[0]?.name || "top assets"), highlight: true },
+              { t: "RUMOR", m: "Transfer Hub activity surging past seasonal averages." },
+              { t: "SCOUT", m: "Anonymous scouts spotted at Vortex Training Facilities." },
+              { t: "AGENT", m: "Player representatives seeking immediate contract reviews." }
             ].map((r, i) => (
-              <div key={i} className="p-2.5 bg-white/5 border border-white/5 rounded-xl">
-                <span className="text-[7px] font-black px-1.5 py-0.5 bg-red-500 text-black rounded mb-1 inline-block">{r.t}</span>
-                <p className="text-[9px] font-bold text-slate-300 leading-tight">{r.m}</p>
+              <div key={i} className={cn("p-4 rounded-2xl border relative overflow-hidden transition-all", 
+                r.highlight ? "bg-red-500/10 border-red-500/30" : "bg-white/5 border-white/5"
+              )}>
+                <div className={cn("absolute left-0 top-0 bottom-0 w-1", r.highlight ? "bg-red-500" : "bg-slate-700")} />
+                <p className={cn("text-[8px] font-black mb-1.5 uppercase tracking-widest", r.highlight ? "text-red-500" : "text-slate-500")}>{r.t}</p>
+                <p className="text-[10px] font-bold text-slate-300 leading-snug">{r.m}</p>
               </div>
             ))}
           </div>
         ) : (
-          <div className="flex-1 space-y-2 md:space-y-3">
-            {[1,2,3,4,5].map(i => (
-              <div key={i} className={`flex items-center justify-between p-2 rounded-xl border border-transparent ${i === 1 ? 'bg-amber-500/10 border-amber-500/20' : ''}`}>
-                <div className="flex items-center gap-2 md:gap-3">
-                  <span className="text-[9px] md:text-[10px] font-black text-slate-500">0{i}</span>
-                  <div className="w-4 h-4 md:w-5 md:h-5 rounded bg-white/5" />
-                  <div className="w-12 md:w-16 h-1 md:h-1.5 bg-white/5 rounded-full" />
+          <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar pr-1">
+            {allClubs.sort((a,b) => (b.managerRating || 0) - (a.managerRating || 0)).slice(0, 6).map((c, i) => (
+              <div key={c.id} className={cn("flex items-center justify-between p-3 rounded-2xl border transition-all", c.id === myClub.id ? "bg-amber-500/10 border-amber-500/30" : "border-transparent bg-white/5 hover:bg-white/10")}>
+                <div className="flex items-center gap-4">
+                  <span className={cn("text-[10px] font-black w-4", i === 0 ? 'text-amber-500' : 'text-slate-500')}>{i+1}</span>
+                  <div className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center text-[10px] font-black shadow-lg" style={{ background: `linear-gradient(135deg, ${c.primaryColor}, ${c.secondaryColor})` }}>
+                    {c.shortName}
+                  </div>
+                  <span className="text-[11px] font-black text-white uppercase tracking-tight truncate w-32">{c.name}</span>
                 </div>
-                <span className="text-[9px] md:text-[10px] font-black text-white">0</span>
+                <div className="text-right">
+                  <span className="text-[11px] font-black text-amber-500">{c.managerRating || 80}</span>
+                  <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">ELO</p>
+                </div>
               </div>
             ))}
           </div>
         )}
-        {!config?.deadlineDayActive && <button className="mt-4 w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[8px] md:text-[9px] font-black text-slate-400 transition-all uppercase tracking-widest">FULL TABLE</button>}
-      </div>
-
-      {/* TRANSFER HUB (Tall) */}
-      <div className="row-span-2 md:row-span-3 bg-[#0f172a] border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 relative overflow-hidden group flex flex-col justify-between hover:border-amber-500/50 transition-all min-h-[200px] md:min-h-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black" />
-        {squad[0] && (
-          <img src={squad[0].image} className="absolute inset-0 w-full h-full object-cover object-top opacity-30 grayscale group-hover:grayscale-0 transition-all duration-700" alt="" />
+        {!config?.deadlineDayActive && (
+          <button className="mt-6 w-full py-4 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black text-slate-400 transition-all uppercase tracking-[0.2em] border border-white/5">
+            LEAGUE TABLES &rarr;
+          </button>
         )}
-        <div className="relative z-10">
-          <p className="text-[9px] md:text-[10px] font-black tracking-widest text-amber-500 uppercase mb-1">MARKET</p>
-          <h3 className="text-2xl md:text-3xl font-black text-white leading-none uppercase italic">TRANSFER<br/>HUB</h3>
-        </div>
-        <div className="relative z-10">
-          <p className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">AVAILABLE FUNDS</p>
-          <p className="text-lg md:text-xl font-black text-amber-500 leading-none">VCC {fmtBudget(myClub.budget)}</p>
-        </div>
       </div>
 
-      {/* CLUB FINANCE (Square) */}
-      <div className="bg-[#0f172a] border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 flex flex-col justify-between hover:border-amber-500/50 transition-all min-h-[120px] md:min-h-0">
-        <div className="flex items-center gap-2">
-          <DollarSign size={14} className="text-emerald-400" />
-          <p className="text-[9px] md:text-[10px] font-black tracking-widest text-slate-500 uppercase">FINANCES</p>
+      {/* ── TRANSFER HUB (Tall) ── */}
+      <div className="row-span-2 md:row-span-3 bg-[#020617] border border-white/10 rounded-[2.5rem] p-8 relative overflow-hidden group flex flex-col justify-between hover:border-amber-500/50 transition-all">
+        <div className="absolute inset-0 bg-gradient-to-b from-brand-purple/5 via-transparent to-black/40" />
+        
+        {squad[0] && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
+             <div className="w-80 h-80 rounded-full bg-brand-purple blur-[100px]" />
+          </div>
+        )}
+        
+        <div className="relative z-10 flex items-start justify-between">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+            <ArrowLeftRight size={28} />
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">CLUB VALUATION</p>
+            <p className="text-2xl font-black text-white leading-none italic uppercase">VCC {(myClub.budget || 0).toLocaleString()}</p>
+          </div>
         </div>
-        <div>
-          <p className="text-lg md:text-xl font-black text-white leading-none italic uppercase">VCC {fmtBudget(myClub.budget)}</p>
-          <p className="text-[8px] md:text-[9px] font-black text-emerald-400 mt-1 uppercase">+15% GROWTH</p>
-        </div>
-      </div>
 
-      {/* SQUAD OVR (Square) */}
-      <div className="bg-[#0f172a] border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 flex flex-col justify-between hover:border-amber-500/50 transition-all min-h-[120px] md:min-h-0">
-        <div className="flex items-center gap-2">
-          <Users size={14} className="text-brand-purple" />
-          <p className="text-[9px] md:text-[10px] font-black tracking-widest text-slate-500 uppercase">AVG OVR</p>
-        </div>
-        <div>
-          <p className="text-2xl md:text-3xl font-black text-white leading-none italic uppercase">{avgOvr}</p>
-          <div className="flex gap-1 mt-2">
-            {[1,2,3,4,5].map(i => <div key={i} className={`h-1 flex-1 rounded-full ${i < 4 ? 'bg-brand-purple' : 'bg-white/5'}`} />)}
+        <div className="relative z-10 space-y-6">
+          <div>
+            <h4 className="text-xl font-black text-white italic uppercase tracking-tighter mb-2">TRANSFER HUB</h4>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+              Global marketplace is currently monitoring {allClubs.length} franchises. Review your squad depth in the SQUAD tab.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 pb-2">
+            <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+              <p className="text-[8px] font-black text-slate-500 mb-1">SQUAD SIZE</p>
+              <p className="text-lg font-black text-white leading-none">{squad.length}</p>
+            </div>
+            <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+              <p className="text-[8px] font-black text-slate-500 mb-1">OFFERS</p>
+              <p className="text-lg font-black text-emerald-400 leading-none">0</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* SOCIAL MEDIA / NOTIFICATIONS (Wide) */}
-      <div className="md:col-span-2 lg:col-span-2 bg-[#0f172a] border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 flex items-center gap-4 md:gap-6 hover:border-amber-500/50 transition-all">
-        <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
-          <Zap size={20} className="md:w-6 md:h-6" />
+      {/* ── SQUAD POWER (Square) ── */}
+      <div className="bg-[#020617] border border-white/10 rounded-[2.5rem] p-8 flex flex-col justify-between hover:border-brand-purple/50 transition-all relative overflow-hidden group">
+        <div className="absolute top-[-10px] right-[-10px] opacity-10 group-hover:scale-110 transition-transform">
+          <Shield size={100} className="text-brand-purple" />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[9px] md:text-[10px] font-black tracking-widest text-slate-500 uppercase mb-0.5 md:mb-1">NOTIFICATIONS</p>
-          <p className="text-[10px] md:text-xs font-bold text-white truncate">The transfer window is now OPEN.</p>
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-brand-purple/10 border border-brand-purple/20 flex items-center justify-center text-brand-purple">
+            <Users size={20} />
+          </div>
+          <p className="text-[11px] font-black tracking-[0.2em] text-slate-500 uppercase">AVG RAT</p>
         </div>
-        <button className="px-3 md:px-4 py-1.5 md:py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[8px] md:text-[9px] font-black text-white transition-all uppercase tracking-widest shrink-0">VIEW</button>
+        <div className="relative z-10">
+          <p className="text-4xl font-black text-white leading-none italic uppercase mb-3">{avgOvr}</p>
+          <div className="flex gap-1.5 h-1.5">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className={cn("flex-1 rounded-full",
+                i <= Math.floor(avgOvr / 20) ? "bg-brand-purple shadow-[0_0_8px_rgba(139,92,246,0.5)]" : "bg-white/5"
+              )} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── NOTIFICATIONS / ALERTS (Wide) ── */}
+      <div className="md:col-span-2 lg:col-span-2 bg-[#020617] border border-white/10 rounded-[2.5rem] p-8 flex items-center gap-8 hover:border-brand-purple/50 transition-all relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-purple/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="w-16 h-16 rounded-[1.5rem] bg-brand-purple/10 border border-brand-purple/20 flex items-center justify-center text-brand-purple shrink-0 group-hover:rotate-12 transition-transform">
+          <Bell size={32} />
+        </div>
+        <div className="flex-grow min-w-0 relative z-10">
+          <p className="text-[11px] font-black tracking-[0.3em] text-slate-500 uppercase mb-1">CLUB NOTIFICATIONS</p>
+          <h4 className="text-xl font-black text-white uppercase tracking-tight leading-tight italic">
+            {inboxUnread > 0 ? `${inboxUnread} UNREAD COMMUNICATIONS` : 'NO NEW NOTIFICATIONS'}
+          </h4>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest italic truncate">
+            {inboxUnread > 0 ? 'Check the club office for latest updates' : 'Your club staff is currently up to date'}
+          </p>
+        </div>
+        <button onClick={() => setActiveTab('inbox')} className="relative z-10 px-8 py-3 bg-white/5 hover:bg-brand-purple hover:text-white text-white rounded-xl text-[10px] font-black transition-all uppercase tracking-widest border border-white/10 shrink-0 shadow-lg">
+          VIEW OFFICE
+        </button>
       </div>
     </div>
   );
@@ -358,15 +505,26 @@ export default function ClubManager() {
       return;
     }
     setLoading(true);
-    const [cs, cfg, ls] = await Promise.all([fetchClubs(), fetchClubConfig(), fetchMarketListings()]);
-    _clubCache = { clubs: cs, config: cfg, listings: ls };
-    setClubs(cs);
+    const [cfg, ls] = await Promise.all([fetchClubConfig(), fetchMarketListings()]);
+    if (_clubCache) {
+      _clubCache.config = cfg;
+      _clubCache.listings = ls;
+    }
     if (cfg) setConfig(cfg);
     setListings(ls);
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Real-time clubs subscription
+    const unsub = subscribeToClubs((cs) => {
+      setClubs(cs);
+      if (_clubCache) _clubCache.clubs = cs;
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
 
   // Subscribe to inbox when owner is identified
   useEffect(() => {
@@ -403,15 +561,15 @@ export default function ClubManager() {
     </div>
   );
 
-  const tabs = [
-    { id: 'overview', label: 'MY CLUB', icon: <Shield size={14} /> },
+  const tabs = useMemo(() => [
+    { id: 'overview', label: 'HUB', icon: <LayoutDashboard size={14} /> },
     { id: 'squad', label: 'SQUAD', icon: <Users size={14} /> },
-    { id: 'market', label: 'MARKET', icon: <ShoppingCart size={14} /> },
-    { id: 'auction', label: auctionLive ? '🔴 AUCTION' : 'AUCTION', icon: <Hammer size={14} /> },
-    { id: 'rankings', label: 'RANKINGS', icon: <Trophy size={14} /> },
-    { id: 'tournaments', label: 'CUPS', icon: <Trophy size={14} /> },
-    { id: 'inbox', label: 'INBOX', icon: <Bell size={14} />, badge: inboxUnread > 0 ? inboxUnread : null },
-  ] as const;
+    { id: 'market', label: 'TRANSFERS', icon: <ShoppingCart size={14} /> },
+    { id: 'auction', label: auctionLive ? '🔴 LIVE AUCTION' : 'AUCTION', icon: <Hammer size={14} /> },
+    { id: 'rankings', label: 'STANDINGS', icon: <Trophy size={14} /> },
+    { id: 'tournaments', label: 'MATCH DAY', icon: <Calendar size={14} /> },
+    { id: 'inbox', label: isOwner ? 'CLUB OFFICE' : 'MY INBOX', icon: <Bell size={14} />, badge: inboxUnread > 0 ? inboxUnread : null },
+  ] as const, [isOwner, auctionLive, inboxUnread]);
 
   return (
     <div className="min-h-screen bg-[#020617] text-white selection:bg-amber-500/30 pb-10">
@@ -445,9 +603,13 @@ export default function ClubManager() {
               <p className="text-[10px] font-black text-white leading-none uppercase truncate max-w-[80px]">{myPlayer?.name || 'MANAGER'}</p>
               <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5 truncate max-w-[80px]">{myClub?.name || 'UNASSIGNED'}</p>
             </div>
-            <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-amber-500 text-black flex items-center justify-center font-black text-[10px] md:text-xs">
-              {myPlayer?.overall || '??'}
-            </div>
+            {myClub ? (
+              <ClubLogo club={myClub} size="sm" />
+            ) : (
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-amber-500 text-black flex items-center justify-center font-black text-[10px] md:text-xs">
+                {myPlayer?.overall || '??'}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -540,40 +702,45 @@ export default function ClubManager() {
             )}
             {activeTab === 'auction' && (
               <motion.div key="auction" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
-                <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} config={config} />
+                <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} loggedInPlayerId={playerId} config={config} />
               </motion.div>
             )}
             {activeTab === 'inbox' && (
               <motion.div key="inbox" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
                 <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden relative" style={{ minHeight: 600 }}>
-                  <div className="flex flex-col h-full">
-                    <div className="grid grid-cols-1 md:grid-cols-2 h-full">
-                      {/* Owner's Club Inbox */}
-                      {isOwner && myClub && (
-                        <div className="border-r border-white/10 flex flex-col h-[600px]">
-                          <div className="p-4 bg-brand-purple/10 border-b border-brand-purple/20">
-                            <h3 className="text-[10px] font-black text-brand-purple uppercase tracking-[0.2em] flex items-center gap-2">
-                              <Shield size={12} /> OWNER INBOX: {myClub.name}
-                            </h3>
-                          </div>
-                          <div className="flex-1 overflow-hidden">
-                            <ClubInbox ownerId={playerId} myClub={myClub} allClubs={clubs} allPlayers={players} />
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Personal Player Inbox */}
-                      <div className={cn("flex flex-col h-[600px]", isOwner ? "" : "md:col-span-2")}>
-                        <div className="p-4 bg-amber-500/10 border-b border-amber-500/20">
-                          <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                            <PenTool size={12} /> PLAYER PORTAL: {myPlayer?.name}
+                  <div className="flex flex-col h-full bg-[#0a0a14]">
+                    {/* Owner's Club Inbox */}
+                    {isOwner && myClub ? (
+                      <div className="flex flex-col h-[600px] w-full">
+                        <div className="p-6 bg-brand-purple/10 border-b border-brand-purple/20">
+                          <h3 className="text-xs font-black text-brand-purple uppercase tracking-[0.3em] flex items-center gap-3">
+                            <Shield size={16} /> OWNER INBOX: {myClub.name}
                           </h3>
                         </div>
                         <div className="flex-1 overflow-hidden">
-                          <PlayerInbox player={myPlayer!} />
+                          <ClubInbox ownerId={playerId} myClub={myClub} allClubs={clubs} allPlayers={players} />
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      /* Personal Player Inbox - Only if not an owner */
+                      <div className="flex flex-col h-[600px] w-full">
+                        <div className="p-6 bg-amber-500/10 border-b border-amber-500/20">
+                          <h3 className="text-xs font-black text-amber-500 uppercase tracking-[0.3em] flex items-center gap-3">
+                            <PenTool size={16} /> PLAYER PORTAL: {myPlayer?.name}
+                          </h3>
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          {myPlayer ? (
+                            <PlayerInbox player={myPlayer} />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                              <Search size={48} className="mb-4 opacity-20" />
+                              <p className="text-xs font-black uppercase tracking-widest">No player profile linked</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -790,12 +957,21 @@ export default function ClubManager() {
 
 function NoClubScreen() {
   return (
-    <div className="text-center py-24">
-      <div className="w-20 h-20 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-amber-500/20">
-        <Layers size={36} className="text-amber-500" />
+    <div className="relative overflow-hidden rounded-[3rem] bg-[#020617] border border-white/5 p-12 text-center shadow-2xl">
+      <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-brand-purple/10" />
+      <div className="relative z-10">
+        <div className="w-24 h-24 bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto mb-8 border border-white/10 shadow-xl group hover:scale-110 transition-transform">
+          <Layers size={40} className="text-slate-400" />
+        </div>
+        <h2 className="text-4xl font-black text-white mb-4 tracking-tighter italic uppercase">Club Hub Offline</h2>
+        <p className="text-slate-400 font-bold text-sm max-w-sm mx-auto leading-relaxed">
+          You are not currently assigned as an owner or player of any club. Please contact your league admin to get registered.
+        </p>
+        <div className="mt-10 flex gap-4 justify-center">
+          <Link to="/" className="px-8 py-4 bg-white/5 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all border border-white/5">Back to Home</Link>
+          <button onClick={() => window.location.reload()} className="px-8 py-4 bg-amber-500 text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:scale-105 transition-all">Refresh Status</button>
+        </div>
       </div>
-      <h2 className="text-2xl font-black text-white mb-3">NOT IN A CLUB</h2>
-      <p className="text-slate-400 text-sm max-w-sm mx-auto">You haven't been assigned to a club yet. Ask your admin to add you to a club squad.</p>
     </div>
   );
 }
@@ -1083,7 +1259,7 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
                   <div className="flex-1 min-w-0">
                     <p className="font-black text-white text-sm truncate">{l.playerName}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: fromClub?.primaryColor || '#8b5cf6' }} />
+                      {fromClub && <ClubLogo club={fromClub} size="xs" />}
                       <p className="text-[9px] font-bold text-slate-400 truncate">{l.fromClubName}</p>
                     </div>
                     <p className="text-amber-400 font-black text-sm mt-1">VCC {fmtBudget(l.price)}</p>
@@ -1227,10 +1403,7 @@ function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; player
                   </td>
                   <td className="px-3 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-black text-[9px] shrink-0"
-                        style={{ background: `linear-gradient(135deg, ${row.club.primaryColor}, ${row.club.secondaryColor})` }}>
-                        {row.club.shortName}
-                      </div>
+                      <ClubLogo club={row.club} size="sm" />
                       <div>
                         <p className={`text-xs font-black ${myClub?.id === row.club.id ? 'text-amber-400' : 'text-white'}`}>{row.club.name}</p>
                         <p className="text-[8px] text-slate-500">{row.club.ownerName || '—'}</p>

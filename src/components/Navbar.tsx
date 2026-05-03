@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Bell, User, Moon, Sun, Menu, X, ChevronDown, Settings, LogOut, Shield, Layers } from 'lucide-react';
+import { Bell, User, Moon, Sun, Menu, X, ChevronDown, Settings, LogOut, Shield, Layers, MoreVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CLUB_LOGO, CLUB_NAME } from '../constants';
@@ -244,9 +244,10 @@ export default function Navbar() {
 
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden p-2 text-slate-400 hover:text-brand-dark dark:hover:text-brand-purple transition-colors"
+          className="md:hidden p-2.5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-xl hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/10"
+          aria-label="Toggle menu"
         >
-          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          {isMobileMenuOpen ? <X size={20} /> : <MoreVertical size={20} />}
         </button>
       </div>
 
