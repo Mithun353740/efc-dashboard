@@ -115,7 +115,7 @@ export default function ClubInbox({ ownerId, myClub, allClubs, allPlayers, onClo
     }
   };
 
-  const mySquad = allPlayers.filter(p => myClub.squadIds.includes(p.id));
+  const mySquad = allPlayers.filter(p => myClub.squadIds?.includes(p.id));
   const isSeller = activeThread ? activeThread.sellerClubId === myClub.id : false;
 
   return (

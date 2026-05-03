@@ -57,7 +57,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [isMinLoadTimePassed, setIsMinLoadTimePassed] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
   const [hasPendingWrites, setHasPendingWrites] = useState(false);
-  const [appVersion, setAppVersion] = useState<string>('1.0.0');
+  const [appVersion, setAppVersion] = useState<string>(VERSION);
 
   useEffect(() => {
     let mounted = true;
@@ -76,14 +76,15 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
       const errStr = String(customEvent.detail.error).toLowerCase();
 
+      // IMPORTANT: Stop all loading indicators so the app doesn't hang on a black screen
       setIsLoadingPlayers(false);
       setIsLoadingLeaders(false);
       setIsLoadingMatches(false);
+      setIsMinLoadTimePassed(true); // Force release the lock
 
       if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
         setDbError('QUOTA_EXCEEDED');
       } else if (errStr.includes('offline')) {
-        // Log but don't show the red banner for transient offline status
         console.warn('[Firebase] Client reported offline');
       } else {
         setDbError('DATABASE_ERROR');
@@ -126,8 +127,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const unsubVersion = subscribeToAppVersion((version) => {
       if (mounted && version) {
         setAppVersion(version);
-        // CRITICAL SAFETY: Only reload if the version is NEWER and it's not our first load
-        // For now, we disable auto-reload to break the current loop and allow the user to see their data.
         console.log('[System] DB Version:', version, 'Code Version:', VERSION);
       }
     });
@@ -139,6 +138,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setHasPendingWrites(pending);
       setIsLoadingLeaders(false);
       if (_globalCache) _globalCache.leaders = data;
+    }, (err) => {
+      // Direct catch for the leaders fetch
+      if (mounted) {
+        setIsLoadingLeaders(false);
+        setIsMinLoadTimePassed(true);
+      }
     });
 
     // 3. Conditional Heavy Data (Matches, Players, Tournaments)

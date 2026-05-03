@@ -427,43 +427,47 @@ async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]
   return results.sort((a, b) => a.timestamp - b.timestamp);
 }
 
-export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 100) {
+export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 100, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
     const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
     callback(players, snapshot.metadata.hasPendingWrites);
   }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, 'players');
+    if (errorCallback) errorCallback(error);
+    handleFirestoreError(error, OperationType.GET, 'players');
   });
 }
 
-export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boolean) => void) {
+export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boolean) => void, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'leaders'), orderBy('points', 'desc'), limit(50));
   return onSnapshot(q, (snapshot) => {
     const leaders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
     callback(leaders, snapshot.metadata.hasPendingWrites);
   }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, 'leaders');
+    if (errorCallback) errorCallback(error);
+    handleFirestoreError(error, OperationType.GET, 'leaders');
   });
 }
 
-export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending: boolean) => void) {
-  const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(200));
+export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending: boolean) => void, limitCount = 50, errorCallback?: (err: Error) => void) {
+  const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
     const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
     callback(matches, snapshot.metadata.hasPendingWrites);
   }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, 'matches');
+    if (errorCallback) errorCallback(error);
+    handleFirestoreError(error, OperationType.GET, 'matches');
   });
 }
 
-export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void, limitCount = 100) {
+export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void, limitCount = 50, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
     const tournaments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
     callback(tournaments, snapshot.metadata.hasPendingWrites);
   }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, 'tournaments');
+    if (errorCallback) errorCallback(error);
+    handleFirestoreError(error, OperationType.GET, 'tournaments');
   });
 }
 

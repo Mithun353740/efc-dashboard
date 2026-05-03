@@ -13,7 +13,7 @@ import {
 } from '../lib/store';
 import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture, AuctionState, ClubInboxMessage, PlayerInboxMessage } from '../types';
 import { getPlayerGrade, GRADE_COLORS } from '../lib/utils';
-import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check, Bell, ArrowLeftRight, X, PenTool, LayoutDashboard } from 'lucide-react';
+import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check, Bell, ArrowLeftRight, X, PenTool, LayoutDashboard, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClubAuction from './club/ClubAuction';
 import ClubInbox from './club/ClubInbox';
@@ -126,7 +126,7 @@ function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; 
 
       {/* Name + stats */}
       <div className="absolute bottom-0 inset-x-0 p-1.5 md:p-2 z-20" style={{ background: `linear-gradient(to top, ${pri}90, transparent)` }}>
-        <p className="text-white font-black text-[7px] md:text-[9px] leading-none truncate uppercase tracking-wide">{player.name.split(' ')[0]}</p>
+        <p className="text-white font-black text-[7px] md:text-[9px] leading-none truncate uppercase tracking-wide">{player.name?.split(' ')?.[0] || '??'}</p>
         <div className="flex gap-1.5 md:gap-2 mt-0.5 md:mt-1">
           <span className="text-[6px] md:text-[7px] font-bold text-white/70">{winPct}%W</span>
           <span className="text-[6px] md:text-[7px] font-bold" style={{ color: gd >= 0 ? '#4ade80' : '#f87171' }}>GD{gd >= 0 ? '+' : ''}{gd}</span>
@@ -574,7 +574,7 @@ export default function ClubManager() {
   return (
     <div className="min-h-screen bg-[#020617] text-white selection:bg-amber-500/30 pb-10">
       {/* FIFA TOP STATUS BAR - Fully Responsive */}
-      <div className="bg-black/60 backdrop-blur-md border-b border-white/5 py-2 px-4 md:px-8 flex items-center justify-between sticky top-0 z-[100]">
+      <div className="bg-black/80 backdrop-blur-md border-b border-white/5 py-2 px-4 md:px-8 flex items-center justify-between sticky top-[64px] md:top-[80px] lg:top-[100px] z-[50]">
         <div className="flex items-center gap-3 md:gap-6">
           {/* Level Info */}
           <div className="flex items-center gap-2">
@@ -1790,7 +1790,7 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
                               className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all border",
                                 sel ? 'bg-amber-500 border-amber-500 text-black' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
                               )}>
-                              {p.name.split(' ')[0]} {sel && '✓'}
+                              {p.name?.split(' ')?.[0] || '??'} {sel && '✓'}
                             </button>
                           );
                         })}
@@ -1820,7 +1820,7 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
                           const selectedHId = matchupSelection[aId];
                           return (
                             <div key={aId} className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl border border-white/5">
-                              <span className="text-[10px] font-black text-slate-400 uppercase w-20 truncate text-right">{aName.split(' ')[0]}</span>
+                              <span className="text-[10px] font-black text-slate-400 uppercase w-20 truncate text-right">{aName?.split(' ')?.[0] || '??'}</span>
                               <span className="text-[10px] font-black text-slate-600">VS</span>
                               <select value={selectedHId || ''} onChange={e => setMatchupSelection({...matchupSelection, [aId]: e.target.value})} 
                                 className="flex-1 bg-white/10 border-0 p-2 rounded-xl text-[10px] font-black text-white focus:ring-1 ring-amber-500 outline-none uppercase">
@@ -1828,8 +1828,9 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
                                 {f.homeLineupIds.map(hId => {
                                   const assignedTo = Object.keys(matchupSelection).find(k => matchupSelection[k] === hId);
                                   const disabled = assignedTo && assignedTo !== aId;
+                                  const p = players.find(x => x.id === hId);
                                   return <option key={hId} value={hId} disabled={!!disabled} className="text-black">
-                                    {players.find(p => p.id === hId)?.name.split(' ')[0]} {disabled ? '(Assigned)' : ''}
+                                    {p?.name?.split(' ')?.[0] || '??'} {disabled ? '(Assigned)' : ''}
                                   </option>;
                                 })}
                               </select>
