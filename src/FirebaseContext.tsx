@@ -62,29 +62,34 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Minimum delay for branding aesthetics
+    // Minimum delay for branding aesthetics - Reduced for responsiveness
     const minLoadTimer = setTimeout(() => {
       if (mounted) setIsMinLoadTimePassed(true);
-    }, 2500);
+    }, 1000);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Error handler — triggered by store.ts when Firestore errors occur
+    // Quota Awareness & Error handling
     // ─────────────────────────────────────────────────────────────────────────
+    const checkQuota = (err: any) => {
+      const errStr = String(err).toLowerCase();
+      if (errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('resource-exhausted')) {
+        setDbError('QUOTA_EXCEEDED');
+        setIsLoadingPlayers(false);
+        setIsLoadingLeaders(false);
+        setIsLoadingMatches(false);
+        setIsMinLoadTimePassed(true);
+        return true;
+      }
+      return false;
+    };
+
     const errorHandler = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (!mounted || !customEvent.detail?.error) return;
+      if (checkQuota(customEvent.detail.error)) return;
 
       const errStr = String(customEvent.detail.error).toLowerCase();
-
-      // IMPORTANT: Stop all loading indicators so the app doesn't hang on a black screen
-      setIsLoadingPlayers(false);
-      setIsLoadingLeaders(false);
-      setIsLoadingMatches(false);
-      setIsMinLoadTimePassed(true); // Force release the lock
-
-      if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
-        setDbError('QUOTA_EXCEEDED');
-      } else if (errStr.includes('offline')) {
+      if (errStr.includes('offline')) {
         console.warn('[Firebase] Client reported offline');
       } else {
         setDbError('DATABASE_ERROR');
@@ -225,8 +230,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setIsLoadingPlayers(false);
         setIsLoadingLeaders(false);
         setIsLoadingMatches(false);
+        setIsMinLoadTimePassed(true); // CRITICAL: Stop the black screen even if data hangs
+        console.warn('[System] Loading timeout reached. Releasing UI lock.');
       }
-    }, 6000);
+    }, 4500);
 
     // ─────────────────────────────────────────────────────────────────────────
     // TOURNAMENT INTEGRATION: Handle messages from the embedded Tournament System

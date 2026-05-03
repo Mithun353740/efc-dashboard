@@ -515,15 +515,24 @@ export default function ClubManager() {
     setLoading(false);
   };
 
+  // Real-time clubs subscription
   useEffect(() => {
     load();
-    // Real-time clubs subscription
     const unsub = subscribeToClubs((cs) => {
-      setClubs(cs);
-      if (_clubCache) _clubCache.clubs = cs;
+      setClubs(cs || []);
+      if (_clubCache) _clubCache.clubs = cs || [];
       setLoading(false);
     });
-    return unsub;
+    
+    // Safety timeout: don't hang on "Loading Club Data" forever on mobile
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
+    return () => {
+      unsub();
+      clearTimeout(timer);
+    };
   }, []);
 
   // Subscribe to inbox when owner is identified
@@ -718,7 +727,14 @@ export default function ClubManager() {
                           </h3>
                         </div>
                         <div className="flex-1 overflow-hidden">
-                          <ClubInbox ownerId={playerId} myClub={myClub} allClubs={clubs} allPlayers={players} />
+                          <ClubInbox 
+                            ownerId={playerId} 
+                            myClub={myClub} 
+                            allClubs={clubs} 
+                            allPlayers={players} 
+                            initialMessages={inboxMessages}
+                            initialUnread={inboxUnread}
+                          />
                         </div>
                       </div>
                     ) : (
@@ -731,7 +747,7 @@ export default function ClubManager() {
                         </div>
                         <div className="flex-1 overflow-hidden">
                           {myPlayer ? (
-                            <PlayerInbox player={myPlayer} />
+                            <PlayerInbox player={myPlayer} allClubs={clubs} />
                           ) : (
                             <div className="flex flex-col items-center justify-center h-full text-slate-500">
                               <Search size={48} className="mb-4 opacity-20" />

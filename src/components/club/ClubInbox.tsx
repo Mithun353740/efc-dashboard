@@ -33,12 +33,14 @@ interface ClubInboxProps {
   allClubs: Club[];
   allPlayers: Player[];
   onClose?: () => void;
+  initialMessages?: ClubInboxMessage[];
+  initialUnread?: number;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function ClubInbox({ ownerId, myClub, allClubs, allPlayers, onClose }: ClubInboxProps) {
-  const [messages, setMessages] = useState<ClubInboxMessage[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+export default function ClubInbox({ ownerId, myClub, allClubs, allPlayers, onClose, initialMessages, initialUnread }: ClubInboxProps) {
+  const [messages, setMessages] = useState<ClubInboxMessage[]>(initialMessages || []);
+  const [unreadCount, setUnreadCount] = useState(initialUnread || 0);
   const [activeThread, setActiveThread] = useState<TransferThread | null>(null);
   const [threads, setThreads] = useState<TransferThread[]>([]);
   const [isLoadingThread, setIsLoadingThread] = useState(false);
@@ -51,14 +53,21 @@ export default function ClubInbox({ ownerId, myClub, allClubs, allPlayers, onClo
   const [counterNote, setCounterNote] = useState('');
   const markedRef = useRef(false);
 
-  // Real-time inbox subscription
+  // Sync with props if provided (ClubManager manages the main subscription)
   useEffect(() => {
+    if (initialMessages) setMessages([...initialMessages].sort((a, b) => b.createdAt - a.createdAt));
+    if (initialUnread !== undefined) setUnreadCount(initialUnread);
+  }, [initialMessages, initialUnread]);
+
+  // Fallback real-time inbox subscription (only if not provided by parent)
+  useEffect(() => {
+    if (initialMessages) return;
     const unsub = subscribeToInbox(ownerId, (msgs, count) => {
       setMessages([...msgs].sort((a, b) => b.createdAt - a.createdAt));
       setUnreadCount(count);
     });
     return unsub;
-  }, [ownerId]);
+  }, [ownerId, initialMessages]);
 
   // Mark all read when inbox is opened
   useEffect(() => {

@@ -17,23 +17,32 @@ function timeAgo(ts: number) {
 
 interface PlayerInboxProps {
   player: Player;
+  allClubs?: Club[];
   onClose?: () => void;
 }
 
-export default function PlayerInbox({ player, onClose }: PlayerInboxProps) {
+export default function PlayerInbox({ player, allClubs, onClose }: PlayerInboxProps) {
   const [messages, setMessages] = useState<PlayerInboxMessage[]>([]);
   const [activeMsg, setActiveMsg] = useState<PlayerInboxMessage | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [clubs, setClubs] = useState<Club[]>([]);
+  const [clubs, setClubs] = useState<Club[]>(allClubs || []);
 
   useEffect(() => {
     const unsub = subscribeToPlayerInbox(player.id, (msgs) => {
       setMessages([...msgs].sort((a, b) => b.createdAt - a.createdAt));
     });
-    fetchClubs().then(setClubs).catch(console.error);
+    
+    if (!allClubs) {
+      fetchClubs().then(setClubs).catch(console.error);
+    }
+    
     return unsub;
-  }, [player.id]);
+  }, [player.id, allClubs]);
+
+  useEffect(() => {
+    if (allClubs) setClubs(allClubs);
+  }, [allClubs]);
 
   const handleOpenMsg = async (msg: PlayerInboxMessage) => {
     setActiveMsg(msg);
