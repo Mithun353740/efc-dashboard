@@ -495,7 +495,14 @@ export default function ClubManager() {
   const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
 
   const myPlayer = useMemo(() => players.find(p => p.id === playerId), [players, playerId]);
-  const myClub = useMemo(() => clubs.find(c => c.squadIds?.includes(playerId) || c.ownerId === playerId), [clubs, playerId]);
+  const [myClub, setMyClub] = useState<Club | null>(null);
+
+  useEffect(() => {
+    if (!clubs.length || !playerId) return;
+    const found = clubs.find(c => c.squadIds?.includes(playerId) || c.ownerId === playerId);
+    setMyClub(found || null);
+  }, [clubs, playerId]);
+
   const squad = useMemo(() => myClub ? players.filter(p => myClub.squadIds?.includes(p.id)) : [], [players, myClub]);
   const isOwner = myClub?.ownerId === playerId;
 
@@ -689,8 +696,9 @@ export default function ClubManager() {
         config?.deadlineDayActive && "bg-gradient-to-b from-red-900/10 to-transparent"
       )}>
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-amber-400 font-black text-sm animate-pulse tracking-widest">LOADING CLUB DATA...</div>
+          <div className="flex flex-col items-center justify-center h-96 gap-6">
+            <div className="w-16 h-16 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+            <div className="text-amber-500 font-black text-xs md:text-sm animate-pulse tracking-[0.3em] uppercase">Initializing Club Systems...</div>
           </div>
         ) : (
           <AnimatePresence mode="wait">
@@ -985,19 +993,19 @@ export default function ClubManager() {
 
 function NoClubScreen() {
   return (
-    <div className="relative overflow-hidden rounded-[3rem] bg-[#020617] border border-white/5 p-12 text-center shadow-2xl">
-      <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-brand-purple/10" />
-      <div className="relative z-10">
-        <div className="w-24 h-24 bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto mb-8 border border-white/10 shadow-xl group hover:scale-110 transition-transform">
-          <Layers size={40} className="text-slate-400" />
+    <div className="relative overflow-hidden rounded-[3rem] bg-slate-900 border border-white/5 p-8 md:p-12 text-center shadow-2xl min-h-[400px] flex flex-col items-center justify-center">
+      <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/10 via-transparent to-amber-500/10" />
+      <div className="relative z-10 w-full max-w-md mx-auto">
+        <div className="w-20 h-20 bg-brand-purple/10 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-brand-purple/20 shadow-xl group hover:scale-110 transition-transform">
+          <Layers size={36} className="text-brand-purple" />
         </div>
-        <h2 className="text-4xl font-black text-white mb-4 tracking-tighter italic uppercase">Club Hub Offline</h2>
-        <p className="text-slate-400 font-bold text-sm max-w-sm mx-auto leading-relaxed">
-          You are not currently assigned as an owner or player of any club. Please contact your league admin to get registered.
+        <h2 className="text-2xl md:text-4xl font-black text-white mb-3 tracking-tighter italic uppercase">Club Hub Offline</h2>
+        <p className="text-slate-400 font-bold text-xs md:text-sm max-w-xs mx-auto leading-relaxed">
+          You are not currently assigned to a club. Contact your league admin or refresh to see if your assignment has been updated.
         </p>
-        <div className="mt-10 flex gap-4 justify-center">
-          <Link to="/" className="px-8 py-4 bg-white/5 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all border border-white/5">Back to Home</Link>
-          <button onClick={() => window.location.reload()} className="px-8 py-4 bg-amber-500 text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:scale-105 transition-all">Refresh Status</button>
+        <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+          <Link to="/" className="px-6 py-3 bg-white/5 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-white transition-all border border-white/5">Back to Home</Link>
+          <button onClick={() => window.location.reload()} className="px-6 py-3 bg-amber-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:scale-105 transition-all">Refresh Status</button>
         </div>
       </div>
     </div>

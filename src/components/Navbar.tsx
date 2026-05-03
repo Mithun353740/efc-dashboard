@@ -82,7 +82,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="flex items-center justify-between px-3 md:px-8 py-3 md:py-4 bg-white dark:bg-brand-dark border-b border-slate-100 dark:border-white/10 sticky top-0 z-[110] transition-colors overflow-hidden">
+    <nav className="flex items-center justify-between px-3 md:px-8 py-3 md:py-4 bg-white dark:bg-brand-dark border-b border-slate-100 dark:border-white/10 sticky top-0 z-[120] transition-colors">
       <Link to="/" className="flex items-center gap-1.5 md:gap-2 shrink-0">
         <div className="w-9 h-9 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-[#0f172a] dark:bg-[#020617] border border-brand-purple/40 shadow-[0_0_20px_rgba(139,92,246,0.4)] transition-all">
           <img 
@@ -111,10 +111,10 @@ export default function Navbar() {
       <div className="hidden md:flex items-center gap-8">
         {[
           { label: 'HOME', path: '/' },
-          { label: 'RANKINGS', path: '/rankings' },
+          {label: 'RANKINGS', path: '/rankings' },
           { label: 'ANALYTICS', path: '/stats' },
           { label: 'TOURNAMENTS', path: '/tournament' },
-          ...((!systemLocks?.clubManager || isAdmin || isClubOwner) && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
+          { label: 'CLUB ZONE', path: '/club', club: true },
           ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
         ].map((item: any) => (
           item.externalUrl ? (
@@ -261,7 +261,7 @@ export default function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="absolute top-full left-0 right-0 bg-white dark:bg-brand-dark border-b border-slate-100 dark:border-white/10 overflow-hidden md:hidden shadow-2xl"
+            className="absolute top-full left-0 right-0 bg-white dark:bg-brand-dark border-b border-slate-100 dark:border-white/10 overflow-hidden md:hidden shadow-2xl z-[130]"
           >
             <div className="flex flex-col p-4 border-t border-slate-100 dark:border-white/10">
               {[
@@ -269,7 +269,7 @@ export default function Navbar() {
                 { label: 'RANKINGS', path: '/rankings' },
                 { label: 'ANALYTICS', path: '/stats' },
                 { label: 'TOURNAMENTS', path: '/tournament' },
-                ...((!systemLocks?.clubManager || isAdmin || isClubOwner) && isPlayer ? [{ label: 'CLUB ZONE', path: '/club', club: true }] : []),
+                { label: 'CLUB ZONE', path: '/club', club: true },
                 ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
               ].map((item: any) => (
                 item.externalUrl ? (
