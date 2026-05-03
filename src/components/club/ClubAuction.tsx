@@ -31,7 +31,11 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
 
   // Role detection
   const isDedicatedAuctionAdmin = config?.auctionAdminId && loggedInPlayerId === config.auctionAdminId;
-  const canOperateControls = isAdmin || isDedicatedAuctionAdmin;
+  const isOwner = !!myClub;
+  
+  // CRITICAL: Only the assigned auction admin can see controls. 
+  // If no auction admin is assigned, global admins can help, but NOT if they are also owners (conflict of interest).
+  const canOperateControls = isDedicatedAuctionAdmin || (isAdmin && !isOwner && !config?.auctionAdminId);
 
   // Admin setup
   const [revealPlayerId, setRevealPlayerId] = useState('');
