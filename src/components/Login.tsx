@@ -21,15 +21,15 @@ export default function Login() {
     if (normalizedUser === 'QVFC' && pass === 'QVFC_19') {
       setIsLoading(true);
       try {
+        const { auth, db } = await import('../firebase');
         await loginAnonymously();
         localStorage.setItem('adminLoggedIn', 'true');
         localStorage.setItem('userType', 'admin');
         
-        // Register this session in Firestore for security rules
-        const { auth, db } = await import('../firebase');
+        // Register this session in sessions collection for security rules
         const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
         if (auth.currentUser) {
-          await setDoc(doc(db, 'admins', auth.currentUser.uid), {
+          await setDoc(doc(db, 'sessions', auth.currentUser.uid), {
             type: 'master',
             lastActive: serverTimestamp(),
             role: 'admin'
@@ -70,29 +70,29 @@ export default function Login() {
         localStorage.setItem('playerLoggedIn', 'true');
         localStorage.setItem('playerId', playerDoc.id);
         localStorage.setItem('playerName', playerData.name);
-        // NOTE: playerImage intentionally NOT stored in localStorage.
-        // Images can be large enough to exceed the ~5MB localStorage quota.
-        // The image is read from the live Firestore players context instead.
         localStorage.setItem('userType', 'player');
 
-        // Check if this player is also an Admin via their role field
-        if (playerData.role === 'admin' || playerData.email === 'mithun47490@gmail.com') {
-           localStorage.setItem('adminLoggedIn', 'true');
-           // Register this session as an Admin session in Firestore for security rules
-           try {
-             const { auth } = await import('../firebase');
-             const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-             if (auth.currentUser) {
-               await setDoc(doc(db, 'admins', auth.currentUser.uid), {
-                 playerId: playerDoc.id,
-                 email: user,
-                 lastActive: serverTimestamp(),
-                 role: 'admin'
-               });
-             }
-           } catch (err) {
-             console.warn('[Security] Could not register admin session:', err);
-           }
+        // Always ensure a Firebase Auth session for security rules
+        try {
+          const { auth, db } = await import('../firebase');
+          const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+          
+          if (!auth.currentUser) {
+            await loginAnonymously();
+          }
+          
+          if (auth.currentUser) {
+            // Register this session to link Auth UID with Player ID
+            await setDoc(doc(db, 'sessions', auth.currentUser.uid), {
+              playerId: playerDoc.id,
+              playerName: playerData.name,
+              email: user,
+              lastActive: serverTimestamp(),
+              role: playerData.role || 'player'
+            });
+          }
+        } catch (err) {
+          console.warn('[Security] Could not link player session:', err);
         }
 
         navigate('/stats');
@@ -113,16 +113,33 @@ export default function Login() {
       if (user.email === 'mithun47490@gmail.com') {
         localStorage.setItem('adminLoggedIn', 'true');
         localStorage.setItem('userType', 'admin');
-        navigate('/admin');
-      } else {
-        setError('Unauthorized account. Only the club owner can access the Control Center.');
+        
+        // Register this session in sessions collection for security rules
+      try {
+        const { db } = await import('../firebase');
+        const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+        if (auth.currentUser) {
+          await setDoc(doc(db, 'sessions', auth.currentUser.uid), {
+            type: 'master',
+            email: user.email,
+            lastActive: serverTimestamp(),
+            role: 'admin'
+          });
+        }
+      } catch (err) {
+        console.warn('[Security] Could not register superadmin session:', err);
       }
-    } catch (err: any) {
-      setError('Google Login failed: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsLoading(false);
+
+      navigate('/admin');
+    } else {
+      setError('Unauthorized account. Only the club owner can access the Control Center.');
     }
-  };
+  } catch (err: any) {
+    setError('Google Login failed: ' + (err.message || 'Unknown error'));
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   if (loginType === 'select') {
     return (

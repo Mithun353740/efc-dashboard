@@ -14,14 +14,28 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.token.email == "mithun47490@gmail.com";
     }
 
-    // A user is an Admin if they are the SuperAdmin OR if they have a registered session in the admins collection
+    // Check if the user has a valid admin session
     function isAdmin() {
-      return isSuperAdmin() || exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return isSuperAdmin() || 
+             exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+             (exists(/databases/$(database)/documents/sessions/$(request.auth.uid)) && 
+              get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    // Get the player ID associated with the current session
+    function getSessionPlayerId() {
+      return get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.playerId;
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
+
+    // Sessions collection (Maps Auth UID to Player ID)
+    match /sessions/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow write: if isAuthenticated() && request.auth.uid == uid;
+    }
 
     // Admins collection (Internal list of authorized sessions)
     match /admins/{uid} {
@@ -70,7 +84,13 @@ service cloud.firestore {
     // Settings collection
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || 
+                    (isAuthenticated() && settingId == 'clubConfig' && 
+                     (
+                       (resource != null && getSessionPlayerId() == resource.data.auctionAdminId) ||
+                       (request.resource != null && getSessionPlayerId() == request.resource.data.auctionAdminId)
+                     )
+                    );
     }
 
     match /settings/locks/{lockId} {

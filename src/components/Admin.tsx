@@ -14,7 +14,7 @@ import { CLUB_LOGO, CLUB_NAME, VERSION } from '../constants';
 export default function Admin() {
   const { players, leaders, matches, tournaments, systemLocks, dbError, hasPendingWrites, appVersion } = useFirebase();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials' | 'clubs'>('players');
+  const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials' | 'clubs' | 'auction'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   const [isResyncing, setIsResyncing] = useState(false);
   
@@ -508,6 +508,7 @@ export default function Admin() {
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} icon={<Trophy size={18} />} label="TOURNAMENTS" /></div>
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'locks'} onClick={() => setActiveTab('locks')} icon={<ShieldCheck size={18} />} label="LOCKS" /></div>
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'clubs'} onClick={() => setActiveTab('clubs')} icon={<Trophy size={18} />} label="CLUBS" /></div>
+            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'auction'} onClick={() => setActiveTab('auction')} icon={<Gavel size={18} />} label="AUCTION" /></div>
           </div>
         </div>
 
@@ -1191,9 +1192,9 @@ export default function Admin() {
                   </div>
                 </div>
               </motion.div>
-            ) : activeTab === 'clubs' ? (
-              <motion.div key="clubs" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
-                <ClubsAdminTab players={players} />
+            ) : activeTab === 'auction' ? (
+              <motion.div key="auction" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                <ClubsAdminTab players={players} forceAuctionSubtab={true} />
               </motion.div>
             ) : null}
             </AnimatePresence>
@@ -1505,7 +1506,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
     </div>
   );
 }
-function ClubsAdminTab({ players }: { players: Player[] }) {
+function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Player[], forceAuctionSubtab?: boolean }) {
   const currentSeasonName = `QVFC Club Season ${getSeasonInfo(new Date()).name}`;
   const DEFAULT_CFG: ClubSystemConfig = { 
     season: currentSeasonName, startingBudget: 5000000, transferWindowOpen: false, 
@@ -1537,7 +1538,12 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
   // flow: landing -> season_management | global_history | franchise_registry
   const [viewState, setViewState] = React.useState<'landing' | 'season_management' | 'global_history' | 'franchise_registry'>('landing');
   const [selectedSeason, setSelectedSeason] = React.useState<ClubSeason | null>(null);
-  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'auction'|'config'|'seasons'|'history'|'franchise'>('clubs');
+  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'auction'|'config'|'seasons'|'history'|'franchise'>(forceAuctionSubtab ? 'auction' : 'clubs');
+
+  // Sync subTab if forced changes
+  React.useEffect(() => {
+    if (forceAuctionSubtab) setSubTab('auction');
+  }, [forceAuctionSubtab]);
 
   // History state (3-layer navigation)
   const [hSeasons, setHSeasons] = React.useState<ClubSeason[]>([]);
@@ -1921,6 +1927,22 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     reader.onloadend = () => setFLogoFile(reader.result as string);
     reader.readAsDataURL(file);
   };
+  const handleSaveAuctionSettings = async () => {
+    setConfigSaving(true);
+    setMsg({ text: '⌛ Saving auction settings...', type: 'info' });
+    try {
+      await saveClubConfig(config);
+      setMsg({ text: '✅ Auction settings saved successfully', type: 'success' });
+    } catch (e: any) {
+      console.error('Save failed:', e);
+      setMsg({ text: '❌ Failed to save: ' + e.message, type: 'error' });
+    } finally { 
+      setConfigSaving(false); 
+      // Clear message after 3 seconds if success
+      setTimeout(() => setMsg(prev => prev.text.includes('saved successfully') ? { text: '', type: '' } : prev), 3000);
+    }
+  };
+
   const handleSaveConfig = async () => {
     setConfigSaving(true);
     try {
@@ -2254,9 +2276,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
 
   const currentAdminPlayerId = localStorage.getItem('playerId');
   const isSuperAdmin = localStorage.getItem('adminLoggedIn') === 'true';
-  const canModifyAuctionAdmin = !config.auctionAdminId || 
-                                config.auctionAdminId === currentAdminPlayerId || 
-                                (isSuperAdmin && !players.some(p => p.id === config.auctionAdminId));
+  const canModifyAuctionAdmin = isSuperAdmin || !config.auctionAdminId || config.auctionAdminId === currentAdminPlayerId;
 
   const ClubLogoComp = ({ club, size = 'sm' }: { club: Club; size?: 'sm' | 'md' }) => {
     const dim = size === 'sm' ? 'w-10 h-10' : 'w-16 h-16';
@@ -3310,13 +3330,28 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                 </div>
 
                 <button 
-                  onClick={handleSaveConfig} 
+                  onClick={handleSaveAuctionSettings} 
                   disabled={configSaving}
-                  className="w-full py-4 bg-brand-purple/20 hover:bg-brand-purple/30 text-brand-purple border border-brand-purple/30 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50"
+                  className={cn(
+                    "w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50",
+                    "bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 border border-amber-500/30 shadow-lg shadow-amber-500/5"
+                  )}
                 >
                   {configSaving ? 'SAVING...' : 'SAVE AUCTION SETTINGS'}
                 </button>
-                {msg.text && <p className={cn('text-[10px] font-bold text-center mt-2', msg.type === 'success' ? 'text-emerald-400' : 'text-red-400')}>{msg.text}</p>}
+                {msg.text && (
+                  <motion.p 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn('text-[10px] font-bold text-center mt-2 px-4 py-2 rounded-lg', 
+                      msg.type === 'success' ? 'text-emerald-400 bg-emerald-500/10' : 
+                      msg.type === 'info' ? 'text-blue-400 bg-blue-500/10' :
+                      'text-red-400 bg-red-500/10'
+                    )}
+                  >
+                    {msg.text}
+                  </motion.p>
+                )}
               </div>
             </div>
           ) : (
