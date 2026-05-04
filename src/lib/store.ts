@@ -309,30 +309,101 @@ export function calculateOvrHybrid(player: Player, elo: number): number {
 
 export const INITIAL_PLAYERS: Player[] = [];
 
-export async function fetchPlayers(limitCount?: number): Promise<Player[]> {
-  const q = limitCount 
-    ? query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount))
-    : query(collection(db, 'players'));
-  const snap = await getDocs(q);
-  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA CACHING & DEDUPLICATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
 }
 
-export async function fetchLeaders(): Promise<Leader[]> {
-  const q = query(collection(db, 'leaders'), limit(50));
-  const snap = await getDocs(q);
-  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes default
+const _cache = new Map<string, CacheEntry<any>>();
+const _pendingRequests = new Map<string, Promise<any>>();
+
+/**
+ * Executes a query with caching and deduplication.
+ */
+async function fetchWithCache<T>(key: string, queryFn: () => Promise<T>, ttl = CACHE_TTL): Promise<T> {
+  const now = Date.now();
+  const cached = _cache.get(key);
+  
+  if (cached && (now - cached.timestamp < ttl)) {
+    return cached.data;
+  }
+
+  if (_pendingRequests.has(key)) {
+    return _pendingRequests.get(key);
+  }
+
+  const promise = queryFn().finally(() => _pendingRequests.delete(key));
+  _pendingRequests.set(key, promise);
+
+  try {
+    const data = await promise;
+    _cache.set(key, { data, timestamp: now });
+    return data;
+  } catch (error) {
+    throw error;
+  }
 }
 
-export async function fetchMatches(): Promise<MatchRecord[]> {
-  const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(100));
-  const snap = await getDocs(q);
-  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
+/**
+ * Clears specific or all cache entries.
+ */
+export function invalidateCache(key?: string) {
+  if (key) {
+    _cache.delete(key);
+  } else {
+    _cache.clear();
+  }
 }
 
-export async function fetchTournaments(): Promise<Tournament[]> {
-  const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(50));
-  const snap = await getDocs(q);
-  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
+export async function fetchPlayers(limitCount?: number, force = false): Promise<Player[]> {
+  const cacheKey = `players_${limitCount || 'all'}`;
+  if (force) invalidateCache(cacheKey);
+
+  return fetchWithCache(cacheKey, async () => {
+    const q = limitCount 
+      ? query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount))
+      : query(collection(db, 'players'));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+  });
+}
+
+export async function fetchLeaders(force = false): Promise<Leader[]> {
+  const cacheKey = 'leaders_top50';
+  if (force) invalidateCache(cacheKey);
+
+  return fetchWithCache(cacheKey, async () => {
+    const q = query(collection(db, 'leaders'), limit(50));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
+  });
+}
+
+export async function fetchMatches(limitCount = 100, force = false): Promise<MatchRecord[]> {
+  const cacheKey = `matches_${limitCount}`;
+  if (force) invalidateCache(cacheKey);
+
+  return fetchWithCache(cacheKey, async () => {
+    const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
+  });
+}
+
+export async function fetchTournaments(force = false): Promise<Tournament[]> {
+  const cacheKey = 'tournaments_active';
+  if (force) invalidateCache(cacheKey);
+
+  return fetchWithCache(cacheKey, async () => {
+    const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(50));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -988,15 +1059,14 @@ export async function bootstrapData() {
 // page is actually open. Each visitor pays at most ~3 reads per page load.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Fetch the club system config (1 read). */
-export async function fetchClubConfig(): Promise<ClubSystemConfig | null> {
-  try {
+export async function fetchClubConfig(force = false): Promise<ClubSystemConfig | null> {
+  const cacheKey = 'club_config';
+  if (force) invalidateCache(cacheKey);
+
+  return fetchWithCache(cacheKey, async () => {
     const snap = await getDoc(doc(db, 'settings', 'clubConfig'));
-    if (snap.exists()) return snap.data() as ClubSystemConfig;
-  } catch (err) {
-    console.warn('[Club] fetchClubConfig failed:', err);
-  }
-  return null;
+    return snap.exists() ? (snap.data() as ClubSystemConfig) : null;
+  });
 }
 
 /** Persist the club system config (1 write). */
@@ -1010,25 +1080,21 @@ export async function saveClubConfig(config: ClubSystemConfig): Promise<void> {
   }
 }
 
-/** Fetch all clubs (1 read per club doc — very small collection). */
-export function subscribeToClubs(callback: (clubs: Club[]) => void) {
-  const q = query(collection(db, 'clubs'), orderBy('name', 'asc'));
-  return onSnapshot(q, (snapshot) => {
-    const clubs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Club));
-    callback(clubs);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, 'clubs');
+export async function fetchClubs(force = false): Promise<Club[]> {
+  const cacheKey = 'clubs_all';
+  if (force) invalidateCache(cacheKey);
+  
+  return fetchWithCache(cacheKey, async () => {
+    const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc')));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
   });
 }
 
-export async function fetchClubs(): Promise<Club[]> {
-  try {
-    const snap = await getDocs(query(collection(db, 'clubs'), limit(100)));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
-  } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, 'clubs');
-    return [];
-  }
+export function subscribeToClubs(callback: (clubs: Club[]) => void) {
+  const q = query(collection(db, 'clubs'), orderBy('name', 'asc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Club)));
+  }, (err) => handleFirestoreError(err, OperationType.GET, 'clubs'));
 }
 
 /**
@@ -1156,14 +1222,14 @@ export async function removePlayerFromClubSquad(club: Club, playerId: string): P
 }
 
 /** Fetch all active market listings (1 collection read). */
-export async function fetchMarketListings(): Promise<MarketListing[]> {
-  try {
-    const snap = await getDocs(query(collection(db, 'clubListings'), limit(100)));
+export async function fetchMarketListings(force = false): Promise<MarketListing[]> {
+  const cacheKey = 'club_market_listings';
+  if (force) invalidateCache(cacheKey);
+
+  return fetchWithCache(cacheKey, async () => {
+    const snap = await getDocs(query(collection(db, 'clubListings'), orderBy('createdAt', 'desc'), limit(100)));
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketListing));
-  } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, 'clubListings');
-    return [];
-  }
+  });
 }
 
 /**
@@ -1979,11 +2045,6 @@ export async function fetchGlobalSeasons(): Promise<GlobalSeason[]> {
 // ═════════════════════════════════════════════════════════════════════════════
 // FRANCHISE REGISTRY (EMPTY CLUBS)
 // ═════════════════════════════════════════════════════════════════════════════
-
-export async function fetchAllClubs(): Promise<Club[]> {
-  const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc')));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
-}
 
 export async function assignClubOwner(clubId: string, player: Player): Promise<void> {
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');

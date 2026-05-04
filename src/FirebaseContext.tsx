@@ -10,7 +10,11 @@ import {
   sortRankedPlayers,
   testFirestoreConnection,
   computeGlobalElo,
-  addMatch
+  addMatch,
+  fetchPlayers,
+  fetchLeaders,
+  fetchMatches,
+  fetchTournaments
 } from './lib/store';
 import { VERSION } from './constants';
 
@@ -109,16 +113,53 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
     const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
 
-    let unsubPlayers: () => void = () => {};
-    let unsubLeaders: () => void = () => {};
-    let unsubMatches: () => void = () => {};
-    let unsubTournaments: () => void = () => {};
-
     // Only probe server health for admins — guests use IndexedDB persistence as fallback
     if (isAdmin) testFirestoreConnection();
 
     // ─────────────────────────────────────────────────────────────────────────
-    // OPTIMIZED SUBSCRIPTIONS
+    // OPTIMIZED DATA FETCHING (PULL + CACHE)
+    // ─────────────────────────────────────────────────────────────────────────
+    const loadInitialData = async () => {
+      if (!mounted) return;
+      try {
+        const [p, l, m, t] = await Promise.all([
+          fetchPlayers(isAdmin ? 100 : (isPlayer ? 60 : 30)),
+          fetchLeaders(),
+          isAdmin ? fetchMatches(100) : Promise.resolve([]),
+          fetchTournaments()
+        ]);
+
+        if (mounted) {
+          setPlayers(p);
+          setLeaders(l);
+          setMatches(m);
+          setTournaments(t);
+          
+          setIsLoadingPlayers(false);
+          setIsLoadingLeaders(false);
+          setIsLoadingMatches(false);
+          setIsMinLoadTimePassed(true);
+          
+          if (_globalCache) {
+            _globalCache.players = p;
+            _globalCache.leaders = l;
+            _globalCache.matches = m;
+            _globalCache.tournaments = t;
+          }
+        }
+      } catch (err) {
+        if (mounted) {
+          checkQuota(err);
+          setIsLoadingPlayers(false);
+          setIsLoadingLeaders(false);
+          setIsLoadingMatches(false);
+          setIsMinLoadTimePassed(true);
+        }
+      }
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // REAL-TIME SUBSCRIPTIONS (MINIMAL)
     // ─────────────────────────────────────────────────────────────────────────
     // 1. System Locks — Always needed (tiny doc)
     const unsubLocks = subscribeToSystemLocks((locks) => {
@@ -128,7 +169,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // 1b. App Version — Real-time update monitoring
+    // 1b. App Version — Real-time update monitoring (tiny doc)
     const unsubVersion = subscribeToAppVersion((version) => {
       if (mounted && version) {
         setAppVersion(version);
@@ -136,70 +177,45 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // 2. Leaders — Always needed for Home Page (small set)
-    unsubLeaders = subscribeToLeaders((data, pending) => {
-      if (!mounted) return;
-      setLeaders(data);
-      setHasPendingWrites(pending);
-      setIsLoadingLeaders(false);
-      if (_globalCache) _globalCache.leaders = data;
-    }, (err) => {
-      // Direct catch for the leaders fetch
-      if (mounted) {
-        setIsLoadingLeaders(false);
-        setIsMinLoadTimePassed(true);
-      }
-    });
+    // Initial Pull
+    loadInitialData();
 
-    // 3. Conditional Heavy Data (Matches, Players, Tournaments)
-    // - Admins: Get the "Full" history for management.
-    // - Players/Guests: Get the "Lite" optimized view (matches are pre-computed in player docs).
+    // 2. Only subscribe to big collections if Admin is logged in 
+    // This allows admins to see changes live while managing, 
+    // but saves 1000s of reads for regular users.
+    let unsubPlayers: () => void = () => {};
+    let unsubLeaders: () => void = () => {};
+    let unsubMatches: () => void = () => {};
+    let unsubTournaments: () => void = () => {};
+
     if (isAdmin) {
-      unsubMatches = subscribeToMatches((data, pending) => {
+      unsubLeaders = subscribeToLeaders((data) => {
         if (mounted) {
-          setMatches(data);
-          setIsLoadingMatches(false);
-          if (_globalCache) _globalCache.matches = data;
+          setLeaders(data);
+          if (_globalCache) _globalCache.leaders = data;
         }
-        matchesRef.current = data;
       });
 
-      unsubPlayers = subscribeToPlayers((data, pending) => {
-        if (!mounted) return;
-        setPlayers(data);
-        setIsLoadingPlayers(false);
-        if (_globalCache) _globalCache.players = data;
-      }, 100);
+      unsubMatches = subscribeToMatches((data) => {
+        if (mounted) {
+          setMatches(data);
+          if (_globalCache) _globalCache.matches = data;
+        }
+      });
 
-      unsubTournaments = subscribeToTournaments((data, pending) => {
-        if (!mounted) return;
-        setTournaments(data);
-        if (_globalCache) _globalCache.tournaments = data;
-      }, 50);
-    } else {
-      // NON-ADMINS: Save massive reads by not downloading the matches collection.
-      // Player stats are already embedded in the Player documents.
-      setMatches([]);
-      setIsLoadingMatches(false);
-
-      const playerLimit = isPlayer ? 60 : 24;
       unsubPlayers = subscribeToPlayers((data) => {
         if (mounted) {
           setPlayers(data);
-          setIsLoadingPlayers(false);
           if (_globalCache) _globalCache.players = data;
         }
-      }, playerLimit);
+      }, 100);
 
       unsubTournaments = subscribeToTournaments((data) => {
         if (mounted) {
           setTournaments(data);
           if (_globalCache) _globalCache.tournaments = data;
         }
-      }, 10);
-
-      setIsLoadingPlayers(false);
-      setIsLoadingLeaders(false);
+      }, 50);
     }
 
     // Initialize cache on first success

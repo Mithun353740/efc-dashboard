@@ -484,43 +484,41 @@ export default function ClubManager() {
   const isOwner = myClub?.ownerId === playerId;
 
   const load = async (force = false) => {
-    // Return cached data immediately unless forced or cache is empty
-    if (_clubCache && !force) {
-      setClubs(_clubCache.clubs);
-      if (_clubCache.config) setConfig(_clubCache.config);
-      setListings(_clubCache.listings);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
-    const [cfg, ls] = await Promise.all([fetchClubConfig(), fetchMarketListings()]);
-    if (_clubCache) {
-      _clubCache.config = cfg;
-      _clubCache.listings = ls;
+    try {
+      const [cfg, ls, cs] = await Promise.all([
+        fetchClubConfig(force),
+        fetchMarketListings(force),
+        fetchClubs(force)
+      ]);
+      
+      if (cfg) setConfig(cfg);
+      setListings(ls);
+      setClubs(cs || []);
+      
+      if (_clubCache) {
+        _clubCache.config = cfg;
+        _clubCache.listings = ls;
+        _clubCache.clubs = cs || [];
+      }
+    } catch (err) {
+      console.error('[ClubManager] Critical load error:', err);
+    } finally {
+      setLoading(false);
     }
-    if (cfg) setConfig(cfg);
-    setListings(ls);
-    setLoading(false);
   };
 
   // Real-time clubs subscription
   useEffect(() => {
+    // Initial load will use cache if available thanks to fetchClubs/Config implementation in store.ts
     load();
+
     const unsub = subscribeToClubs((cs) => {
       setClubs(cs || []);
       if (_clubCache) _clubCache.clubs = cs || [];
-      setLoading(false);
     });
-    
-    // Safety timeout: don't hang on "Loading Club Data" forever on mobile
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
 
-    return () => {
-      unsub();
-      clearTimeout(timer);
-    };
+    return () => unsub();
   }, []);
 
   // Subscribe to inbox when owner is identified
