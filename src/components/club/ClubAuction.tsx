@@ -232,8 +232,12 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
                         </div>
 
                         {/* Player image */}
-                        <div className="h-52 overflow-hidden">
-                          <img src={auctionState.currentPlayer!.image} alt={auctionState.currentPlayer!.name} className="w-full h-full object-cover object-top" style={{ maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)' }} />
+                        <div className="h-52 overflow-hidden flex items-center justify-center bg-white/5">
+                          {auctionState.currentPlayer?.image ? (
+                            <img src={auctionState.currentPlayer.image} alt={auctionState.currentPlayer.name} className="w-full h-full object-cover object-top" style={{ maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)' }} />
+                          ) : (
+                            <Users size={64} className="text-white/5" />
+                          )}
                         </div>
 
                         {/* Name + previous club */}

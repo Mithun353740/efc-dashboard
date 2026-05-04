@@ -191,7 +191,13 @@ export default function Tournament() {
                       </td>
                       <td className="p-3 md:p-6">
                         <div className="flex items-center gap-2 md:gap-4">
-                          <img src={player.image} alt={player.name} className="w-8 h-8 md:w-12 md:h-12 rounded-full object-cover border-2 border-transparent group-hover:border-brand-purple transition-colors" />
+                          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full overflow-hidden border-2 border-transparent group-hover:border-brand-purple transition-colors flex items-center justify-center bg-slate-100 dark:bg-white/5 shrink-0">
+                            {player.image ? (
+                              <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <Users size={16} className="text-slate-400" />
+                            )}
+                          </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-black text-[10px] md:text-sm text-brand-dark dark:text-white uppercase tracking-tight truncate">{player.name}</p>
                             <p className="hidden md:block text-[10px] font-bold text-slate-400 tracking-widest">#{player.number}</p>

@@ -12,7 +12,11 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-12">
           <div className="flex items-center gap-3 md:gap-5">
             <div className="w-12 h-12 md:w-16 md:h-16 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-brand-dark shadow-[0_0_20px_rgba(139,92,246,0.3)]">
-              <img src={CLUB_LOGO} alt={CLUB_NAME} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              {CLUB_LOGO ? (
+                <img src={CLUB_LOGO} alt={CLUB_NAME} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-full h-full bg-brand-gradient" />
+              )}
             </div>
             <div>
               <span className="font-black italic tracking-tighter text-xl md:text-2xl text-transparent bg-clip-text bg-brand-gradient block leading-none">

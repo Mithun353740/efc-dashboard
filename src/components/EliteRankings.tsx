@@ -55,8 +55,12 @@ export default function EliteRankings() {
               </span>
 
               <div className="relative z-10">
-                <div className="w-full aspect-square mb-3 md:mb-6 overflow-hidden rounded-xl transition-all duration-500 group-hover:scale-105">
-                  <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                <div className="w-full aspect-square mb-3 md:mb-6 overflow-hidden rounded-xl transition-all duration-500 group-hover:scale-105 bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                  {player.image ? (
+                    <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-brand-purple italic font-black text-2xl">QVC</div>
+                  )}
                 </div>
 
                 <h3 className="text-[11px] md:text-xl font-black text-brand-dark dark:text-white tracking-tight leading-tight truncate">{player.name}</h3>

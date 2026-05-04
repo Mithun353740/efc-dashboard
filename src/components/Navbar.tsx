@@ -85,23 +85,29 @@ export default function Navbar() {
     <nav className="flex items-center justify-between px-3 md:px-8 py-3 md:py-4 bg-white dark:bg-brand-dark border-b border-slate-100 dark:border-white/10 sticky top-0 z-[120] transition-colors">
       <Link to="/" className="flex items-center gap-1.5 md:gap-2 shrink-0">
         <div className="w-9 h-9 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-[#0f172a] dark:bg-[#020617] border border-brand-purple/40 shadow-[0_0_20px_rgba(139,92,246,0.4)] transition-all">
-          <img 
-            src={CLUB_LOGO}
-            alt={CLUB_NAME} 
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-            onError={(e) => {
-              const target = e.currentTarget;
-              target.style.display = 'none';
-              const parent = target.parentElement;
-              if (parent && !parent.querySelector('.fallback-v')) {
-                const fallback = document.createElement('div');
-                fallback.className = "fallback-v w-full h-full flex items-center justify-center text-white dark:text-brand-purple font-bold italic text-sm lg:text-2xl";
-                fallback.innerText = "QV";
-                parent.appendChild(fallback);
-              }
-            }}
-          />
+          {CLUB_LOGO ? (
+            <img 
+              src={CLUB_LOGO}
+              alt={CLUB_NAME} 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                const target = e.currentTarget;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent && !parent.querySelector('.fallback-v')) {
+                  const fallback = document.createElement('div');
+                  fallback.className = "fallback-v w-full h-full flex items-center justify-center text-white dark:text-brand-purple font-bold italic text-sm lg:text-2xl";
+                  fallback.innerText = "QV";
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white dark:text-brand-purple font-bold italic text-sm lg:text-2xl">
+              QV
+            </div>
+          )}
         </div>
         <span className="font-black italic tracking-tighter text-sm sm:text-2xl md:text-3xl lg:text-4xl text-transparent bg-clip-text bg-brand-gradient whitespace-nowrap truncate max-w-[100px] xs:max-w-[130px] sm:max-w-none">
           {CLUB_NAME}
@@ -173,8 +179,12 @@ export default function Navbar() {
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center gap-1.5 md:gap-2 group transition-all"
                 >
-                  <div className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-brand-purple/30 group-hover:border-brand-purple overflow-hidden shadow-lg shadow-brand-purple/10 transition-all">
-                    <img src={playerImage} alt={playerName} className="w-full h-full object-cover" />
+                  <div className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-brand-purple/30 group-hover:border-brand-purple overflow-hidden shadow-lg shadow-brand-purple/10 transition-all flex items-center justify-center bg-brand-purple/5">
+                    {playerImage ? (
+                      <img src={playerImage} alt={playerName} className="w-full h-full object-cover" />
+                    ) : (
+                      <User size={16} className="text-brand-purple/40" />
+                    )}
                   </div>
                   <ChevronDown size={12} className={`text-slate-400 group-hover:text-brand-purple transition-all hidden xs:block ${isDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>

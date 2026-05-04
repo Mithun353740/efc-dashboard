@@ -182,8 +182,12 @@ export default function Rankings() {
                     </td>
                     <td className="p-2 lg:p-6">
                       <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
-                        <div className="shrink-0 w-6 h-6 lg:w-10 lg:h-10 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden border border-slate-200 dark:border-white/10 group relative">
-                          <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                        <div className="shrink-0 w-6 h-6 lg:w-10 lg:h-10 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden border border-slate-200 dark:border-white/10 group relative flex items-center justify-center">
+                          {player.image ? (
+                            <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-[8px] lg:text-[10px] font-black text-brand-purple italic">QVC</span>
+                          )}
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -251,8 +255,12 @@ export default function Rankings() {
                     <span className={cn("text-lg font-black w-6 text-center", index === 0 ? "text-brand-purple" : "text-slate-300")}>
                       {index + 1}
                     </span>
-                    <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 dark:border-white/10">
-                      <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                    <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 dark:border-white/10 flex items-center justify-center bg-slate-100 dark:bg-white/5">
+                      {player.image ? (
+                        <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-[10px] font-black text-brand-purple italic">QVC</span>
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">

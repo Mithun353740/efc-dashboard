@@ -287,7 +287,13 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
                             isSelected ? 'bg-indigo-500/10 border-indigo-500' : 'bg-[#0a0a12] border-[#1e1e32] hover:border-slate-600'
                           }`}
                         >
-                          <img src={p.image} alt={p.name} className={`w-12 h-12 mx-auto rounded-xl object-cover mb-3 ${isSelected ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-[#050508]' : ''}`} />
+                          <div className={`w-12 h-12 mx-auto rounded-xl overflow-hidden mb-3 flex items-center justify-center bg-white/5 ${isSelected ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-[#050508]' : ''}`}>
+                            {p.image ? (
+                              <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <Users className="text-white/20" size={20} />
+                            )}
+                          </div>
                           <div className={`text-xs font-black truncate ${isSelected ? 'text-white' : 'text-slate-400'}`}>{p.name}</div>
                           <div className="text-[9px] font-bold text-slate-500 mt-1 uppercase tracking-widest">OVR {p.ovr}</div>
                         </button>

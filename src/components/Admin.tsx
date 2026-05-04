@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play } from 'lucide-react';
+import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -406,7 +406,11 @@ export default function Admin() {
       <div className="max-w-6xl mx-auto flex justify-between items-center mb-12">
         <div className="flex items-center gap-4 md:gap-6">
           <div className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 shrink-0 rounded-full overflow-hidden bg-[#020617] border border-brand-purple/40 flex items-center justify-center shadow-[0_0_30px_rgba(139,92,246,0.6)] transition-all hover:shadow-[0_0_40px_rgba(139,92,246,0.8)]">
-            <img src={CLUB_LOGO} alt={CLUB_NAME} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            {CLUB_LOGO ? (
+              <img src={CLUB_LOGO} alt={CLUB_NAME} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <Shield className="text-brand-purple/40" size={32} />
+            )}
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-brand-gradient">{CLUB_NAME}</h1>
@@ -920,9 +924,13 @@ export default function Admin() {
                     {leaders.map(leader => (
                       <div key={leader.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10">
-                            <img src={leader.image} className="w-full h-full object-cover" alt="" />
-                          </div>
+                            <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10 flex items-center justify-center bg-white/5">
+                              {leader.image ? (
+                                <img src={leader.image} className="w-full h-full object-cover" alt="" />
+                              ) : (
+                                <Users size={16} className="text-white/20" />
+                              )}
+                            </div>
                           <div>
                             <p className="text-xs font-black">{leader.name}</p>
                             <p className="text-[9px] font-bold text-slate-500 uppercase">{leader.role}</p>
@@ -1321,7 +1329,13 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
               <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute z-50 w-full mt-2 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
                 {players.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 6).map(p => (
                   <button key={p.id} type="button" onClick={() => handleSelectPlayer(p)} className="w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-0">
-                    <img src={p.image} className="w-8 h-8 rounded-lg object-cover" alt="" />
+                    <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
+                      {p.image ? (
+                        <img src={p.image} className="w-full h-full object-cover" alt="" />
+                      ) : (
+                        <Users size={12} className="text-white/20" />
+                      )}
+                    </div>
                     <div>
                       <p className="text-xs font-black">{p.name}</p>
                       <div className="flex items-center gap-2">
@@ -1343,7 +1357,13 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
         {selectedPlayer && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <div className="flex items-center gap-3 p-4 bg-brand-purple/5 border border-brand-purple/20 rounded-xl mb-4">
-              <img src={selectedPlayer.image} className="w-10 h-10 rounded-xl object-cover" alt="" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden border border-brand-purple/20 bg-brand-purple/5 flex items-center justify-center">
+                {selectedPlayer.image ? (
+                  <img src={selectedPlayer.image} className="w-full h-full object-cover" alt="" />
+                ) : (
+                  <Users size={16} className="text-brand-purple/40" />
+                )}
+              </div>
               <div>
                 <p className="text-xs font-black">{selectedPlayer.name}</p>
                 <p className="text-[9px] font-bold text-slate-500 uppercase">#{selectedPlayer.number}</p>
@@ -1392,7 +1412,13 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
         <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
           {players.map(p => (
             <button key={p.id} onClick={() => handleSelectPlayer(p)} className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-left border border-white/5">
-              <img src={p.image} className="w-9 h-9 rounded-lg object-cover shrink-0" alt="" />
+              <div className="w-9 h-9 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
+                {p.image ? (
+                  <img src={p.image} className="w-full h-full object-cover" alt="" />
+                ) : (
+                  <Users size={14} className="text-white/20" />
+                )}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black truncate">{p.name}</p>
                 <div className="flex flex-col">
@@ -1427,7 +1453,13 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
                 className="group relative flex items-center gap-3 p-3 bg-slate-900/40 border border-white/5 rounded-2xl hover:border-emerald-500/50 transition-all text-left overflow-hidden"
               >
                 <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0 grayscale group-hover:grayscale-0 transition-all" alt="" />
+                <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
+                  {p.image ? (
+                    <img src={p.image} className="w-full h-full object-cover shrink-0 grayscale group-hover:grayscale-0 transition-all" alt="" />
+                  ) : (
+                    <Users size={12} className="text-white/20" />
+                  )}
+                </div>
                 <div className="min-w-0 flex-1 relative z-10">
                   <p className="text-[10px] font-black text-slate-200 truncate uppercase tracking-tight">{p.name}</p>
                   <div className="flex items-center gap-1">
@@ -2233,7 +2265,13 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
     if (club.logo) {
       return (
         <div className={`${dim} ${rounded} overflow-hidden bg-white/5 border border-white/10 shrink-0`}>
-          <img src={club.logo} className="w-full h-full object-contain p-1" alt="" />
+          <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white/5">
+            {club.logo ? (
+              <img src={club.logo} className="w-full h-full object-contain p-1" alt="" />
+            ) : (
+              <Shield size={16} className="text-white/20" />
+            )}
+          </div>
         </div>
       );
     }
@@ -2302,7 +2340,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                   {form.logo ? (
                     <img src={form.logo} className="w-full h-full object-contain p-2" alt="Preview" />
                   ) : (
-                    <div className="text-[8px] font-bold text-slate-600 uppercase text-center p-2">No Logo</div>
+                    <Shield size={24} className="text-white/20" />
                   )}
                 </div>
                 <div className="flex-1">
@@ -2371,7 +2409,13 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                   <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute z-50 w-full mt-2 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
                     {filteredOwners.map(p => (
                       <button key={p.id} type="button" onClick={() => { setForm({...form, ownerId: p.id}); setOwnerSearch(''); setShowOwnerDrop(false); }} className="w-full p-3 flex items-center gap-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-0">
-                        <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
+                        <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
+                          {p.image ? (
+                            <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
+                          ) : (
+                            <Users size={12} className="text-white/20" />
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[10px] font-black truncate">{p.name}</p>
                           <p className="text-[8px] text-slate-500">#{p.number}{p.isClubOwner ? ' · Already owns a club' : ''}</p>
@@ -2494,7 +2538,13 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
               <div key={club.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 relative group overflow-hidden">
                 <div className="flex items-center gap-4 mb-6">
                   {club.logo ? (
-                    <img src={club.logo} className="w-16 h-16 rounded-2xl object-contain bg-white/5 p-2 shadow-lg" alt="" />
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/5 flex items-center justify-center p-2 shadow-lg">
+                      {club.logo ? (
+                        <img src={club.logo} className="w-full h-full object-contain" alt="" />
+                      ) : (
+                        <Shield size={24} className="text-white/20" />
+                      )}
+                    </div>
                   ) : (
                     <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg uppercase" style={{ background: `linear-gradient(135deg, ${club.primaryColor}, ${club.secondaryColor})` }}>
                       {club.shortName}
@@ -2576,7 +2626,13 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Logo Upload</label>
                         <label className="block w-full h-32 bg-white/5 border border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-amber-500/50 transition-all overflow-hidden relative group">
                           {fLogoFile ? (
-                            <img src={fLogoFile} className="w-full h-full object-contain p-4" alt="Logo" />
+                            <div className="w-full h-full flex items-center justify-center bg-white/5 p-4">
+                              {fLogoFile ? (
+                                <img src={fLogoFile} className="w-full h-full object-contain p-4" alt="Logo" />
+                              ) : (
+                                <Shield size={32} className="text-white/20" />
+                              )}
+                            </div>
                           ) : (
                             <>
                               <Upload className="text-slate-500 group-hover:text-amber-500 transition-colors" />
@@ -2942,17 +2998,35 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                     <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                       className="absolute z-50 w-full mt-1 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
                       {filtP1.map(p => (
-                        <button key={p.id} type="button" onClick={() => { setMForm({...mForm, p1Id: p.id}); setP1Search(''); setShowP1(false); }}
-                          className="w-full p-3 flex items-center gap-3 hover:bg-white/5 border-b border-white/5 last:border-0 text-left">
-                          <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
-                          <div><p className="text-[10px] font-black">{p.name}</p><p className="text-[8px] text-slate-500">OVR {p.ovr}</p></div>
-                        </button>
+                          <button key={p.id} type="button" onClick={() => { setMForm({...mForm, p1Id: p.id}); setP1Search(''); setShowP1(false); }}
+                            className="w-full p-3 flex items-center gap-3 hover:bg-white/5 border-b border-white/5 last:border-0 text-left">
+                            <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
+                              {p.image ? (
+                                <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
+                              ) : (
+                                <Users size={12} className="text-white/20" />
+                              )}
+                            </div>
+                            <div><p className="text-[10px] font-black">{p.name}</p><p className="text-[8px] text-slate-500">OVR {p.ovr}</p></div>
+                          </button>
                       ))}
                       {filtP1.length === 0 && <div className="p-3 text-center text-slate-500 text-xs font-bold">Not found</div>}
                     </motion.div>
                   )}
                 </AnimatePresence>
-                {p1Player && <div className="flex items-center gap-2 mt-2 p-2 bg-white/5 rounded-lg border border-white/5"><img src={p1Player.image} className="w-7 h-7 rounded-lg object-cover" alt="" /><span className="text-xs font-black text-white">{p1Player.name}</span><span className="text-[9px] text-slate-500 ml-auto">OVR {p1Player.ovr}</span></div>}
+                {p1Player && (
+                  <div className="flex items-center gap-2 mt-2 p-2 bg-white/5 rounded-lg border border-white/5">
+                    <div className="w-7 h-7 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center">
+                      {p1Player.image ? (
+                        <img src={p1Player.image} className="w-full h-full object-cover" alt="" />
+                      ) : (
+                        <Users size={12} className="text-white/20" />
+                      )}
+                    </div>
+                    <span className="text-xs font-black text-white">{p1Player.name}</span>
+                    <span className="text-[9px] text-slate-500 ml-auto">OVR {p1Player.ovr}</span>
+                  </div>
+                )}
               </div>
               {/* P2 picker */}
               <div className="space-y-1 relative">
@@ -2965,17 +3039,35 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                     <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                       className="absolute z-50 w-full mt-1 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
                       {filtP2.map(p => (
-                        <button key={p.id} type="button" onClick={() => { setMForm({...mForm, p2Id: p.id}); setP2Search(''); setShowP2(false); }}
-                          className="w-full p-3 flex items-center gap-3 hover:bg-white/5 border-b border-white/5 last:border-0 text-left">
-                          <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
-                          <div><p className="text-[10px] font-black">{p.name}</p><p className="text-[8px] text-slate-500">OVR {p.ovr}</p></div>
-                        </button>
+                          <button key={p.id} type="button" onClick={() => { setMForm({...mForm, p2Id: p.id}); setP2Search(''); setShowP2(false); }}
+                            className="w-full p-3 flex items-center gap-3 hover:bg-white/5 border-b border-white/5 last:border-0 text-left">
+                            <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
+                              {p.image ? (
+                                <img src={p.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
+                              ) : (
+                                <Users size={12} className="text-white/20" />
+                              )}
+                            </div>
+                            <div><p className="text-[10px] font-black">{p.name}</p><p className="text-[8px] text-slate-500">OVR {p.ovr}</p></div>
+                          </button>
                       ))}
                       {filtP2.length === 0 && <div className="p-3 text-center text-slate-500 text-xs font-bold">Not found</div>}
                     </motion.div>
                   )}
                 </AnimatePresence>
-                {p2Player && <div className="flex items-center gap-2 mt-2 p-2 bg-white/5 rounded-lg border border-white/5"><img src={p2Player.image} className="w-7 h-7 rounded-lg object-cover" alt="" /><span className="text-xs font-black text-white">{p2Player.name}</span><span className="text-[9px] text-slate-500 ml-auto">OVR {p2Player.ovr}</span></div>}
+                {p2Player && (
+                  <div className="flex items-center gap-2 mt-2 p-2 bg-white/5 rounded-lg border border-white/5">
+                    <div className="w-7 h-7 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center">
+                      {p2Player.image ? (
+                        <img src={p2Player.image} className="w-full h-full object-cover" alt="" />
+                      ) : (
+                        <Users size={12} className="text-white/20" />
+                      )}
+                    </div>
+                    <span className="text-xs font-black text-white">{p2Player.name}</span>
+                    <span className="text-[9px] text-slate-500 ml-auto">OVR {p2Player.ovr}</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-4 mb-4">
@@ -3199,7 +3291,13 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                   
                   {auctionState.currentPlayer ? (
                     <div className="flex items-center gap-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
-                      <img src={auctionState.currentPlayer.image} className="w-16 h-16 rounded-xl object-cover" alt="" />
+                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-black/40 flex items-center justify-center">
+                        {auctionState.currentPlayer.image ? (
+                          <img src={auctionState.currentPlayer.image} className="w-full h-full object-cover" alt="" />
+                        ) : (
+                          <Users size={24} className="text-white/10" />
+                        )}
+                      </div>
                       <div>
                         <p className="text-xs font-black text-white">{auctionState.currentPlayer.name}</p>
                         <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">{auctionState.currentPlayer.ovr} OVR PLAYER</p>

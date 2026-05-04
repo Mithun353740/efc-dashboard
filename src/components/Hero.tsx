@@ -71,18 +71,22 @@ export default function Hero({ player }: HeroProps) {
 
       {/* Player Image */}
       <div className="relative z-0 h-[52vh] md:absolute md:right-0 md:bottom-0 md:h-full w-full md:w-[50%] order-1 md:order-2 flex items-end justify-center md:justify-end">
-        <motion.img
-          initial={{ opacity: 0, scale: 1.05 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
-          src={player.image}
-          alt={player.name}
-          className="h-full w-full object-cover object-top md:object-center"
-          style={{
-            WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 65%, transparent 100%)',
-            maskImage: 'linear-gradient(to bottom, black 0%, black 65%, transparent 100%)'
-          }}
-        />
+        {player.image ? (
+          <motion.img
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            src={player.image}
+            alt={player.name}
+            className="h-full w-full object-cover object-top md:object-center"
+            style={{
+              WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 65%, transparent 100%)',
+              maskImage: 'linear-gradient(to bottom, black 0%, black 65%, transparent 100%)'
+            }}
+          />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-t from-brand-purple/10 to-transparent" />
+        )}
       </div>
     </section>
   );

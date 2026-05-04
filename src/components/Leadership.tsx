@@ -40,8 +40,12 @@ export default function Leadership() {
               className="relative pt-12"
             >
               <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 shadow-xl shadow-slate-200/50 dark:shadow-none rounded-xl md:rounded-2xl p-4 md:p-8 h-full flex flex-col items-center text-center transition-colors">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-16 md:w-24 md:h-24 rounded-full border-[3px] md:border-4 border-white dark:border-brand-dark shadow-lg overflow-hidden">
-                  <img src={leader.image} alt={leader.name} className="w-full h-full object-cover" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-16 md:w-24 md:h-24 rounded-full border-[3px] md:border-4 border-white dark:border-brand-dark shadow-lg overflow-hidden bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                  {leader.image ? (
+                    <img src={leader.image} alt={leader.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-brand-purple italic font-black text-2xl">{leader.initials}</div>
+                  )}
                 </div>
 
                 <div className="mt-6 md:mt-12 mb-4 md:mb-6">

@@ -80,7 +80,8 @@ function ClubLogo({ club, size = 'md' }: { club: Club; size?: 'xs' | 'sm' | 'md'
 function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; size?: 'sm' | 'md' | 'lg' }) {
   const form = getFormGrade(player.form || []);
   const formColor = { 'A': '#4ade80', 'B': '#84cc16', 'C': '#eab308', 'D': '#f97316', 'E': '#ef4444' }[form];
-  const dims = size === 'lg' ? 'w-36 h-48 md:w-44 md:h-60' : size === 'md' ? 'w-28 h-36 md:w-36 md:h-48' : 'w-24 h-32 md:w-28 md:h-36';
+  // More compact dimensions for mobile
+  const dims = size === 'lg' ? 'w-28 h-36 md:w-36 md:h-48 lg:w-44 lg:h-60' : size === 'md' ? 'w-20 h-28 md:w-28 md:h-36 lg:w-36 lg:h-48' : 'w-16 h-24 md:w-24 md:h-32 lg:w-28 lg:h-36';
   const pri = club?.primaryColor || '#8b5cf6';
   const sec = club?.secondaryColor || '#f59e0b';
   const total = player.win + player.loss + player.draw;
@@ -116,12 +117,18 @@ function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; 
 
       {/* Player image */}
       <div className="absolute inset-x-0 top-5 bottom-8 md:top-6 md:bottom-10 flex items-end justify-center">
-        <img
-          src={player.image}
-          alt={player.name}
-          className="w-full h-full object-cover object-top"
-          style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }}
-        />
+        {player.image ? (
+          <img
+            src={player.image}
+            alt={player.name}
+            className="w-full h-full object-cover object-top"
+            style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-white/5">
+            <Users size={32} className="text-white/10" />
+          </div>
+        )}
       </div>
 
       {/* Name + stats */}
@@ -181,78 +188,72 @@ function ClubStatBar({ label, val, icon }: { label: string; val: string | number
 function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, setActiveTab }: { 
   myClub: Club; squad: Player[]; allClubs: Club[]; config: ClubSystemConfig | null; matches: MatchRecord[];
   inboxUnread: number;
-  setActiveTab: (t: 'overview' | 'squad' | 'market' | 'auction' | 'tournaments' | 'inbox' | 'player_inbox') => void;
+  setActiveTab: (t: 'overview' | 'squad' | 'market' | 'auction' | 'rankings' | 'tournaments' | 'inbox' | 'player_inbox') => void;
 }) {
   const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
   
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:auto-rows-min lg:auto-rows-[200px]">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 md:auto-rows-min lg:auto-rows-[180px]">
       {/* ── MAIN HUB WIDGET (FIFA 24 STYLE) ── */}
-      <div className="md:col-span-4 lg:col-span-3 row-span-2 relative group overflow-hidden rounded-[2rem] md:rounded-[2.5rem] bg-[#020617] border border-white/5 p-6 md:p-12 flex flex-col justify-between transition-all shadow-2xl hover:border-amber-500/30">
+      <div className="md:col-span-4 lg:col-span-3 row-span-2 relative group overflow-hidden rounded-2xl md:rounded-[2rem] bg-[#020617] border border-white/5 p-4 md:p-8 flex flex-col justify-between transition-all shadow-2xl hover:border-amber-500/30">
         {/* Dynamic Background FX */}
         <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/20 via-transparent to-amber-500/10 opacity-40 group-hover:opacity-60 transition-opacity" />
-        <div className="absolute top-0 right-0 w-64 h-64 md:w-96 md:h-96 bg-brand-purple/20 blur-[80px] md:blur-[120px] rounded-full -mr-24 -mt-24 md:-mr-32 md:-mt-32 animate-pulse" />
+        <div className="absolute top-0 right-0 w-48 h-48 md:w-80 md:h-80 bg-brand-purple/20 blur-[60px] md:blur-[100px] rounded-full -mr-16 -mt-16 md:-mr-32 md:-mt-32 animate-pulse" />
         
-        <div className="relative z-10 flex flex-col md:row items-start justify-between gap-6 md:gap-8 h-full">
-          <div className="flex-1 w-full">
+        <div className="relative z-10 flex flex-col md:flex-row items-start justify-between gap-4 md:gap-4 h-full">
+          <div className="flex-1 w-full text-center md:text-left">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-              <p className="text-[10px] md:text-[12px] font-black tracking-[0.3em] md:tracking-[0.5em] text-amber-500 uppercase mb-3 md:mb-4 drop-shadow-lg">VORTEX ELITE FRANCHISE</p>
-              <div className="flex items-center gap-4 md:gap-6">
-                <ClubLogo club={myClub} size="lg" />
-                <h2 className="text-3xl sm:text-5xl md:text-8xl font-black text-white tracking-tighter uppercase italic leading-[0.9] truncate max-w-full select-none">
+              <p className="text-[7px] md:text-[11px] font-black tracking-[0.2em] md:tracking-[0.4em] text-amber-500 uppercase mb-1 md:mb-3 drop-shadow-lg">VORTEX ELITE FRANCHISE</p>
+              <div className="flex flex-col md:flex-row items-center gap-2 md:gap-5">
+                <ClubLogo club={myClub} size="md" />
+                <h2 className="text-xl sm:text-3xl md:text-5xl lg:text-5xl font-black text-white tracking-tighter uppercase italic leading-[0.9] truncate max-w-full select-none">
                   {myClub.name}
                 </h2>
               </div>
               
-              <div className="flex flex-wrap gap-2 md:gap-4 mt-6 md:mt-10">
-                <div className="px-4 md:px-6 py-2 md:py-3 bg-white/5 border border-white/10 rounded-full flex items-center gap-2 md:gap-3 group-hover:bg-white/10 transition-all cursor-default">
-                  <Shield size={14} className="text-amber-500" />
-                  <span className="text-[9px] md:text-[11px] font-black text-white uppercase tracking-[0.1em] md:tracking-[0.2em]">{myClub.shortName}</span>
-                </div>
-                <div className="hidden xs:flex px-4 md:px-6 py-2 md:py-3 bg-white/5 border border-white/10 rounded-full items-center gap-2 md:gap-3">
-                  <div className="flex gap-1">
-                    <div className="w-2.5 h-2.5 rounded-full shadow-lg" style={{ background: myClub.primaryColor }} />
-                    <div className="w-2.5 h-2.5 rounded-full shadow-lg" style={{ background: myClub.secondaryColor }} />
-                  </div>
-                  <span className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">COLORS</span>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 md:gap-3 mt-3 md:mt-8">
+                <div className="px-2 md:px-5 py-1 md:py-2.5 bg-white/5 border border-white/10 rounded-full flex items-center gap-1.5 group-hover:bg-white/10 transition-all cursor-default">
+                  <Shield size={10} className="text-amber-500 md:w-[12px]" />
+                  <span className="text-[7px] md:text-[10px] font-black text-white uppercase tracking-[0.1em] md:tracking-[0.2em]">{myClub.shortName}</span>
                 </div>
               </div>
             </motion.div>
           </div>
-
+  
           {/* Ratings */}
-          <div className="flex flex-row md:flex-col gap-6 md:gap-12 shrink-0 md:items-end w-full md:w-auto">
-            <div className="flex-1 md:text-right group/ovr">
-              <p className="text-[9px] md:text-[10px] font-black text-slate-500 tracking-[0.2em] md:tracking-[0.3em] uppercase mb-0 md:mb-1 group-hover/ovr:text-white transition-colors">AVG RATING</p>
-              <p className="text-5xl sm:text-7xl md:text-9xl font-black text-white leading-none tracking-tighter italic" style={{ color: ovrColor(avgOvr) }}>{avgOvr}</p>
+          <div className="flex flex-row md:flex-col gap-2 md:gap-6 shrink-0 md:items-end w-full md:w-auto items-center justify-center border-t md:border-t-0 border-white/5 pt-3 md:pt-0">
+            <div className="flex-1 md:text-right group/ovr text-center">
+              <p className="text-[7px] md:text-[9px] font-black text-slate-500 tracking-[0.1em] md:tracking-[0.2em] uppercase mb-0 group-hover/ovr:text-white transition-colors">AVG RATING</p>
+              <p className="text-3xl sm:text-5xl md:text-5xl lg:text-6xl font-black text-white leading-none tracking-tighter italic" style={{ color: ovrColor(avgOvr) }}>{avgOvr}</p>
             </div>
-            <div className="flex-1 md:text-right">
-              <p className="text-[9px] md:text-[10px] font-black text-slate-500 tracking-[0.2em] md:tracking-[0.3em] uppercase mb-0 md:mb-1 uppercase">SQUAD POWER</p>
-              <div className="flex items-baseline md:justify-end gap-1.5 md:gap-2 leading-none">
-                <p className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tighter italic">{squad.length}</p>
-                <span className="text-sm md:text-xl font-black text-slate-700 italic">/25</span>
+            <div className="flex-1 md:text-right text-center">
+              <p className="text-[7px] md:text-[9px] font-black text-slate-500 tracking-[0.1em] md:tracking-[0.2em] uppercase mb-0 uppercase">SQUAD POWER</p>
+              <div className="flex items-baseline md:justify-end justify-center gap-0.5 md:gap-1.5 leading-none">
+                <p className="text-xl sm:text-4xl md:text-4xl font-black text-white tracking-tighter italic">{squad.length}</p>
+                <span className="text-[10px] md:text-lg font-black text-slate-700 italic">/25</span>
               </div>
             </div>
           </div>
         </div>
 
+ 
         {/* Global Footer Bar */}
-        <div className="relative z-10 mt-8 md:mt-12 pt-6 md:pt-10 border-t border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        <div className="relative z-10 mt-6 md:mt-10 pt-4 md:pt-8 border-t border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <div>
-                <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Objective</p>
-                <p className="text-[9px] font-bold text-slate-500 mt-1 uppercase italic">{myClub.activeObjective || 'Elite Performance'}</p>
+                <p className="text-[9px] font-black text-white uppercase tracking-widest leading-none">Objective</p>
+                <p className="text-[8px] font-bold text-slate-500 mt-0.5 uppercase italic">{myClub.activeObjective || 'Elite Performance'}</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {matches.slice(0, 3).reverse().map((m, i) => {
                 const win = (m.p1Id === myClub.ownerId && m.p1Score > m.p2Score) || (m.p2Id === myClub.ownerId && m.p2Score > m.p1Score);
                 const draw = m.p1Score === m.p2Score;
                 return (
-                  <div key={i} className={cn("w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-black", 
+                  <div key={i} className={cn("w-5 h-5 rounded-md flex items-center justify-center text-[8px] font-black", 
                     win ? 'bg-emerald-500 text-black' : draw ? 'bg-amber-500 text-black' : 'bg-red-500 text-white'
                   )}>
                     {win ? 'W' : draw ? 'D' : 'L'}
@@ -261,14 +262,14 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
               })}
             </div>
           </div>
-
+ 
           <motion.button 
             whileHover={{ scale: 1.05 }} 
             whileTap={{ scale: 0.95 }}
             onClick={() => setActiveTab('squad')}
-            className="w-full md:w-auto px-6 py-4 bg-white text-black rounded-2xl font-black text-[10px] tracking-widest uppercase italic shadow-xl flex items-center justify-center gap-3"
+            className="w-full md:w-auto px-5 py-3 md:py-3.5 bg-white text-black rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] tracking-widest uppercase italic shadow-xl flex items-center justify-center gap-2"
           >
-            SQUAD HUB <ArrowLeft size={14} className="rotate-180" />
+            SQUAD HUB <ArrowLeft size={12} className="rotate-180" />
           </motion.button>
         </div>
       </div>
@@ -858,8 +859,14 @@ export default function ClubManager() {
                   </div>
 
                   {/* Player mini card */}
-                  <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 mb-5">
-                    <img src={shortlistPlayer.image} className="w-14 h-14 rounded-xl object-cover" alt={shortlistPlayer.name} />
+                  <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 mb-5 text-center justify-center">
+                    {shortlistPlayer.image ? (
+                      <img src={shortlistPlayer.image} className="w-14 h-14 rounded-xl object-cover" alt={shortlistPlayer.name} />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center">
+                        <Users size={20} className="text-white/20" />
+                      </div>
+                    )}
                     <div className="flex-1">
                       <p className="font-black text-white">{shortlistPlayer.name}</p>
                       <p className="text-[10px] text-slate-400 font-bold">{shortlistPlayer.ovr} OVR · {sellerClub?.name || 'Unknown Club'}</p>
@@ -1020,8 +1027,12 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, match
             const total = p.win + p.loss + p.draw;
             return (
               <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all">
-                <div className="relative h-40 overflow-hidden">
-                  <img src={p.image} className="w-full h-full object-cover object-top" alt={p.name} style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} />
+                <div className="relative h-40 overflow-hidden flex items-center justify-center bg-white/5">
+                  {p.image ? (
+                    <img src={p.image} className="w-full h-full object-cover object-top" alt={p.name} style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} />
+                  ) : (
+                    <Users size={48} className="text-white/5" />
+                  )}
                   <div className="absolute top-2 left-2 flex gap-1">
                     <div className="px-2 py-1 rounded-lg text-[10px] font-black" style={{ background: gradeColor, color: '#000' }}>{grade}</div>
                     <div className="px-2 py-1 rounded-lg text-[10px] font-black" style={{ 
@@ -1079,8 +1090,12 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, match
 
             return (
               <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all group relative">
-                <div className="relative h-40 overflow-hidden">
-                  <img src={p.image} className="w-full h-full object-cover object-top" alt={p.name} style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} />
+                <div className="relative h-40 overflow-hidden flex items-center justify-center bg-white/5">
+                  {p.image ? (
+                    <img src={p.image} className="w-full h-full object-cover object-top" alt={p.name} style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} />
+                  ) : (
+                    <Users size={48} className="text-white/5" />
+                  )}
                   <div className="absolute top-2 left-2 flex flex-col gap-1">
                     <div className="px-2 py-1 rounded-lg text-[10px] font-black" style={{ background: gradeColor, color: '#000' }}>{grade}</div>
                     <div className={cn("px-2 py-1 shadow-lg rounded-lg text-[9px] font-black uppercase tracking-widest", (matchesLeft > 2) ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-500 border border-red-500/30')}>
@@ -1140,7 +1155,13 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, match
               const gradeColor = GRADE_COLORS[grade];
               return (
                 <div key={id} className="flex items-center gap-4 p-4 bg-white/5 border border-violet-500/20 rounded-2xl">
-                  <img src={p.image} className="w-12 h-12 rounded-xl object-cover" alt={p.name} />
+                  {p.image ? (
+                    <img src={p.image} className="w-12 h-12 rounded-xl object-cover" alt={p.name} />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center">
+                      <Users size={16} className="text-white/20" />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-black text-white truncate">{p.name}</p>
                     <div className="flex gap-2 items-center mt-0.5">
@@ -1260,8 +1281,12 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
               const formColor = { 'A': '#4ade80', 'B': '#84cc16', 'C': '#eab308', 'D': '#f97316', 'E': '#ef4444' }[form];
               return (
                 <motion.div key={l.id} whileHover={{ scale: 1.01 }} className="bg-[#0f172a] border border-white/10 rounded-2xl p-4 flex items-center gap-4">
-                  <div className="relative shrink-0">
-                    <img src={l.playerImage} className="w-14 h-14 rounded-xl object-cover" alt="" />
+                  <div className="relative shrink-0 w-14 h-14 bg-white/5 rounded-xl flex items-center justify-center">
+                    {l.playerImage ? (
+                      <img src={l.playerImage} className="w-14 h-14 rounded-xl object-cover" alt="" />
+                    ) : (
+                      <Users size={20} className="text-white/20" />
+                    )}
                     <div className="absolute -top-1 -right-1 flex flex-col gap-1">
                       <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black text-white shadow-lg" style={{ background: ovrColor(l.playerOvr) }}>{l.playerOvr}</div>
                       <div className="w-6 h-4 rounded flex items-center justify-center text-[7px] font-black text-black shadow-lg" style={{ background: formColor }}>{form}</div>

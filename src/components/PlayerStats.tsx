@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ChevronRight, Trophy, Filter, ChevronDown, Info, X, Target, Zap, Activity, Flame, Shield, Percent } from 'lucide-react';
+import { Search, ChevronRight, Trophy, Filter, ChevronDown, Info, X, Target, Zap, Activity, Flame, Shield, Percent, Users } from 'lucide-react';
 import { useFirebase } from '../FirebaseContext';
 import { cn, getSeasonInfo, resolveCanonicalTournamentName } from '../lib/utils';
 import { useSearchParams } from 'react-router-dom';
@@ -120,8 +120,12 @@ export default function PlayerStats() {
                 selectedPlayer?.id === player.id ? "bg-brand-dark dark:bg-brand-purple text-white dark:text-brand-dark shadow-xl shadow-brand-dark/20" : "hover:bg-slate-50 dark:hover:bg-white/5"
               )}
             >
-              <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-100 dark:border-white/10 transition-all">
-                <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+              <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-100 dark:border-white/10 transition-all flex items-center justify-center bg-white/5">
+                {player.image ? (
+                  <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                ) : (
+                  <Users size={16} className="text-white/10" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black truncate">{player.name}</p>
@@ -155,8 +159,12 @@ export default function PlayerStats() {
               {/* Header Card */}
               <div className="relative bg-brand-dark dark:bg-white/5 rounded-[2rem] lg:rounded-[2.5rem] p-6 lg:p-12 text-white border dark:border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.1)]">
                 <div className="absolute inset-0 rounded-[2rem] lg:rounded-[2.5rem] overflow-hidden pointer-events-none">
-                  <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 pointer-events-none">
-                    <img src={selectedPlayer.image} alt="" className="w-full h-full object-cover object-top" />
+                  <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 pointer-events-none flex items-center justify-center">
+                    {selectedPlayer.image ? (
+                      <img src={selectedPlayer.image} alt="" className="w-full h-full object-cover object-top" />
+                    ) : (
+                      <Users size={120} className="text-white/5" />
+                    )}
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-r from-brand-dark dark:from-black via-brand-dark/80 dark:via-black/80 to-transparent" />
                 </div>

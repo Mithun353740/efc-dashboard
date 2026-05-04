@@ -4,7 +4,7 @@ import { useFirebase } from '../FirebaseContext';
 import { sortRankedPlayers } from '../lib/store';
 import { cn, getSeasonInfo, resolveCanonicalTournamentName } from '../lib/utils';
 import { Player } from '../types';
-import { Trophy, ChevronDown, Calendar, History } from 'lucide-react';
+import { Trophy, ChevronDown, Calendar, History, Users } from 'lucide-react';
 
 export default function TournamentRanking() {
   const { rankedPlayers, tournaments } = useFirebase();
@@ -237,7 +237,13 @@ export default function TournamentRanking() {
                       <td className="p-4 md:p-7">
                         <div className="flex items-center gap-3 md:gap-5">
                           <div className="relative">
-                            <img src={player.image} alt={player.name} className="w-10 h-10 md:w-14 md:h-14 rounded-2xl object-cover border-2 border-transparent group-hover:border-brand-purple transition-all" />
+                            <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl overflow-hidden border-2 border-transparent group-hover:border-brand-purple transition-all flex items-center justify-center bg-white/5">
+                              {player.image ? (
+                                <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <Users size={20} className="text-white/10" />
+                              )}
+                            </div>
                             <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-6 md:h-6 bg-brand-dark rounded-lg flex items-center justify-center border border-white/10">
                               <span className="text-[7px] md:text-[8px] font-black text-brand-purple uppercase">#{player.number}</span>
                             </div>

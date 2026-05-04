@@ -40,7 +40,11 @@ export function TournamentList({
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
             <div className="w-16 h-16 md:w-20 md:h-20 shrink-0 rounded-full overflow-hidden bg-[#0a0a12] border border-blue-500/40 flex items-center justify-center shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-all hover:shadow-[0_0_40px_rgba(59,130,246,0.8)]">
-              <img src={CLUB_LOGO} alt="Official Tournaments" className="w-full h-full object-cover" />
+              {CLUB_LOGO ? (
+                <img src={CLUB_LOGO} alt="Official Tournaments" className="w-full h-full object-cover" />
+              ) : (
+                <Trophy className="text-blue-500" size={32} />
+              )}
             </div>
             <div className="space-y-3">
               {isAdmin && (

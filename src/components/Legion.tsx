@@ -22,8 +22,12 @@ export default function Legion() {
             className="group w-full"
           >
             <div className="bg-white dark:bg-white/5 rounded-lg md:rounded-xl overflow-hidden shadow-sm border border-slate-100 dark:border-white/10 transition-all hover:shadow-xl hover:-translate-y-1">
-              <div className="aspect-[4/5] overflow-hidden transition-all duration-500">
-                <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+              <div className="aspect-[4/5] overflow-hidden transition-all duration-500 bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                {player.image ? (
+                  <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-brand-purple font-black text-4xl italic opacity-20">QVC</div>
+                )}
               </div>
               <div className="p-1.5 md:p-4">
                 <h3 className="text-[7px] md:text-xs font-black text-brand-dark dark:text-white tracking-tight truncate">{player.name}</h3>

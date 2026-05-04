@@ -122,10 +122,21 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const loadInitialData = async () => {
       if (!mounted) return;
       try {
+        // Optimization: Admins don't need the initial PULL because onSnapshot
+        // will provide the initial data immediately upon subscription.
+        // This saves ~250 reads per admin login.
+        if (isAdmin) {
+          setIsLoadingPlayers(false);
+          setIsLoadingLeaders(false);
+          setIsLoadingMatches(false);
+          setIsMinLoadTimePassed(true);
+          return;
+        }
+
         const [p, l, m, t] = await Promise.all([
-          fetchPlayers(isAdmin ? 100 : (isPlayer ? 60 : 30)),
+          fetchPlayers(isPlayer ? 60 : 30),
           fetchLeaders(),
-          isAdmin ? fetchMatches(100) : Promise.resolve([]),
+          Promise.resolve([]), // Regular users don't need matches list initially
           fetchTournaments()
         ]);
 
@@ -189,33 +200,41 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     let unsubTournaments: () => void = () => {};
 
     if (isAdmin) {
-      unsubLeaders = subscribeToLeaders((data) => {
-        if (mounted) {
-          setLeaders(data);
-          if (_globalCache) _globalCache.leaders = data;
-        }
-      });
+      // Small delay to ensure snapshot triggers don't collide with mount state updates
+      setTimeout(() => {
+        if (!mounted) return;
+        
+        unsubLeaders = subscribeToLeaders((data) => {
+          if (mounted) {
+            setLeaders(data);
+            if (_globalCache) _globalCache.leaders = data;
+            setIsLoadingLeaders(false);
+          }
+        });
 
-      unsubMatches = subscribeToMatches((data) => {
-        if (mounted) {
-          setMatches(data);
-          if (_globalCache) _globalCache.matches = data;
-        }
-      });
+        unsubMatches = subscribeToMatches((data) => {
+          if (mounted) {
+            setMatches(data);
+            if (_globalCache) _globalCache.matches = data;
+            setIsLoadingMatches(false);
+          }
+        });
 
-      unsubPlayers = subscribeToPlayers((data) => {
-        if (mounted) {
-          setPlayers(data);
-          if (_globalCache) _globalCache.players = data;
-        }
-      }, 100);
+        unsubPlayers = subscribeToPlayers((data) => {
+          if (mounted) {
+            setPlayers(data);
+            if (_globalCache) _globalCache.players = data;
+            setIsLoadingPlayers(false);
+          }
+        }, 100);
 
-      unsubTournaments = subscribeToTournaments((data) => {
-        if (mounted) {
-          setTournaments(data);
-          if (_globalCache) _globalCache.tournaments = data;
-        }
-      }, 50);
+        unsubTournaments = subscribeToTournaments((data) => {
+          if (mounted) {
+            setTournaments(data);
+            if (_globalCache) _globalCache.tournaments = data;
+          }
+        }, 50);
+      }, 0);
     }
 
     // Initialize cache on first success
