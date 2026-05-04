@@ -4,7 +4,7 @@ import { useFirebase } from '../FirebaseContext';
 import { Player } from '../types';
 import { computePlayerStats, sortRankedPlayers } from '../lib/store';
 import { cn, getSeasonInfo } from '../lib/utils';
-import { Trophy, ChevronDown } from 'lucide-react';
+import { Trophy, ChevronDown, Users } from 'lucide-react';
 
 const TOURNAMENTS = ["QVFC Elite League Cup", "QVFC Elite League Cup Division 2", "Vortex Champions Cup", "Vortex Domestic Cup"];
 

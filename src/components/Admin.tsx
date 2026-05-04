@@ -3258,6 +3258,66 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                   Start Auction Session
                 </button>
               </div>
+
+              {/* Auction Schedule & Admin Settings (Moved here for better UX) */}
+              <div className="max-w-sm mx-auto mt-12 pt-8 border-t border-white/10 space-y-6 text-left">
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">PRE-AUCTION SETTINGS</h4>
+                
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Auction Start Time (Countdown)</label>
+                  <input 
+                    type="datetime-local"
+                    value={config.auctionStartTime ? (() => {
+                      const d = new Date(config.auctionStartTime);
+                      const offset = d.getTimezoneOffset() * 60000;
+                      return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+                    })() : ''} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (!val) {
+                        const newCfg = { ...config };
+                        delete newCfg.auctionStartTime;
+                        setConfig(newCfg);
+                        return;
+                      }
+                      setConfig({...config, auctionStartTime: new Date(val).getTime()});
+                    }} 
+                    className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" 
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Auction Admin (Assigned Role)</label>
+                  <select 
+                    value={config.auctionAdminId || ''} 
+                    disabled={!canModifyAuctionAdmin}
+                    onChange={e => setConfig({...config, auctionAdminId: e.target.value})}
+                    className={cn(
+                      "w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none",
+                      !canModifyAuctionAdmin && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    <option value="">Admin Only (Default)</option>
+                    {players.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Schedule Text</label>
+                  <input value={config.auctionSchedule || ''} onChange={e => setConfig({...config, auctionSchedule: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" placeholder="e.g. Sunday, 8:00 PM PST" />
+                </div>
+
+                <button 
+                  onClick={handleSaveConfig} 
+                  disabled={configSaving}
+                  className="w-full py-4 bg-brand-purple/20 hover:bg-brand-purple/30 text-brand-purple border border-brand-purple/30 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50"
+                >
+                  {configSaving ? 'SAVING...' : 'SAVE AUCTION SETTINGS'}
+                </button>
+                {msg.text && <p className={cn('text-[10px] font-bold text-center mt-2', msg.type === 'success' ? 'text-emerald-400' : 'text-red-400')}>{msg.text}</p>}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -3424,43 +3484,6 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
                 </button>
               </div>
               
-              <div className="space-y-1">
-                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Auction Start Time (Countdown)</label>
-                <input 
-                  type="datetime-local"
-                  value={config.auctionStartTime ? new Date(config.auctionStartTime).toISOString().slice(0, 16) : ''} 
-                  onChange={e => setConfig({...config, auctionStartTime: new Date(e.target.value).getTime()})} 
-                  className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" 
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Next Auction Schedule (Text)</label>
-                <input value={config.auctionSchedule || ''} onChange={e => setConfig({...config, auctionSchedule: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none" placeholder="e.g. Sunday, 8:00 PM PST" />
-                <p className="text-[8px] font-bold text-slate-500 mt-1">This will be displayed in the Club Zone when no auction is active.</p>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Auction Admin (Controls Auction)</label>
-                <select 
-                  value={config.auctionAdminId || ''} 
-                  disabled={!canModifyAuctionAdmin}
-                  onChange={e => setConfig({...config, auctionAdminId: e.target.value})}
-                  className={cn(
-                    "w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-amber-500 outline-none",
-                    !canModifyAuctionAdmin && "opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  <option value="">Admin Only (Default)</option>
-                  {players.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                {!canModifyAuctionAdmin && (
-                  <p className="text-[8px] font-bold text-red-400 mt-1 uppercase italic">Only the current Auction Admin or Super Admin can reassign this role.</p>
-                )}
-              </div>
-
               <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-4 mt-4">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Contracts Economy</label>
@@ -3502,6 +3525,7 @@ function ClubsAdminTab({ players }: { players: Player[] }) {
               <button onClick={handleSaveConfig} disabled={configSaving} className="w-full py-4 glossy-btn rounded-xl disabled:opacity-50 uppercase text-xs font-black tracking-widest">
                 {configSaving ? 'SAVING...' : 'SAVE CONFIG'}
               </button>
+              {msg.text && <p className={cn('text-[10px] font-bold text-center mt-2', msg.type === 'success' ? 'text-emerald-400' : 'text-red-400')}>{msg.text}</p>}
             </div>
           </div>
         </div>
