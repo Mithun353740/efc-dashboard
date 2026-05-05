@@ -90,6 +90,8 @@ export async function fetchSystemLocks(): Promise<Record<string, boolean>> {
 }
 
 export async function toggleSystemLock(systemId: string, locked: boolean) {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) return;
   try {
     const lockDoc = doc(db, 'settings', 'locks');
@@ -113,6 +115,8 @@ export function subscribeToAppVersion(callback: (version: string) => void) {
 }
 
 export async function updateAppVersion(newVersion: string) {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) return;
   try {
     await setDoc(doc(db, 'settings', 'version'), { 
@@ -412,6 +416,8 @@ export async function registerPlayerInTournament(
   playerName: string,
   playerImage: string
 ): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) {
     throw new Error('SYSTEM LOCKED: Cannot register while quota is exceeded.');
   }
@@ -455,6 +461,8 @@ export async function updatePlayerProfile(
   playerId: string,
   updates: { image?: string; uid?: string; device?: string }
 ): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) {
     throw new Error('SYSTEM LOCKED: Cannot update profile while quota is exceeded.');
   }
@@ -623,6 +631,8 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[], el
  * and writes all Player documents atomically.
  */
 export async function recalculateAllStats(playersArg?: Player[]) {
+  
+  await ensureAdminSession();
   const batch = writeBatch(db);
   
   // Recovery: If no players provided, fetch them all from Firestore first
@@ -658,6 +668,8 @@ export async function recalculateAllStats(playersArg?: Player[]) {
  * Useful for recovering an empty system.
  */
 export async function seedDatabase() {
+  
+  await ensureAdminSession();
   const { MOCK_PLAYERS, LEADERS } = await import('../mockData');
   const batch = writeBatch(db);
 
@@ -675,6 +687,8 @@ export async function seedDatabase() {
 }
 
 export async function savePlayer(player: Player) {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) {
     throw new Error("SYSTEM LOCKED: Cannot save player info while Quota is exceeded. Please refresh after reset.");
   }
@@ -708,6 +722,8 @@ export async function addMatch(
   seasonId?: string,
   matchday?: number
 ) {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) {
     throw new Error("SYSTEM LOCKED: Cannot add match while Quota is exceeded.");
   }
@@ -806,6 +822,8 @@ export async function editMatch(
   newSeasonId?: string,
   newMatchday?: number
 ) {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) return;
   const batch = writeBatch(db);
 
@@ -901,6 +919,8 @@ export async function deleteMatchFromHistory(
   players: Player[],
   _legacyMatches: MatchRecord[] // kept for API compatibility, not used
 ) {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) return;
   const batch = writeBatch(db);
   batch.delete(doc(db, 'matches', matchRecord.id));
@@ -969,6 +989,8 @@ export async function deleteMatchFromHistory(
 }
 
 export async function deletePlayer(id: string) {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) return;
   const path = `players/${id}`;
   try {
@@ -980,6 +1002,8 @@ export async function deletePlayer(id: string) {
 }
 
 export async function saveLeader(leader: Leader) {
+  
+  await ensureAdminSession();
   const path = `leaders/${leader.id}`;
   try {
     await setDoc(doc(db, 'leaders', leader.id), leader);
@@ -990,6 +1014,8 @@ export async function saveLeader(leader: Leader) {
 }
 
 export async function deleteLeader(id: string) {
+  
+  await ensureAdminSession();
   const path = `leaders/${id}`;
   try {
     await deleteDoc(doc(db, 'leaders', id));
@@ -1000,6 +1026,8 @@ export async function deleteLeader(id: string) {
 }
 
 export async function saveTournament(tournament: Tournament) {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) {
     throw new Error("SYSTEM LOCKED: Cannot update tournament while Quota is exceeded.");
   }
@@ -1014,6 +1042,8 @@ export async function saveTournament(tournament: Tournament) {
 }
 
 export async function deleteTournament(id: string) {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) return;
   const path = `tournaments/${id}`;
   try {
@@ -1064,6 +1094,8 @@ export async function fetchClubConfig(force = false): Promise<ClubSystemConfig |
 
 /** Persist the club system config (1 write). */
 export async function saveClubConfig(config: ClubSystemConfig): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
   try {
     await setDoc(doc(db, 'settings', 'clubConfig'), config);
@@ -1095,6 +1127,8 @@ export function subscribeToClubs(callback: (clubs: Club[]) => void) {
  * If ownerId changed, clears old owner's flags.
  */
 export async function saveClub(club: Club, previousOwnerId?: string): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
   
   // Check for duplicate names (case insensitive) if this is a new club
@@ -1153,6 +1187,8 @@ export async function saveClub(club: Club, previousOwnerId?: string): Promise<vo
 
 /** Delete a club and clean up all player references. */
 export async function deleteClub(id: string): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) return;
   try {
     const snap = await getDoc(doc(db, 'clubs', id));
@@ -1341,6 +1377,8 @@ export async function saveClubTournament(tourney: import('../types').ClubTournam
 }
 
 export async function deleteClubTournament(id: string): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) return;
   try {
     await deleteDoc(doc(db, 'clubTournaments', id));
@@ -1378,6 +1416,8 @@ export async function saveClubFixture(fixture: import('../types').ClubFixture): 
 }
 
 export async function deleteClubFixture(id: string): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) return;
   try {
     await deleteDoc(doc(db, 'clubFixtures', id));
@@ -1510,6 +1550,8 @@ export function subscribeToAuction(callback: (state: AuctionState | null) => voi
 
 /** Admin: Initialize/reset the auction for a new session. */
 export async function adminStartAuction(clubIds: string[], bidIncrement: number, basePrice: number): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   const state: AuctionState = {
     auctionId: Date.now().toString(),
@@ -1533,6 +1575,8 @@ export async function adminStartAuction(clubIds: string[], bidIncrement: number,
 
 /** Admin: Reveal the next player card. Resets bid state for the new player. */
 export async function adminRevealCard(player: { id: string; name: string; image: string; ovr: number; currentClubId: string | null; currentClubName: string | null }, basePrice: number, bidIncrement: number): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   await setDoc(AUCTION_DOC, {
     status: 'active',
@@ -1627,11 +1671,15 @@ export async function adminConfirmSold(currentState: AuctionState, winningClub: 
 
 /** Admin: Skip the current player (unsold / folded). */
 export async function adminSkipPlayer(): Promise<void> {
+  
+  await ensureAdminSession();
   await setDoc(AUCTION_DOC, { status: 'folded', currentPlayer: null, leadingClubId: null, leadingClubName: null, currentBid: 0, foldedClubs: [] }, { merge: true });
 }
 
 /** Admin: End the entire auction session. */
 export async function adminEndAuction(): Promise<void> {
+  
+  await ensureAdminSession();
   await setDoc(AUCTION_DOC, { status: 'ended', currentPlayer: null }, { merge: true });
 }
 
@@ -1891,6 +1939,8 @@ export async function fetchClubSeasons(globalSeason: string): Promise<ClubSeason
 
 /** Admin: Start a new internal season. 1 write. */
 export async function startClubSeason(globalSeason: string, seasonNumber: number, length?: number, transferWindows?: number): Promise<ClubSeason> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   const id = `${globalSeason.replace('/', '_')}__S${seasonNumber}`;
   const season: ClubSeason = {
@@ -1912,6 +1962,8 @@ export async function startClubSeason(globalSeason: string, seasonNumber: number
 
 /** Admin: End an internal season, saving the final standings snapshot. 1 write. */
 export async function endClubSeason(seasonId: string, standingsSnapshot: ClubSeason['standingsSnapshot']): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   await setDoc(doc(db, 'clubSeasons', seasonId), { status: 'completed', endedAt: Date.now(), standingsSnapshot }, { merge: true });
   await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: null, activeInternalSeasonLabel: null }, { merge: true });
@@ -2009,6 +2061,8 @@ export function calculateBasePrize(ovr: number, form: 'A' | 'B' | 'C' | 'D' | 'E
 }
 
 export async function deleteClubSeason(seasonId: string): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
   try {
     await deleteDoc(doc(db, 'clubSeasons', seasonId));
@@ -2023,6 +2077,8 @@ export async function deleteClubSeason(seasonId: string): Promise<void> {
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
 export async function startGlobalSeason(name: string): Promise<GlobalSeason> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   const id = name.replace(/\//g, '_');
   const gs: GlobalSeason = { id, name, status: 'active', createdAt: Date.now() };
@@ -2040,6 +2096,8 @@ export async function fetchGlobalSeasons(): Promise<GlobalSeason[]> {
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
 export async function assignClubOwner(clubId: string, player: Player): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   const batch = writeBatch(db);
   batch.update(doc(db, 'clubs', clubId), { 
@@ -2056,6 +2114,8 @@ export async function assignClubOwner(clubId: string, player: Player): Promise<v
 }
 
 export async function unassignClubOwner(clubId: string): Promise<void> {
+  
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   await setDoc(doc(db, 'clubs', clubId), { ownerId: null, ownerName: null }, { merge: true });
   
