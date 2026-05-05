@@ -473,7 +473,6 @@ export default function Admin() {
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} icon={<Trophy size={18} />} label="TOURNAMENTS" /></div>
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'locks'} onClick={() => setActiveTab('locks')} icon={<ShieldCheck size={18} />} label="LOCKS" /></div>
             <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'clubs'} onClick={() => setActiveTab('clubs')} icon={<Trophy size={18} />} label="CLUBS" /></div>
-            <div className="snap-center shrink-0 lg:shrink"><NavBtn active={activeTab === 'auction'} onClick={() => setActiveTab('auction')} icon={<Gavel size={18} />} label="AUCTION" /></div>
           </div>
         </div>
 
@@ -1113,9 +1112,9 @@ export default function Admin() {
                   </div>
                 </div>
               </motion.div>
-            ) : activeTab === 'auction' ? (
-              <motion.div key="auction" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
-                <ClubsAdminTab players={players} forceAuctionSubtab={true} />
+            ) : activeTab === 'clubs' ? (
+              <motion.div key="clubs" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                <ClubsAdminTab players={players} forceAuctionSubtab={false} />
               </motion.div>
             ) : null}
             </AnimatePresence>
@@ -1459,7 +1458,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   // flow: landing -> season_management | global_history | franchise_registry
   const [viewState, setViewState] = React.useState<'landing' | 'season_management' | 'global_history' | 'franchise_registry'>('landing');
   const [selectedSeason, setSelectedSeason] = React.useState<ClubSeason | null>(null);
-  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'auction'|'config'|'seasons'|'history'|'franchise'>(forceAuctionSubtab ? 'auction' : 'clubs');
+  const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'auction'|'config'|'seasons'|'history'|'franchise'>('auction');
 
   // Sync subTab if forced changes
   React.useEffect(() => {
@@ -2256,13 +2255,13 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       {/* SubTab Nav - Only show in Season Management mode */}
       {viewState === 'season_management' && (
         <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-2xl flex-wrap">
-          {(['clubs','franchise','tournaments','fixtures','matches','auction','config','seasons','history'] as const).map(t => (
+          {(['franchise','tournaments','fixtures','matches','auction','config','seasons','history'] as const).map(t => (
             <button key={t} onClick={() => setSubTab(t)}
               className={cn('flex-1 min-w-[100px] py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all',
                 subTab === t ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
               )}
             >
-              {t === 'clubs' ? '⚽ ASSIGN' : t === 'franchise' ? '🏢 REGISTRY' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : t === 'auction' ? '🔨 AUCTION' : t === 'config' ? '⚙️ CONFIG' : t === 'seasons' ? '📅 SEASONS' : '🕒 HISTORY'}
+              {t === 'franchise' ? '🏢 REGISTRY' : t === 'tournaments' ? '🏆 TOURNAMENTS' : t === 'fixtures' ? '📅 FIXTURES' : t === 'matches' ? '🗒️ MATCH LOG' : t === 'auction' ? '⚽ CLUBS' : t === 'config' ? '⚙️ CONFIG' : t === 'seasons' ? '📅 SEASONS' : '🕒 HISTORY'}
             </button>
           ))}
         </div>
