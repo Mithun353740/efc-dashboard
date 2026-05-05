@@ -216,13 +216,47 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
   inboxUnread: number;
   setActiveTab: (t: 'overview' | 'squad' | 'market' | 'auction' | 'rankings' | 'tournaments' | 'inbox' | 'player_inbox') => void;
 }) {
-  const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
-  const fitness = Math.min(100, Math.round(avgOvr * 0.95 + Math.random() * 5));
-  const sharpness = Math.min(100, Math.round(avgOvr * 0.88 + 4));
-  const morale = squad.length >= 5 ? 82 : 55;
+    const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
+  
+  // Filter for Club Zone matches (matches played in current season)
+  const clubMatches = matches.filter(m => m.season === config?.season).sort((a,b) => a.timestamp - b.timestamp);
+  const myClubMatches = clubMatches.filter(m => m.p1Id === myClub.ownerId || m.p2Id === myClub.ownerId);
+  const recentMatches = myClubMatches.slice(-5).reverse();
+  
+  // Calculate Form (W/D/L)
+  const formRecord = recentMatches.map(m => {
+    const isHome = m.p1Id === myClub.ownerId;
+    const myScore = isHome ? m.p1Score : m.p2Score;
+    const oppScore = isHome ? m.p2Score : m.p1Score;
+    if (myScore > oppScore) return 'W';
+    if (myScore < oppScore) return 'L';
+    return 'D';
+  });
+  
+  // Calculate Fitness
+  // Start at 100%. Each recent match played drops fitness by 3-5%, recovered by 1-2% per match missed.
+  let calculatedFitness = 100;
+  myClubMatches.slice(-10).forEach(m => {
+     calculatedFitness -= 4; 
+  });
+  // Simulate recovery (simple heuristic: if less than 10 matches, you are fit)
+  calculatedFitness = Math.max(60, Math.min(100, 100 - (myClubMatches.length * 2) + Math.round(avgOvr * 0.1)));
+
+  // Calculate Sharpness
+  // Base is OVR. Boosted by wins and goals.
+  let calculatedSharpness = Math.round(avgOvr * 0.85);
+  let goalBonus = 0;
+  recentMatches.forEach(m => {
+    const isHome = m.p1Id === myClub.ownerId;
+    goalBonus += isHome ? m.p1Score : m.p2Score;
+  });
+  calculatedSharpness = Math.min(100, calculatedSharpness + goalBonus + (formRecord.filter(x => x === 'W').length * 2));
+
+  const fitness = calculatedFitness;
+  const sharpness = calculatedSharpness;
+  const morale = formRecord[0] === 'W' ? 95 : formRecord[0] === 'L' ? 45 : (squad.length >= 5 ? 82 : 55);
 
   const topScorers = [...squad].sort((a, b) => (b.goalsScored || 0) - (a.goalsScored || 0)).slice(0, 3);
-  const recentMatches = matches.filter(m => m.p1Id === myClub.ownerId || m.p2Id === myClub.ownerId).slice(-5).reverse();
 
   const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -617,9 +651,12 @@ export default function ClubManager() {
 
           {/* Manager + Club Name */}
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] sm:text-xs font-black text-white uppercase tracking-tight truncate leading-none">
-              {myPlayer?.name || 'MANAGER'}
-            </p>
+            <div className="flex items-center gap-2">
+              {myPlayer?.image && <img src={myPlayer.image} className="w-5 h-5 rounded-full object-cover border border-white/20" alt="Manager" />}
+              <p className="text-[10px] sm:text-xs font-black text-white uppercase tracking-tight truncate leading-none">
+                {myPlayer?.name || 'MANAGER'}
+              </p>
+            </div>
             <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate mt-0.5">
               {myClub?.name || 'No Club Assigned'}
             </p>
@@ -1554,7 +1591,10 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
 
   useEffect(() => {
     async function load() {
-      if (!config?.season) return;
+      if (!config?.season) {
+        setLoading(false);
+        return;
+      }
       // Use cache if available for this season
       const cached = _tournamentsCache[config.season];
       if (cached) {

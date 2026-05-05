@@ -139,7 +139,7 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
       </div>
 
       {/* Table Header */}
-      <div className="grid grid-cols-[2rem_1fr_auto] items-center text-[9px] font-black uppercase tracking-[0.2em] text-slate-600 px-4 gap-4">
+      <div className="overflow-x-auto no-scrollbar"><div className="min-w-[600px]"><div className="grid grid-cols-[2rem_1fr_auto] items-center text-[9px] font-black uppercase tracking-[0.2em] text-slate-600 px-4 gap-4">
         <span>#</span>
         <span>Club</span>
         <div className="flex gap-6 text-right">
@@ -156,7 +156,7 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
       </div>
 
       {/* Rows */}
-      <div className="space-y-2">
+      <div className="overflow-x-auto no-scrollbar pb-4"><div className="space-y-2 min-w-[600px]">
         {sortedRows.map((row, i) => {
           const isTopThree = i < 3;
           return (
@@ -228,7 +228,7 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
             </motion.div>
           );
         })}
-      </div>
+      </div></div>
     </div>
   );
 }

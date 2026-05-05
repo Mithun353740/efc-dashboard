@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Trash2, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield } from 'lucide-react';
+import { Search, Plus, Trash2, Edit3, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -1481,6 +1481,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const [showFForm, setShowFForm] = React.useState(false);
   const [fLogoFile, setFLogoFile] = React.useState<string | null>(null);
   const [fFormExtended, setFFormExtended] = React.useState({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b' });
+  const [editingClubId, setEditingClubId] = React.useState<string | null>(null);
 
   // Start New Season Form
   const [showNewSeasonForm, setShowNewSeasonForm] = React.useState(false);
@@ -1823,24 +1824,27 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     if (!fFormExtended.name) return;
     setLoading(true);
     try {
+      const existingClub = editingClubId ? fClubs.find(c => c.id === editingClubId) : null;
       const nc: Club = {
-        id: `club_${Date.now()}`,
+        ...(existingClub || {}),
+        id: editingClubId || `club_${Date.now()}`,
         name: fFormExtended.name.toUpperCase(),
         shortName: fFormExtended.shortName.toUpperCase().slice(0,3),
         primaryColor: fFormExtended.primaryColor,
         secondaryColor: fFormExtended.secondaryColor,
-        logo: fLogoFile || undefined,
-        ownerId: null,
-        ownerName: null,
-        budget: 50000000,
-        squadIds: [],
-        createdAt: Date.now()
-      };
+        logo: fLogoFile !== undefined ? fLogoFile : existingClub?.logo,
+        ownerId: existingClub ? existingClub.ownerId : null,
+        ownerName: existingClub ? existingClub.ownerName : null,
+        budget: existingClub ? existingClub.budget : 50000000,
+        squadIds: existingClub ? existingClub.squadIds : [],
+        createdAt: existingClub ? existingClub.createdAt : Date.now()
+      } as Club;
       await saveClub(nc);
-      setMsg({ text: '✅ Empty club added to franchise registry', type: 'success' });
+      setMsg({ text: editingClubId ? '✅ Club updated' : '✅ Empty club added to franchise registry', type: 'success' });
       setShowFForm(false);
       setFFormExtended({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b' });
       setFLogoFile(null);
+      setEditingClubId(null);
       loadRegistry();
     } catch (e: any) {
       setMsg({ text: '❌ ' + e.message, type: 'error' });
@@ -1974,7 +1978,14 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const [showTSetup, setShowTSetup] = React.useState(false);
 
   const handleAddTournament = async () => {
-    if (!tSetupForm.name) return;
+    if (!tSetupForm.name) {
+      flashMatch('❌ Please enter a tournament name', false);
+      return;
+    }
+    if (tSetupForm.participatingClubIds.length < 2) {
+      flashMatch('❌ Please select at least 2 clubs', false);
+      return;
+    }
     setMatchBusy(true);
     try {
       const nt: ClubTournament = {
@@ -2492,7 +2503,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
               <h3 className="text-2xl font-black tracking-tight mb-1 uppercase">Franchise Registry</h3>
               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Create and manage empty clubs for seasonal assignment</p>
             </div>
-            <button onClick={() => setShowFForm(true)} className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl transition-all uppercase">
+            <button onClick={() => { setEditingClubId(null); setFFormExtended({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b' }); setShowFForm(true); }} className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl transition-all uppercase">
               CREATE EMPTY CLUB
             </button>
           </div>
@@ -2500,6 +2511,15 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {fClubs.map(club => (
               <div key={club.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 relative group overflow-hidden">
+                <div className="absolute top-4 right-4 z-20 flex gap-2">
+                  <button onClick={() => {
+                    setEditingClubId(club.id);
+                    setFFormExtended({ name: club.name, shortName: club.shortName || '', primaryColor: club.primaryColor || '#8b5cf6', secondaryColor: club.secondaryColor || '#f59e0b' });
+                    setShowFForm(true);
+                  }} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-lg">
+                    <Edit3 size={12} />
+                  </button>
+                </div>
                 <div className="flex items-center gap-4 mb-6">
                   {club.logo ? (
                     <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/5 flex items-center justify-center p-2 shadow-lg">
@@ -2632,7 +2652,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                   </div>
 
                   <button onClick={handleCreateRegistryClub} disabled={loading} className="w-full py-5 bg-amber-500 text-black font-black rounded-2xl shadow-lg shadow-amber-500/20 uppercase tracking-widest transition-all">
-                    {loading ? 'CREATING...' : 'CONFIRM REGISTRATION'}
+                    {loading ? (editingClubId ? 'UPDATING...' : 'CREATING...') : (editingClubId ? 'UPDATE CLUB' : 'CONFIRM REGISTRATION')}
                   </button>
                 </motion.div>
               </motion.div>
@@ -2743,7 +2763,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
                     <div className="pt-6 flex gap-4">
                       <button onClick={() => setShowTSetup(false)} className="flex-1 py-5 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black tracking-widest uppercase transition-all">CANCEL</button>
-                      <button onClick={handleAddTournament} disabled={matchBusy || !tSetupForm.name || tSetupForm.participatingClubIds.length < 2} className="flex-1 py-5 bg-amber-500 hover:bg-amber-400 text-black rounded-2xl text-[10px] font-black tracking-widest uppercase shadow-xl shadow-amber-500/20 disabled:opacity-50 transition-all">
+                      <button onClick={handleAddTournament} disabled={matchBusy} className="flex-1 py-5 bg-amber-500 hover:bg-amber-400 text-black rounded-2xl text-[10px] font-black tracking-widest uppercase shadow-xl shadow-amber-500/20 disabled:opacity-50 transition-all">
                         {matchBusy ? 'CREATING...' : 'CREATE TOURNAMENT'}
                       </button>
                     </div>
