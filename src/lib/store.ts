@@ -1110,8 +1110,13 @@ export async function fetchClubs(force = false): Promise<Club[]> {
   if (force) invalidateCache(cacheKey);
   
   return fetchWithCache(cacheKey, async () => {
-    const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc')));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
+    try {
+      const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc')));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'clubs');
+      throw err;
+    }
   });
 }
 
@@ -1178,6 +1183,7 @@ export async function saveClub(club: Club, previousOwnerId?: string): Promise<vo
 
   try {
     await batch.commit();
+    invalidateCache('clubs_all');
     
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `clubs/${clubId}`);
@@ -1367,6 +1373,7 @@ export async function fetchClubTournaments(seasonName: string): Promise<import('
 }
 
 export async function saveClubTournament(tourney: import('../types').ClubTournament): Promise<void> {
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
   try {
     await setDoc(doc(db, 'clubTournaments', tourney.id), tourney);
@@ -1406,6 +1413,7 @@ export async function fetchClubFixtures(seasonName: string): Promise<import('../
 }
 
 export async function saveClubFixture(fixture: import('../types').ClubFixture): Promise<void> {
+  await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
   try {
     await setDoc(doc(db, 'clubFixtures', fixture.id), fixture);

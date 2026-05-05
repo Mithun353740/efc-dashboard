@@ -1724,10 +1724,15 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
   const reload = async () => {
     setLoading(true);
-    const [cs, cfg] = await Promise.all([fetchClubs(), fetchClubConfig()]);
-    setClubs(cs);
-    if (cfg) setConfig(cfg);
-    setLoading(false);
+    try {
+      const [cs, cfg] = await Promise.all([fetchClubs(), fetchClubConfig()]);
+      setClubs(cs);
+      if (cfg) setConfig(cfg);
+    } catch (e) {
+      console.error('Failed to load clubs:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   React.useEffect(() => { reload(); }, []);
