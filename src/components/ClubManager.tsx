@@ -183,6 +183,32 @@ function ClubStatBar({ label, val, icon }: { label: string; val: string | number
   );
 }
 
+// ─── Stat Circle ──────────────────────────────────────────────────────────────
+
+function StatCircle({ label, value, color, icon }: { label: string; value: number; color: string; icon: React.ReactNode }) {
+  const r = 28; const circ = 2 * Math.PI * r;
+  const offset = circ - (value / 100) * circ;
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="relative w-16 h-16 sm:w-20 sm:h-20">
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 72 72">
+          <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
+          <circle cx="36" cy="36" r={r} fill="none" stroke={color} strokeWidth="6"
+            strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+            style={{ transition: 'stroke-dashoffset 1s ease' }} />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center" style={{ color }}>
+          {icon}
+        </div>
+      </div>
+      <div className="text-center">
+        <p className="text-[10px] sm:text-xs font-black text-white">{value}</p>
+        <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest" style={{ color }}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, setActiveTab }: { 
@@ -191,260 +217,264 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
   setActiveTab: (t: 'overview' | 'squad' | 'market' | 'auction' | 'rankings' | 'tournaments' | 'inbox' | 'player_inbox') => void;
 }) {
   const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
-  
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 md:auto-rows-min lg:auto-rows-[180px]">
-      {/* ── MAIN HUB WIDGET (FIFA 24 STYLE) ── */}
-      <div className="md:col-span-4 lg:col-span-3 row-span-2 relative group overflow-hidden rounded-2xl md:rounded-[2rem] bg-[#020617] border border-white/5 p-4 md:p-8 flex flex-col justify-between transition-all shadow-2xl hover:border-amber-500/30">
-        {/* Dynamic Background FX */}
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/20 via-transparent to-amber-500/10 opacity-40 group-hover:opacity-60 transition-opacity" />
-        <div className="absolute top-0 right-0 w-48 h-48 md:w-80 md:h-80 bg-brand-purple/20 blur-[60px] md:blur-[100px] rounded-full -mr-16 -mt-16 md:-mr-32 md:-mt-32 animate-pulse" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row items-start justify-between gap-4 md:gap-4 h-full">
-          <div className="flex-1 w-full text-center md:text-left">
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-              <p className="text-[7px] md:text-[11px] font-black tracking-[0.2em] md:tracking-[0.4em] text-amber-500 uppercase mb-1 md:mb-3 drop-shadow-lg">VORTEX ELITE FRANCHISE</p>
-              <div className="flex flex-col md:flex-row items-center gap-2 md:gap-5">
-                <ClubLogo club={myClub} size="md" />
-                <h2 className="text-xl sm:text-3xl md:text-5xl lg:text-5xl font-black text-white tracking-tighter uppercase italic leading-[0.9] truncate max-w-full select-none">
-                  {myClub.name}
-                </h2>
-              </div>
-              
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 md:gap-3 mt-3 md:mt-8">
-                <div className="px-2 md:px-5 py-1 md:py-2.5 bg-white/5 border border-white/10 rounded-full flex items-center gap-1.5 group-hover:bg-white/10 transition-all cursor-default">
-                  <Shield size={10} className="text-amber-500 md:w-[12px]" />
-                  <span className="text-[7px] md:text-[10px] font-black text-white uppercase tracking-[0.1em] md:tracking-[0.2em]">{myClub.shortName}</span>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-  
-          {/* Ratings */}
-          <div className="flex flex-row md:flex-col gap-2 md:gap-6 shrink-0 md:items-end w-full md:w-auto items-center justify-center border-t md:border-t-0 border-white/5 pt-3 md:pt-0">
-            <div className="flex-1 md:text-right group/ovr text-center">
-              <p className="text-[7px] md:text-[9px] font-black text-slate-500 tracking-[0.1em] md:tracking-[0.2em] uppercase mb-0 group-hover/ovr:text-white transition-colors">AVG RATING</p>
-              <p className="text-3xl sm:text-5xl md:text-5xl lg:text-6xl font-black text-white leading-none tracking-tighter italic" style={{ color: ovrColor(avgOvr) }}>{avgOvr}</p>
-            </div>
-            <div className="flex-1 md:text-right text-center">
-              <p className="text-[7px] md:text-[9px] font-black text-slate-500 tracking-[0.1em] md:tracking-[0.2em] uppercase mb-0 uppercase">SQUAD POWER</p>
-              <div className="flex items-baseline md:justify-end justify-center gap-0.5 md:gap-1.5 leading-none">
-                <p className="text-xl sm:text-4xl md:text-4xl font-black text-white tracking-tighter italic">{squad.length}</p>
-                <span className="text-[10px] md:text-lg font-black text-slate-700 italic">/25</span>
-              </div>
-            </div>
-          </div>
-        </div>
+  const fitness = Math.min(100, Math.round(avgOvr * 0.95 + Math.random() * 5));
+  const sharpness = Math.min(100, Math.round(avgOvr * 0.88 + 4));
+  const morale = squad.length >= 5 ? 82 : 55;
 
- 
-        {/* Global Footer Bar */}
-        <div className="relative z-10 mt-6 md:mt-10 pt-4 md:pt-8 border-t border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+  const topScorers = [...squad].sort((a, b) => (b.goalsScored || 0) - (a.goalsScored || 0)).slice(0, 3);
+  const recentMatches = matches.filter(m => m.p1Id === myClub.ownerId || m.p2Id === myClub.ownerId).slice(-5).reverse();
+
+  const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  return (
+    <div className="space-y-3 sm:space-y-4">
+
+      {/* ── ROW 1: Training Day Hero + Notifications ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4">
+
+        {/* Training Day Panel */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          className="lg:col-span-3 relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10"
+          style={{ background: 'linear-gradient(135deg, #1a2744 0%, #0f1729 50%, #0a0f1e 100%)' }}
+        >
+          {/* Yellow accent strip top */}
+          <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${myClub.primaryColor}, ${myClub.secondaryColor})` }} />
+          
+          <div className="p-4 sm:p-6">
+            <div className="flex items-start justify-between mb-4 sm:mb-6">
               <div>
-                <p className="text-[9px] font-black text-white uppercase tracking-widest leading-none">Objective</p>
-                <p className="text-[8px] font-bold text-slate-500 mt-0.5 uppercase italic">{myClub.activeObjective || 'Elite Performance'}</p>
+                <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-0.5">
+                  {todayStr}
+                </p>
+                <h3 className="text-lg sm:text-2xl font-black text-white uppercase tracking-tight">TRAINING DAY</h3>
+              </div>
+              <div className="px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest"
+                style={{ background: myClub.primaryColor + '30', color: myClub.primaryColor, border: `1px solid ${myClub.primaryColor}40` }}>
+                ACTIVE
               </div>
             </div>
-            
-            <div className="flex items-center gap-1.5">
-              {matches.slice(0, 3).reverse().map((m, i) => {
+
+            {/* Stat Circles Row */}
+            <div className="flex items-center justify-around py-4 sm:py-6">
+              <StatCircle label="FITNESS" value={fitness} color="#4ade80" icon={<Zap size={16} />} />
+              <StatCircle label="SHARPNESS" value={sharpness} color="#f59e0b" icon={<Star size={16} />} />
+              <StatCircle label="MORALE" value={morale} color="#8b5cf6" icon={<TrendingUp size={16} />} />
+            </div>
+
+            {/* Recent form */}
+            <div className="mt-2 flex items-center gap-2">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mr-1">FORM</p>
+              {recentMatches.length === 0 ? (
+                <p className="text-[9px] text-slate-600 font-bold italic">No matches yet</p>
+              ) : recentMatches.map((m, i) => {
                 const win = (m.p1Id === myClub.ownerId && m.p1Score > m.p2Score) || (m.p2Id === myClub.ownerId && m.p2Score > m.p1Score);
                 const draw = m.p1Score === m.p2Score;
                 return (
-                  <div key={i} className={cn("w-5 h-5 rounded-md flex items-center justify-center text-[8px] font-black", 
-                    win ? 'bg-emerald-500 text-black' : draw ? 'bg-amber-500 text-black' : 'bg-red-500 text-white'
-                  )}>
+                  <div key={i} className={cn('w-6 h-6 rounded flex items-center justify-center text-[9px] font-black',
+                    win ? 'bg-emerald-500 text-black' : draw ? 'bg-amber-500 text-black' : 'bg-red-500/80 text-white')}>
                     {win ? 'W' : draw ? 'D' : 'L'}
                   </div>
                 );
               })}
             </div>
           </div>
- 
-          <motion.button 
-            whileHover={{ scale: 1.05 }} 
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setActiveTab('squad')}
-            className="w-full md:w-auto px-5 py-3 md:py-3.5 bg-white text-black rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] tracking-widest uppercase italic shadow-xl flex items-center justify-center gap-2"
+        </motion.div>
+
+        {/* Right column: Notifications + Development stacked */}
+        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4">
+
+          {/* Notifications */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+            onClick={() => setActiveTab('inbox')}
+            className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-5 cursor-pointer group transition-all hover:border-brand-purple/40"
+            style={{ background: 'linear-gradient(135deg, #12142a, #0a0c1a)' }}
           >
-            SQUAD HUB <ArrowLeft size={12} className="rotate-180" />
-          </motion.button>
-        </div>
-      </div>
-
-      {/* ── FINANCE WIDGET ── */}
-      <div className="md:col-span-2 lg:col-span-1 rounded-[2rem] bg-amber-500 p-6 md:p-8 flex flex-col justify-between shadow-xl relative overflow-hidden group">
-        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
-        <DollarSign className="absolute top-[-20px] right-[-20px] text-black/10" size={100} />
-        
-        <div className="relative z-10">
-          <p className="text-[10px] font-black text-black/60 uppercase tracking-widest mb-2">BUDGET</p>
-          <div className="flex items-baseline gap-1">
-            <span className="text-sm font-black text-black/40">VCC</span>
-            <h3 className="text-3xl md:text-4xl font-black text-black tracking-tighter italic">{(myClub.budget || 0).toLocaleString()}</h3>
-          </div>
-        </div>
-        
-        <button onClick={() => setActiveTab('market')} className="relative z-10 text-[9px] font-black text-black uppercase tracking-widest mt-4">Market Centre &rarr;</button>
-      </div>
-
-      {/* ── MATCHDAY WIDGET ── */}
-      <div className="md:col-span-2 lg:col-span-1 rounded-[2rem] bg-[#0f172a] border border-white/5 p-6 md:p-8 flex flex-col justify-between shadow-xl">
-        <Calendar className="text-amber-500 mb-4" size={24} />
-        <div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">CURRENT</p>
-          <p className="text-xl font-black text-white italic uppercase truncate">{config?.season || 'Season 1'}</p>
-        </div>
-        <button onClick={() => setActiveTab('tournaments')} className="text-[9px] font-black text-amber-500 uppercase tracking-widest mt-4">Match Day &rarr;</button>
-      </div>
-
-      {/* MINI STANDINGS / RUMOR MILL (Square) ── */}
-      <div className={cn(
-        "row-span-2 border rounded-[2.5rem] p-8 flex flex-col transition-all relative overflow-hidden group",
-        config?.deadlineDayActive ? "bg-red-950/20 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.1)]" : "bg-[#020617] border-white/10 hover:border-amber-500/30"
-      )}>
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            {config?.deadlineDayActive ? <Zap size={18} className="text-red-500 animate-pulse" /> : <Trophy size={18} className="text-amber-500" />}
-            <p className={cn("text-[10px] md:text-[12px] font-black tracking-[0.2em] uppercase", config?.deadlineDayActive ? "text-red-500" : "text-white")}>
-              {config?.deadlineDayActive ? "TRANSFER RUMORS" : "STANDINGS"}
-            </p>
-          </div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{config?.season}</p>
-        </div>
-        
-        {config?.deadlineDayActive ? (
-          <div className="flex-1 space-y-4 overflow-y-auto no-scrollbar">
-            {[
-              { t: "BREAKING", m: "Mega-bid incoming for " + (squad[0]?.name || "top assets"), highlight: true },
-              { t: "RUMOR", m: "Transfer Hub activity surging past seasonal averages." },
-              { t: "SCOUT", m: "Anonymous scouts spotted at Vortex Training Facilities." },
-              { t: "AGENT", m: "Player representatives seeking immediate contract reviews." }
-            ].map((r, i) => (
-              <div key={i} className={cn("p-4 rounded-2xl border relative overflow-hidden transition-all", 
-                r.highlight ? "bg-red-500/10 border-red-500/30" : "bg-white/5 border-white/5"
-              )}>
-                <div className={cn("absolute left-0 top-0 bottom-0 w-1", r.highlight ? "bg-red-500" : "bg-slate-700")} />
-                <p className={cn("text-[8px] font-black mb-1.5 uppercase tracking-widest", r.highlight ? "text-red-500" : "text-slate-500")}>{r.t}</p>
-                <p className="text-[10px] font-bold text-slate-300 leading-snug">{r.m}</p>
+            <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative z-10 flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-brand-purple/10 border border-brand-purple/20 flex items-center justify-center text-brand-purple shrink-0 group-hover:scale-110 transition-transform">
+                <Bell size={20} />
               </div>
-            ))}
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-0.5">NOTIFICATIONS</p>
+                <p className="text-sm sm:text-base font-black text-white truncate">
+                  {inboxUnread > 0 ? `${inboxUnread} NEW` : 'ALL CLEAR'}
+                </p>
+                <p className="text-[9px] font-bold text-slate-400 italic truncate">
+                  {inboxUnread > 0 ? 'You have unread messages' : 'No pending communications'}
+                </p>
+              </div>
+              {inboxUnread > 0 && (
+                <div className="shrink-0 w-6 h-6 rounded-full bg-brand-purple text-white text-[10px] font-black flex items-center justify-center">
+                  {inboxUnread > 9 ? '9+' : inboxUnread}
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Development */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            onClick={() => setActiveTab('squad')}
+            className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-5 cursor-pointer group transition-all hover:border-amber-500/40"
+            style={{ background: 'linear-gradient(135deg, #141a12, #0a0f0a)' }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative z-10 flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 group-hover:scale-110 transition-transform">
+                <TrendingUp size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-0.5">DEVELOPMENT</p>
+                <p className="text-sm sm:text-base font-black text-white">SQUAD HUB</p>
+                <p className="text-[9px] font-bold text-slate-400 italic truncate">Help players grow to their full potential</p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* ── ROW 2: Top Scorers + Weekly Schedule + Budget ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+
+        {/* Top Scorers */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
+          className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-6"
+          style={{ background: 'linear-gradient(135deg, #1a1412, #0f0a08)' }}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500">
+              <Trophy size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">TOP SCORERS</p>
+              <p className="text-[9px] text-slate-600 font-bold italic">View current goal scorers stats</p>
+            </div>
           </div>
-        ) : (
-          <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar pr-1">
-            {allClubs.sort((a,b) => (b.managerRating || 0) - (a.managerRating || 0)).slice(0, 6).map((c, i) => (
-              <div key={c.id} className={cn("flex items-center justify-between p-3 rounded-2xl border transition-all", c.id === myClub.id ? "bg-amber-500/10 border-amber-500/30" : "border-transparent bg-white/5 hover:bg-white/10")}>
-                <div className="flex items-center gap-4">
-                  <span className={cn("text-[10px] font-black w-4", i === 0 ? 'text-amber-500' : 'text-slate-500')}>{i+1}</span>
-                  <div className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center text-[10px] font-black shadow-lg" style={{ background: `linear-gradient(135deg, ${c.primaryColor}, ${c.secondaryColor})` }}>
-                    {c.shortName}
-                  </div>
-                  <span className="text-[11px] font-black text-white uppercase tracking-tight truncate w-32">{c.name}</span>
+          <div className="space-y-2 sm:space-y-3">
+            {topScorers.length === 0 ? (
+              <p className="text-[10px] text-slate-600 font-bold italic text-center py-4">No stats yet</p>
+            ) : topScorers.map((p, i) => (
+              <div key={p.id} className="flex items-center gap-3">
+                <span className={cn('w-4 text-[10px] font-black shrink-0', i === 0 ? 'text-amber-500' : 'text-slate-500')}>{i + 1}</span>
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
+                  {p.image ? <img src={p.image} className="w-full h-full object-cover" alt="" /> : <Users size={12} className="text-white/20" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-black text-white uppercase truncate">{p.name}</p>
+                  <p className="text-[8px] text-slate-500 font-bold">OVR {p.ovr}</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-[11px] font-black text-amber-500">{c.managerRating || 80}</span>
-                  <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">ELO</p>
+                  <p className="text-sm font-black text-amber-500">{p.goalsScored || 0}</p>
+                  <p className="text-[8px] text-slate-500 font-bold uppercase">goals</p>
                 </div>
               </div>
             ))}
           </div>
-        )}
-        {!config?.deadlineDayActive && (
-          <button className="mt-6 w-full py-4 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black text-slate-400 transition-all uppercase tracking-[0.2em] border border-white/5">
-            LEAGUE TABLES &rarr;
+        </motion.div>
+
+        {/* Weekly Schedule */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          onClick={() => setActiveTab('tournaments')}
+          className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-6 cursor-pointer group transition-all hover:border-amber-500/30"
+          style={{ background: 'linear-gradient(135deg, #14121a, #0a0812)' }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="relative z-10 h-full flex flex-col">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-brand-purple/10 flex items-center justify-center text-brand-purple">
+                <Calendar size={16} />
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">WEEKLY</p>
+                <p className="text-sm font-black text-white uppercase tracking-tight">SCHEDULE</p>
+              </div>
+            </div>
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center justify-between p-2.5 bg-white/5 rounded-xl border border-white/5">
+                <div>
+                  <p className="text-[9px] font-black text-white uppercase">Current Season</p>
+                  <p className="text-[8px] text-slate-500 font-bold italic truncate">{config?.season || 'Season 1'}</p>
+                </div>
+                <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded text-[8px] font-black uppercase">ACTIVE</div>
+              </div>
+              <div className="flex items-center justify-between p-2.5 bg-white/5 rounded-xl border border-white/5">
+                <div>
+                  <p className="text-[9px] font-black text-white uppercase">Match Day</p>
+                  <p className="text-[8px] text-slate-500 font-bold italic">View fixtures & results</p>
+                </div>
+                <ArrowLeft size={12} className="text-brand-purple rotate-180" />
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Budget / Transfers */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
+          onClick={() => setActiveTab('market')}
+          className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-4 sm:p-6 cursor-pointer group transition-all"
+          style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}22, ${myClub.secondaryColor}15)`, border: `1px solid ${myClub.primaryColor}30` }}
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 rounded-full blur-[60px] opacity-20"
+            style={{ background: myClub.primaryColor }} />
+          <div className="relative z-10 flex flex-col h-full">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: myClub.primaryColor + '30', color: myClub.primaryColor }}>
+                <DollarSign size={16} />
+              </div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">TRANSFER HUB</p>
+            </div>
+            <div className="flex-1">
+              <p className="text-[9px] font-black uppercase tracking-widest mb-1" style={{ color: myClub.primaryColor }}>BUDGET</p>
+              <p className="text-2xl sm:text-3xl font-black text-white italic leading-none">{fmtBudget(myClub.budget || 0)}</p>
+              <p className="text-[8px] text-slate-500 font-bold mt-0.5 uppercase">VCC Available</p>
+            </div>
+            <div className="mt-4 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest" style={{ color: myClub.primaryColor }}>
+              Open Market <ArrowLeft size={10} className="rotate-180" />
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* ── ROW 3: Club Standings ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+        className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-6"
+        style={{ background: 'linear-gradient(135deg, #0f1118, #080b14)' }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Trophy size={16} className="text-amber-500" />
+            <p className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white">STANDINGS</p>
+          </div>
+          <button onClick={() => setActiveTab('rankings')} className="text-[9px] font-black uppercase tracking-widest text-amber-500 hover:text-amber-400 transition-colors">
+            Full Table →
           </button>
-        )}
-      </div>
-
-      {/* ── TRANSFER HUB (Tall) ── */}
-      <div className="row-span-2 md:row-span-3 bg-[#020617] border border-white/10 rounded-[2.5rem] p-8 relative overflow-hidden group flex flex-col justify-between hover:border-amber-500/50 transition-all">
-        <div className="absolute inset-0 bg-gradient-to-b from-brand-purple/5 via-transparent to-black/40" />
-        
-        {squad[0] && (
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-             <div className="w-80 h-80 rounded-full bg-brand-purple blur-[100px]" />
-          </div>
-        )}
-        
-        <div className="relative z-10 flex items-start justify-between">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-            <ArrowLeftRight size={28} />
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">CLUB VALUATION</p>
-            <p className="text-2xl font-black text-white leading-none italic uppercase">VCC {(myClub.budget || 0).toLocaleString()}</p>
-          </div>
         </div>
-
-        <div className="relative z-10 space-y-6">
-          <div>
-            <h4 className="text-xl font-black text-white italic uppercase tracking-tighter mb-2">TRANSFER HUB</h4>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
-              Global marketplace is currently monitoring {allClubs.length} franchises. Review your squad depth in the SQUAD tab.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 pb-2">
-            <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-              <p className="text-[8px] font-black text-slate-500 mb-1">SQUAD SIZE</p>
-              <p className="text-lg font-black text-white leading-none">{squad.length}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {allClubs.sort((a, b) => (b.managerRating || 0) - (a.managerRating || 0)).slice(0, 6).map((c, i) => (
+            <div key={c.id} className={cn('flex items-center gap-3 p-2.5 rounded-xl border transition-all',
+              c.id === myClub.id ? 'border-amber-500/30 bg-amber-500/5' : 'border-white/5 bg-white/3 hover:bg-white/5')}>
+              <span className={cn('text-[10px] font-black w-4 shrink-0', i === 0 ? 'text-amber-500' : 'text-slate-500')}>{i + 1}</span>
+              <ClubLogo club={c} size="xs" />
+              <p className="text-[10px] font-black text-white uppercase truncate flex-1">{c.name}</p>
+              <span className="text-[10px] font-black shrink-0" style={{ color: i === 0 ? '#f59e0b' : '#64748b' }}>{c.managerRating || 80}</span>
             </div>
-            <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-              <p className="text-[8px] font-black text-slate-500 mb-1">OFFERS</p>
-              <p className="text-lg font-black text-emerald-400 leading-none">0</p>
-            </div>
-          </div>
+          ))}
         </div>
-      </div>
+      </motion.div>
 
-      {/* ── SQUAD POWER (Square) ── */}
-      <div className="bg-[#020617] border border-white/10 rounded-[2.5rem] p-8 flex flex-col justify-between hover:border-brand-purple/50 transition-all relative overflow-hidden group">
-        <div className="absolute top-[-10px] right-[-10px] opacity-10 group-hover:scale-110 transition-transform">
-          <Shield size={100} className="text-brand-purple" />
-        </div>
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-brand-purple/10 border border-brand-purple/20 flex items-center justify-center text-brand-purple">
-            <Users size={20} />
-          </div>
-          <p className="text-[11px] font-black tracking-[0.2em] text-slate-500 uppercase">AVG RAT</p>
-        </div>
-        <div className="relative z-10">
-          <p className="text-4xl font-black text-white leading-none italic uppercase mb-3">{avgOvr}</p>
-          <div className="flex gap-1.5 h-1.5">
-            {[1,2,3,4,5].map(i => (
-              <div key={i} className={cn("flex-1 rounded-full",
-                i <= Math.floor(avgOvr / 20) ? "bg-brand-purple shadow-[0_0_8px_rgba(139,92,246,0.5)]" : "bg-white/5"
-              )} />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── NOTIFICATIONS / ALERTS (Wide) ── */}
-      <div className="md:col-span-2 lg:col-span-2 bg-[#020617] border border-white/10 rounded-[2.5rem] p-8 flex items-center gap-8 hover:border-brand-purple/50 transition-all relative overflow-hidden group">
-        <div className="absolute inset-0 bg-gradient-to-r from-brand-purple/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="w-16 h-16 rounded-[1.5rem] bg-brand-purple/10 border border-brand-purple/20 flex items-center justify-center text-brand-purple shrink-0 group-hover:rotate-12 transition-transform">
-          <Bell size={32} />
-        </div>
-        <div className="flex-grow min-w-0 relative z-10">
-          <p className="text-[11px] font-black tracking-[0.3em] text-slate-500 uppercase mb-1">CLUB NOTIFICATIONS</p>
-          <h4 className="text-xl font-black text-white uppercase tracking-tight leading-tight italic">
-            {inboxUnread > 0 ? `${inboxUnread} UNREAD COMMUNICATIONS` : 'NO NEW NOTIFICATIONS'}
-          </h4>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest italic truncate">
-            {inboxUnread > 0 ? 'Check the club office for latest updates' : 'Your club staff is currently up to date'}
-          </p>
-        </div>
-        <button onClick={() => setActiveTab('inbox')} className="relative z-10 px-8 py-3 bg-white/5 hover:bg-brand-purple hover:text-white text-white rounded-xl text-[10px] font-black transition-all uppercase tracking-widest border border-white/10 shrink-0 shadow-lg">
-          VIEW OFFICE
-        </button>
-      </div>
     </div>
   );
 }
 
+
 // ─── Main Component (shell + tab router) ─────────────────────────────────────
+
 
 export default function ClubManager() {
   const { players, matches, systemLocks } = useFirebase();
@@ -569,77 +599,72 @@ export default function ClubManager() {
 
   return (
     <div className="min-h-screen bg-[#020617] text-white selection:bg-amber-500/30 pb-10">
-      {/* FIFA TOP STATUS BAR - Fully Responsive */}
-      <div className="bg-black/80 backdrop-blur-md border-b border-white/5 py-2 px-3 md:px-8 flex items-center justify-between sticky top-[60px] md:top-[80px] lg:top-[100px] z-[50]">
-        <div className="flex items-center gap-2 md:gap-6">
-          {/* Level Info */}
-          <div className="flex items-center gap-1.5 md:gap-2">
-            <span className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">LVL</span>
-            <div className="px-1 md:px-2 py-0.5 bg-amber-500 text-black text-[8px] md:text-[10px] font-black rounded">{calcLevel(myPlayer).lvl}</div>
-            <div className="w-12 md:w-24 h-1 bg-white/10 rounded-full overflow-hidden hidden xs:block">
-              <div className="h-full bg-amber-500" style={{ width: `${calcLevel(myPlayer).progress}%` }} />
-            </div>
-          </div>
-          {/* Budget */}
-          <div className="flex items-center gap-1 md:gap-2 text-amber-500">
-            <DollarSign size={10} className="md:w-[14px]" />
-            <span className="text-[9px] md:text-[11px] font-black uppercase tracking-widest">{fmtBudget(myClub?.budget || 0)}</span>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2 md:gap-4">
-          {/* Squad Count */}
-          <div className="hidden xs:flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-full border border-white/10">
-            <Users size={10} className="text-slate-500" />
-            <span className="text-[8px] md:text-[10px] font-black text-white uppercase">{squad.length}/25</span>
-          </div>
-          {/* User Peek */}
-          <div className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-white/10">
-            <div className="text-right hidden sm:block">
-              <p className="text-[9px] md:text-[10px] font-black text-white leading-none uppercase truncate max-w-[80px]">{myPlayer?.name || 'MANAGER'}</p>
-              <p className="text-[7px] md:text-[8px] font-bold text-slate-500 uppercase mt-0.5 truncate max-w-[80px]">{myClub?.name || 'UNASSIGNED'}</p>
-            </div>
-            {myClub ? (
-              <ClubLogo club={myClub} size="xs" />
-            ) : (
-              <div className="w-6 h-6 md:w-8 md:h-8 rounded md:rounded-lg bg-amber-500 text-black flex items-center justify-center font-black text-[9px] md:text-xs">
-                {myPlayer?.overall || '??'}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* Main Container */}
-      <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-6 md:py-10">
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-8 md:mb-12">
-          <div className="text-center xl:text-left">
-            <p className="text-[9px] md:text-[10px] font-black text-amber-500 tracking-[0.4em] uppercase mb-2">CLUB MANAGEMENT SYSTEM</p>
-            <h1 className="text-4xl md:text-5xl xl:text-6xl font-black text-white tracking-tighter uppercase italic leading-none">CLUB ZONE</h1>
-          </div>
-          
-          {/* Tabs - Responsive Scrollable Container */}
-          <div className="w-full xl:w-auto overflow-x-auto no-scrollbar py-2">
-            <div className="flex gap-2 p-1.5 bg-white/5 border border-white/10 rounded-[1.5rem] md:rounded-full w-max mx-auto xl:mx-0">
-              {tabs.map((t: any) => (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id)}
-                  className={cn(
-                    "relative flex items-center gap-2 px-4 md:px-6 py-2.5 md:py-3.5 rounded-full text-[9px] md:text-[11px] font-black tracking-widest whitespace-nowrap transition-all",
-                    activeTab === t.id
-                      ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20 scale-105'
-                      : auctionLive && t.id === 'auction' ? 'text-red-400 hover:text-white hover:bg-white/5 animate-pulse'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
-                  )}
-                >
-                  {t.icon}<span className="md:inline">{t.label}</span>
-                  {t.badge > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-violet-500 text-white text-[8px] font-black flex items-center justify-center">{t.badge > 9 ? '9+' : t.badge}</span>
-                  )}
-                </button>
-              ))}
+      {/* ── FIFA MANAGER STYLE HEADER ── */}
+      <div className="sticky top-[60px] md:top-[80px] z-[50]"
+        style={{ background: 'linear-gradient(180deg, #0a0e1a 0%, #060a14 100%)', borderBottom: `2px solid ${myClub?.primaryColor || '#8b5cf6'}40` }}>
+
+        {/* Top strip: club logo + manager info + rating */}
+        <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-6 py-2 sm:py-3 border-b border-white/5">
+          {/* Club Logo */}
+          {myClub ? (
+            <ClubLogo club={myClub} size="sm" />
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+              <Shield size={16} className="text-slate-500" />
             </div>
+          )}
+
+          {/* Manager + Club Name */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] sm:text-xs font-black text-white uppercase tracking-tight truncate leading-none">
+              {myPlayer?.name || 'MANAGER'}
+            </p>
+            <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate mt-0.5">
+              {myClub?.name || 'No Club Assigned'}
+            </p>
+          </div>
+
+          {/* OVR Rating Badge */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="px-2.5 py-1 rounded font-black text-sm sm:text-base text-white leading-none"
+              style={{ background: myClub?.primaryColor || '#8b5cf6' }}>
+              {myPlayer?.ovr || '—'}
+            </div>
+            {/* Budget pill */}
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
+              <DollarSign size={10} className="text-amber-500" />
+              <span className="text-[10px] font-black text-amber-400">{fmtBudget(myClub?.budget || 0)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Nav */}
+        <div className="overflow-x-auto no-scrollbar">
+          <div className="flex items-stretch min-w-max">
+            {tabs.map((t: any) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={cn(
+                  'relative flex items-center gap-1.5 px-4 sm:px-6 py-2.5 sm:py-3 text-[9px] sm:text-[10px] font-black tracking-widest whitespace-nowrap uppercase transition-all border-b-2',
+                  activeTab === t.id
+                    ? 'text-white border-current'
+                    : auctionLive && t.id === 'auction'
+                      ? 'text-red-400 border-transparent hover:border-red-400/40 animate-pulse'
+                      : 'text-slate-500 border-transparent hover:text-white hover:border-white/20'
+                )}
+                style={activeTab === t.id ? { borderColor: myClub?.primaryColor || '#f59e0b', color: myClub?.primaryColor || '#f59e0b' } : {}}
+              >
+                {t.icon}
+                <span>{t.label}</span>
+                {t.badge > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-violet-500 text-white text-[8px] font-black flex items-center justify-center">
+                    {t.badge > 9 ? '9+' : t.badge}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </div>
