@@ -669,7 +669,7 @@ export default function Admin() {
                           {players.filter(p => p.name.toLowerCase().includes(delSearch.toLowerCase())).map(p => (
                             <button 
                               key={p.id} 
-                              onClick={() => playerToDelete === p.id ? handleDelete(p.id, true) : setPlayerToDelete(p.id)} 
+                              onClick={() => playerToDelete === p.id ? handleDeletePlayer(p.id, true) : setPlayerToDelete(p.id)} 
                               className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
                             >
                               <div>
@@ -677,7 +677,7 @@ export default function Admin() {
                                 <p className="text-[9px] font-bold text-slate-500">#{p.number} • {p.position}</p>
                               </div>
                               {playerToDelete === p.id ? (
-                                <button type="button" onClick={() => handleDelete(p.id, true)} disabled={isSubmitting} className="text-[10px] font-black text-white bg-red-500/80 px-3 py-1.5 rounded uppercase tracking-wider disabled:opacity-50">
+                                <button type="button" onClick={() => handleDeletePlayer(p.id, true)} disabled={isSubmitting} className="text-[10px] font-black text-white bg-red-500/80 px-3 py-1.5 rounded uppercase tracking-wider disabled:opacity-50">
                                   {isSubmitting ? 'DELETING...' : 'TAP TO CONFIRM'}
                                 </button>
                               ) : (
