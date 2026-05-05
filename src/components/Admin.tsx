@@ -2828,10 +2828,22 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                </div>
             </div>
 
-            <button onClick={handleAddFixture} disabled={matchBusy || !fForm.tournamentId || !fForm.homeClubId || !fForm.awayClubId}
-              className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl disabled:opacity-50 transition-all uppercase mt-2 shadow-lg shadow-amber-500/20">
-              {matchBusy ? 'SCHEDULING...' : 'SCHEDULE FIXTURE'}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
+              <button 
+                onClick={handleAddFixture} 
+                disabled={matchBusy || !fForm.tournamentId || !fForm.homeClubId || !fForm.awayClubId}
+                className="flex-[2] py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-[10px] tracking-widest rounded-xl disabled:opacity-50 transition-all uppercase shadow-lg shadow-amber-500/20"
+              >
+                {matchBusy ? 'SCHEDULING...' : 'SCHEDULE FIXTURE'}
+              </button>
+              <button 
+                onClick={handleAutoGenerateClubFixtures} 
+                disabled={matchBusy || !fForm.tournamentId}
+                className="flex-1 py-4 bg-white/10 hover:bg-white/20 text-white font-black text-[10px] tracking-widest rounded-xl border border-white/10 disabled:opacity-50 transition-all uppercase"
+              >
+                {matchBusy ? 'GENERATING...' : 'AUTO-GENERATE'}
+              </button>
+            </div>
             {matchMsg.text && <p className={cn('text-[10px] font-bold mt-3 text-center', matchMsg.ok ? 'text-emerald-400' : 'text-red-400')}>{matchMsg.text}</p>}
           </div>
           

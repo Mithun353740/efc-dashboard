@@ -26,6 +26,7 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
   const [matchDayEnd, setMatchDayEnd] = useState('');
   const [maxTeams, setMaxTeams] = useState<string>('');
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
+  const [autoGenerateFixtures, setAutoGenerateFixtures] = useState(true);
 
   const handleNext = () => setStep(prev => prev + 1);
   const handlePrev = () => setStep(prev => prev - 1);
@@ -50,10 +51,10 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
       let groups: any[] = [];
       const currentStage = format === 'groups' ? 'groups' : format;
 
-      // Only generate fixtures if players are pre-seeded.
-      // If no players selected, the tournament is saved as an open-registration
-      // shell — fixtures will be generated once all players have registered.
-      if (teams.length >= 2) {
+      // Only generate fixtures if players are pre-seeded and auto-generate is ON.
+      // If no players selected or auto-generate is OFF, the tournament is saved as an open-registration
+      // shell — fixtures will be generated once all players have registered or added manually.
+      if (teams.length >= 2 && autoGenerateFixtures) {
         // Pad to power of 2 if knockout
         if (format === 'knockout') {
           let size = 2;
@@ -385,6 +386,17 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-3xl p-6 text-left mb-8 flex items-center justify-between">
+                <div>
+                  <h3 className="text-white font-bold mb-1">Auto-Generate Fixtures</h3>
+                  <p className="text-slate-400 text-xs">If turned off, the tournament will be created as an empty shell, allowing you to add fixtures manually.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={autoGenerateFixtures} onChange={e => setAutoGenerateFixtures(e.target.checked)} />
+                  <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+                </label>
               </div>
 
               <div className="flex justify-between items-center">
