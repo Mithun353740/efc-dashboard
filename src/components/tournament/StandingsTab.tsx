@@ -153,7 +153,7 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
             <><span className="w-6">P</span><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GD</span><span className="w-8">PTS</span></>
           )}
         </div>
-      </div>
+      </div></div></div>
 
       {/* Rows */}
       <div className="overflow-x-auto no-scrollbar pb-4"><div className="space-y-2 min-w-[600px]">
