@@ -2131,3 +2131,74 @@ export async function respondToContractRenewal(msg: PlayerInboxMessage, accepted
   await batch.commit();
   
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN SESSION HELPER
+// Re-registers the current anonymous UID in the admins collection so that
+// Firestore security rules recognize this session as an admin. Must be called
+// at the start of every sensitive write operation to heal drifted sessions.
+// ─────────────────────────────────────────────────────────────────────────────
+let _adminSessionRegistered = false;
+export async function ensureAdminSession(): Promise<void> {
+  if (_adminSessionRegistered) return;
+  const isAdminFlag = localStorage.getItem('adminLoggedIn') === 'true';
+  if (!isAdminFlag) return;
+
+  // Make sure we have a Firebase auth user
+  let user = auth.currentUser;
+  if (!user) {
+    try {
+      const { signInAnonymously } = await import('firebase/auth');
+      await signInAnonymously(auth);
+      user = auth.currentUser;
+    } catch (e) {
+      console.warn('[Auth] ensureAdminSession: could not get auth user', e);
+      return;
+    }
+  }
+  if (!user) return;
+
+  try {
+    const playerId = localStorage.getItem('playerId') || '';
+    const adminData: Record<string, any> = {
+      lastActive: serverTimestamp(),
+      role: 'admin',
+    };
+    if (playerId) {
+      // Player-admin login
+      adminData.playerId = playerId;
+    } else {
+      // Master admin (QVFC/QVFC_19)
+      adminData.type = 'master';
+    }
+    await setDoc(doc(db, 'admins', user.uid), adminData, { merge: true });
+    _adminSessionRegistered = true;
+    console.log('[Auth] Admin session registered for uid:', user.uid);
+  } catch (e) {
+    console.warn('[Auth] ensureAdminSession: failed to write admins doc', e);
+  }
+}
+
+/** One-shot fetch for guests — no real-time listener. */
+export async function fetchPlayersOnce(limitCount = 15): Promise<Player[]> {
+  try {
+    const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Player));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, 'players');
+    return [];
+  }
+}
+
+/** One-shot fetch for guests — no real-time listener. */
+export async function fetchLeadersOnce(): Promise<Leader[]> {
+  try {
+    const q = query(collection(db, 'leaders'), limit(20));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Leader));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, 'leaders');
+    return [];
+  }
+}
