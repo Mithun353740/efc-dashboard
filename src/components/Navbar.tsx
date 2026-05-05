@@ -53,7 +53,7 @@ export default function Navbar() {
     checkAuth();
     window.addEventListener('storage', checkAuth);
     return () => window.removeEventListener('storage', checkAuth);
-  }, []);
+  }, [location.pathname]); // Re-check auth on every route change (catches same-tab login)
 
   if (location.pathname === '/login' || location.pathname === '/admin') return null;
 

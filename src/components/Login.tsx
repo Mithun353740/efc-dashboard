@@ -36,6 +36,9 @@ export default function Login() {
           });
         }
         
+        // Notify Navbar (same-tab storage events don't fire automatically)
+        window.dispatchEvent(new StorageEvent('storage', { key: 'adminLoggedIn', newValue: 'true' }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: 'admin' }));
         navigate('/admin');
       } catch (err: any) {
         setError('Firebase authentication failed: ' + (err.message || 'Unknown error'));
@@ -52,6 +55,13 @@ export default function Login() {
     setIsLoading(true);
     setError('');
     try {
+      // Ensure we have a Firebase auth user BEFORE any Firestore reads/writes
+      if (!loginAnonymously) throw new Error('Auth not ready');
+      const { auth: firebaseAuth } = await import('../firebase');
+      if (!firebaseAuth.currentUser) {
+        await loginAnonymously();
+      }
+
       // Find player by email and password in Firestore
       const { db } = await import('../firebase');
       const { collection, query, where, getDocs } = await import('firebase/firestore');
@@ -95,6 +105,10 @@ export default function Login() {
           console.warn('[Security] Could not link player session:', err);
         }
 
+        // Notify Navbar that auth state changed (same-tab storage events don't fire automatically)
+        window.dispatchEvent(new StorageEvent('storage', { key: 'playerLoggedIn', newValue: 'true' }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: 'player' }));
+
         navigate('/stats');
       } else {
         setError('Invalid player email or password');
@@ -113,28 +127,30 @@ export default function Login() {
       if (user.email === 'mithun47490@gmail.com') {
         localStorage.setItem('adminLoggedIn', 'true');
         localStorage.setItem('userType', 'admin');
-        
         // Register this session in sessions collection for security rules
-      try {
-        const { db } = await import('../firebase');
-        const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-        if (auth.currentUser) {
-          await setDoc(doc(db, 'sessions', auth.currentUser.uid), {
-            type: 'master',
-            email: user.email,
-            lastActive: serverTimestamp(),
-            role: 'admin'
-          });
+        try {
+          const { db } = await import('../firebase');
+          const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+          const { auth } = await import('../firebase');
+          if (auth.currentUser) {
+            await setDoc(doc(db, 'sessions', auth.currentUser.uid), {
+              type: 'master',
+              email: user.email,
+              lastActive: serverTimestamp(),
+              role: 'admin'
+            });
+          }
+        } catch (err) {
+          console.warn('[Security] Could not register superadmin session:', err);
         }
-      } catch (err) {
-        console.warn('[Security] Could not register superadmin session:', err);
-      }
 
-      navigate('/admin');
-    } else {
-      setError('Unauthorized account. Only the club owner can access the Control Center.');
-    }
-  } catch (err: any) {
+        window.dispatchEvent(new StorageEvent('storage', { key: 'adminLoggedIn', newValue: 'true' }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: 'admin' }));
+        navigate('/admin');
+      } else {
+        setError('Unauthorized account. Only the club owner can access the Control Center.');
+      }
+    } catch (err: any) {
     setError('Google Login failed: ' + (err.message || 'Unknown error'));
   } finally {
     setIsLoading(false);

@@ -102,19 +102,7 @@ export default function Admin() {
   const [globalSeason, setGlobalSeason] = useState(() => getSeasonInfo(new Date()).name);
   const [seasonMsg, setSeasonMsg] = useState('');
 
-  // Subscribe to auction doc when on auction-control tab
-  useEffect(() => {
-    if (activeTab !== 'auction-control') return;
-    const unsub = subscribeToAuction(setAuctionState);
-    return unsub;
-  }, [activeTab]);
 
-  // Load clubs + seasons when on auction-control tab
-  useEffect(() => {
-    if (activeTab !== 'auction-control') return;
-    fetchClubs().then(setAuctionClubs);
-    fetchClubSeasons(globalSeason).then(setClubSeasons);
-  }, [activeTab, globalSeason]);
 
   const compressImage = (base64Str: string, maxWidth = 1600, maxHeight = 1600): Promise<string> => {
     return new Promise((resolve) => {
@@ -204,50 +192,34 @@ export default function Admin() {
   
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (authStatus !== 'authenticated') {
-      setPlayerMsg({ text: '❌ Not authenticated with Firebase. Please try logging in again.', type: 'error' });
-      return;
-    }
-    if (!newPlayer.name || !newPlayer.number) {
-      setPlayerMsg({ text: '❌ Name and Number are required', type: 'error' });
-      return;
-    }
-
-    if (players.some(p => p.name.toLowerCase() === newPlayer.name.toLowerCase() && p.id !== editingPlayerId)) {
-      setPlayerMsg({ text: '❌ Player name already exists', type: 'error' });
-      return;
-    }
-
-    if (players.some(p => p.number === newPlayer.number && p.id !== editingPlayerId)) {
-      setPlayerMsg({ text: '❌ Jersey number already exists', type: 'error' });
-      return;
-    }
-
     setIsSubmitting(true);
-    console.log('Starting player save process...');
-    
-    const existingPlayer = editingPlayerId ? players.find(p => p.id === editingPlayerId) : null;
-
-    const player: Player = {
-      ...existingPlayer,
-      id: editingPlayerId || (typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11)),
-      name: newPlayer.name.toUpperCase(),
-      number: newPlayer.number,
-      position: 'ANY',
-      ovr: existingPlayer ? existingPlayer.ovr : 60,
-      win: existingPlayer ? existingPlayer.win : 0,
-      loss: existingPlayer ? existingPlayer.loss : 0,
-      draw: existingPlayer ? existingPlayer.draw : 0,
-      goalsScored: existingPlayer ? existingPlayer.goalsScored : 0,
-      goalsConceded: existingPlayer ? existingPlayer.goalsConceded : 0,
-      image: newPlayer.image || existingPlayer?.image || 'https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=400&auto=format&fit=crop',
-      form: existingPlayer ? existingPlayer.form : [],
-      device: newPlayer.device,
-      uid: newPlayer.uid,
-      role: newPlayer.role as 'admin' | 'player'
-    };
+    setPlayerMsg({ text: '', type: '' });
 
     try {
+      // Heal session before write
+      await ensureAdminSession();
+
+      const existingPlayer = editingPlayerId ? players.find(p => p.id === editingPlayerId) : null;
+
+      const player: Player = {
+        ...existingPlayer,
+        id: editingPlayerId || (typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11)),
+        name: (newPlayer.name || '').toUpperCase(),
+        number: newPlayer.number || '',
+        position: 'ANY',
+        ovr: existingPlayer ? existingPlayer.ovr : 60,
+        win: existingPlayer ? existingPlayer.win : 0,
+        loss: existingPlayer ? existingPlayer.loss : 0,
+        draw: existingPlayer ? existingPlayer.draw : 0,
+        goalsScored: existingPlayer ? existingPlayer.goalsScored : 0,
+        goalsConceded: existingPlayer ? existingPlayer.goalsConceded : 0,
+        image: newPlayer.image || existingPlayer?.image || 'https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=400&auto=format&fit=crop',
+        form: existingPlayer ? existingPlayer.form : [],
+        device: newPlayer.device || 'PS5',
+        uid: newPlayer.uid || '',
+        role: (newPlayer.role || 'player') as 'admin' | 'player'
+      };
+
       await savePlayer(player);
       setPlayerMsg({ text: editingPlayerId ? '✅ Player updated successfully' : '✅ Player added successfully', type: 'success' });
       setNewPlayer(DEFAULT_PLAYER);
@@ -258,7 +230,6 @@ export default function Admin() {
       console.error('Error saving player:', err);
       setPlayerMsg({ text: `❌ Failed to save player: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
     } finally {
-      console.log('Player save process finished');
       setIsSubmitting(false);
     }
   };
@@ -309,12 +280,14 @@ export default function Admin() {
     }
   };
 
-  const handleDelete = async (id: string, confirmSubmit: boolean = false) => {
-    if (!confirmSubmit) {
+  const handleDeletePlayer = async (id: string, force = false) => {
+    if (!force) {
       setPlayerToDelete(id);
       return;
     }
+    setIsSubmitting(true);
     try {
+      await ensureAdminSession();
       await deletePlayer(id);
       setDelSearch('');
       setPlayerMsg({ text: '✅ Player deleted successfully', type: 'success' });
@@ -323,49 +296,44 @@ export default function Admin() {
       console.error('Error deleting player:', err);
       setPlayerMsg({ text: `❌ Failed to delete player: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
       setPlayerToDelete(null);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleAddMatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (authStatus !== 'authenticated') {
-      setMatchMsg({ text: '❌ Not authenticated with Firebase.', type: 'error' });
-      return;
-    }
 
-    // Strict validation for Player 1
     const p1 = players.find(p => p.id === match.p1Id || p.name.toLowerCase() === p1Search.trim().toLowerCase());
     if (!p1) {
-      setMatchMsg({ text: '❌ Invalid Club Player (P1). Please select from the search suggestions.', type: 'error' });
+      setMatchMsg({ text: '❌ Invalid Club Player (P1).', type: 'error' });
       return;
     }
 
-    // Strict validation for Player 2
     let p2: Player | undefined = undefined;
     if (!match.isExternal) {
       p2 = players.find(p => p.id === match.p2Id || p.name.toLowerCase() === p2Search.trim().toLowerCase());
       if (!p2) {
-        setMatchMsg({ text: '❌ Invalid Opponent. Please select from search suggestions or toggle EXTERNAL.', type: 'error' });
+        setMatchMsg({ text: '❌ Invalid Opponent.', type: 'error' });
         return;
       }
     }
 
     if (match.p1Score === '' || match.p2Score === '') {
-      setMatchMsg({ text: '❌ Please enter scores for both players.', type: 'error' });
+      setMatchMsg({ text: '❌ Please enter scores.', type: 'error' });
       return;
     }
 
     setIsSubmitting(true);
-    setMatchMsg({ text: '', type: '' });
     try {
+      await ensureAdminSession();
       await addMatch(p1, Number(match.p1Score), Number(match.p2Score), p2, matches, match.tournament, match.isExternal ? p2Search : undefined);
       setMatchMsg({ text: '✅ Match recorded', type: 'success' });
       setMatch({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'QVFC Elite League Cup Division 1' });
       setP1Search('');
       setP2Search('');
     } catch (err) {
-      console.error('Error recording match:', err);
-      setMatchMsg({ text: `❌ Failed to record match: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
+      setMatchMsg({ text: `❌ Failed: ${err instanceof Error ? err.message : 'Error'}`, type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -374,12 +342,9 @@ export default function Admin() {
   const handleEditMatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMatch) return;
-    if (editMatchScore1 === '' || editMatchScore2 === '') {
-      alert("Please ensure both scores are filled to update a match.");
-      return;
-    }
     
     try {
+      await ensureAdminSession();
       await editMatch(editingMatch, Number(editMatchScore1), Number(editMatchScore2), players, matches, editMatchTournament);
       setEditingMatch(null);
       setEditMatchScore1('');
@@ -955,59 +920,6 @@ export default function Admin() {
                   </div>
                 </div>
               </motion.div>
-            ) : activeTab === 'auction' ? (
-              <motion.div key="auction" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500"><Gavel size={20} /></div>
-                    <div>
-                      <h3 className="text-lg font-black text-white uppercase tracking-tight">Auction Session Control</h3>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Start or end a live auction session</p>
-                    </div>
-                  </div>
-
-                  {!auctionState || auctionState.status === 'ended' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Base Price (VCC)</label>
-                        <input type="number" value={setupBasePrice} onChange={e => setSetupBasePrice(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-amber-500/50" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Bid Increment (VCC)</label>
-                        <input type="number" value={setupIncrement} onChange={e => setSetupIncrement(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-amber-500/50" />
-                      </div>
-                      <button 
-                        onClick={async () => {
-                          if (!auctionClubs.length) { alert('No clubs found! Create clubs first.'); return; }
-                          await import('../lib/store').then(m => m.adminStartAuction(auctionClubs.map(c => c.id), Number(setupIncrement), Number(setupBasePrice)));
-                          setSeasonMsg('Auction session started! You can now switch to the Club Zone to operate the live auction.');
-                        }}
-                        className="col-span-1 md:col-span-2 py-4 bg-amber-500 text-black font-black text-xs tracking-widest rounded-xl hover:scale-[1.02] active:scale-95 transition-all uppercase flex items-center justify-center gap-2"
-                      >
-                        <Play size={14} /> Start Auction Session
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="bg-amber-500/10 border border-amber-500/20 p-6 rounded-xl flex items-center justify-between">
-                      <div>
-                        <p className="text-amber-500 font-black uppercase text-sm mb-1">Live Auction is Active</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Base: {auctionState.basePrice} / Increment: {auctionState.bidIncrement}</p>
-                      </div>
-                      <button 
-                        onClick={async () => {
-                          if (!window.confirm('Are you sure you want to end the current auction session?')) return;
-                          await import('../lib/store').then(m => m.adminEndAuction());
-                          setSeasonMsg('Auction session ended.');
-                        }}
-                        className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                      >
-                        End Session
-                      </button>
-                    </div>
-                  )}
-                  {seasonMsg && <p className="mt-4 text-[10px] font-black text-emerald-400 uppercase tracking-widest">{seasonMsg}</p>}
-                </div>
-              </motion.div>
             ) : activeTab === 'history' ? (
               <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
@@ -1125,7 +1037,10 @@ export default function Admin() {
                       </div>
                       <button
                         onClick={async () => {
-                          try { await toggleSystemLock('tournaments', !systemLocks?.tournaments); }
+                          try { 
+                            await ensureAdminSession();
+                            await toggleSystemLock('tournaments', !systemLocks?.tournaments); 
+                          }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
                         className={cn("px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all whitespace-nowrap", systemLocks?.tournaments ? "bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/25" : "bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/25")}
@@ -1152,7 +1067,10 @@ export default function Admin() {
                       <button
                         onClick={async () => {
                           const isCurrentlyLocked = systemLocks?.tournamentRegistration !== false;
-                          try { await toggleSystemLock('tournamentRegistration', !isCurrentlyLocked); }
+                          try { 
+                            await ensureAdminSession();
+                            await toggleSystemLock('tournamentRegistration', !isCurrentlyLocked); 
+                          }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
                         className={cn("px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all whitespace-nowrap",
@@ -1180,7 +1098,10 @@ export default function Admin() {
                       </div>
                       <button
                         onClick={async () => {
-                          try { await toggleSystemLock('clubManager', !systemLocks?.clubManager); }
+                          try { 
+                            await ensureAdminSession();
+                            await toggleSystemLock('clubManager', !systemLocks?.clubManager); 
+                          }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
                         className={cn("px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all whitespace-nowrap", systemLocks?.clubManager ? "bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/25" : "bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/25")}
@@ -1675,11 +1596,12 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const [revealPlayerId, setRevealPlayerId] = React.useState('');
 
   React.useEffect(() => {
+    if (subTab !== 'auction') return;
     const unsub = subscribeToAuction((state) => {
       setAuctionState(state);
     });
     return unsub;
-  }, []);
+  }, [subTab]);
 
   const groupedHistory = useMemo(() => {
     if (!hMatches.length) return {};

@@ -11,10 +11,9 @@ import {
   testFirestoreConnection,
   computeGlobalElo,
   addMatch,
-  fetchPlayers,
-  fetchLeaders,
-  fetchMatches,
-  fetchTournaments
+  fetchPlayersOnce,
+  fetchLeadersOnce,
+  ensureAdminSession,
 } from './lib/store';
 import { VERSION } from './constants';
 
@@ -65,45 +64,30 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    const unsubscribers: (() => void)[] = [];
 
-    // Minimum delay for branding aesthetics - Reduced for responsiveness
+    // Minimum delay for branding aesthetics
     const minLoadTimer = setTimeout(() => {
       if (mounted) setIsMinLoadTimePassed(true);
     }, 1000);
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Quota Awareness & Error handling
-    // ─────────────────────────────────────────────────────────────────────────
-    const checkQuota = (err: any) => {
-      const errStr = String(err).toLowerCase();
-      if (errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('resource-exhausted')) {
-        setDbError('QUOTA_EXCEEDED');
-        setIsLoadingPlayers(false);
-        setIsLoadingLeaders(false);
-        setIsLoadingMatches(false);
-        setIsMinLoadTimePassed(true);
-        return true;
-      }
-      return false;
-    };
-
+    // Error handler
     const errorHandler = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (!mounted || !customEvent.detail?.error) return;
-      if (checkQuota(customEvent.detail.error)) return;
-
       const errStr = String(customEvent.detail.error).toLowerCase();
-      if (errStr.includes('offline')) {
-        console.warn('[Firebase] Client reported offline');
+      setIsLoadingPlayers(false);
+      setIsLoadingLeaders(false);
+      setIsLoadingMatches(false);
+      if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
+        setDbError('QUOTA_EXCEEDED');
       } else {
         setDbError('DATABASE_ERROR');
       }
     };
     window.addEventListener('firestore-error', errorHandler);
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Ensure anonymous auth for guests
-    // ─────────────────────────────────────────────────────────────────────────
+    // Anonymous auth for all users
     import('./firebase').then(({ loginAnonymously, auth }) => {
       if (!auth.currentUser) {
         loginAnonymously().catch(err => console.warn('[Firebase] Anonymous login failed:', err));
@@ -113,227 +97,141 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
     const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
 
-    // Only probe server health for admins — guests use IndexedDB persistence as fallback
-    if (isAdmin) testFirestoreConnection();
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // OPTIMIZED DATA FETCHING (PULL + CACHE)
-    // ─────────────────────────────────────────────────────────────────────────
-    const loadInitialData = async () => {
-      if (!mounted) return;
-      try {
-        // Optimization: Admins don't need the initial PULL because onSnapshot
-        // will provide the initial data immediately upon subscription.
-        // This saves ~250 reads per admin login.
-        if (isAdmin) {
-          setIsLoadingPlayers(false);
-          setIsLoadingLeaders(false);
-          setIsLoadingMatches(false);
-          setIsMinLoadTimePassed(true);
-          return;
-        }
-
-        const [p, l, m, t] = await Promise.all([
-          fetchPlayers(isPlayer ? 60 : 30),
-          fetchLeaders(),
-          Promise.resolve([]), // Regular users don't need matches list initially
-          fetchTournaments()
-        ]);
-
-        if (mounted) {
-          setPlayers(p);
-          setLeaders(l);
-          setMatches(m);
-          setTournaments(t);
-          
-          setIsLoadingPlayers(false);
-          setIsLoadingLeaders(false);
-          setIsLoadingMatches(false);
-          setIsMinLoadTimePassed(true);
-          
-          if (_globalCache) {
-            _globalCache.players = p;
-            _globalCache.leaders = l;
-            _globalCache.matches = m;
-            _globalCache.tournaments = t;
-          }
-        }
-      } catch (err) {
-        if (mounted) {
-          checkQuota(err);
-          setIsLoadingPlayers(false);
-          setIsLoadingLeaders(false);
-          setIsLoadingMatches(false);
-          setIsMinLoadTimePassed(true);
-        }
-      }
-    };
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // REAL-TIME SUBSCRIPTIONS (MINIMAL)
-    // ─────────────────────────────────────────────────────────────────────────
-    // 1. System Locks — Always needed (tiny doc)
-    const unsubLocks = subscribeToSystemLocks((locks) => {
+    // 1. System Locks — real-time for everyone (tiny doc)
+    unsubscribers.push(subscribeToSystemLocks((locks) => {
       if (mounted) {
         setSystemLocks(locks);
         if (_globalCache) _globalCache.systemLocks = locks;
       }
-    });
-
-    // 1b. App Version — Real-time update monitoring (tiny doc)
-    const unsubVersion = subscribeToAppVersion((version) => {
-      if (mounted && version) {
-        setAppVersion(version);
-        console.log('[System] DB Version:', version, 'Code Version:', VERSION);
-      }
-    });
-
-    // Initial Pull
-    loadInitialData();
-
-    // 2. Only subscribe to big collections if Admin is logged in 
-    // This allows admins to see changes live while managing, 
-    // but saves 1000s of reads for regular users.
-    let unsubPlayers: () => void = () => {};
-    let unsubLeaders: () => void = () => {};
-    let unsubMatches: () => void = () => {};
-    let unsubTournaments: () => void = () => {};
+    }));
 
     if (isAdmin) {
-      // Small delay to ensure snapshot triggers don't collide with mount state updates
-      setTimeout(() => {
+      // ── ADMIN: Full real-time subscriptions ──────────────────────────────
+      ensureAdminSession(); 
+      testFirestoreConnection();
+
+      unsubscribers.push(subscribeToPlayers((data, pending) => {
         if (!mounted) return;
-        
-        unsubLeaders = subscribeToLeaders((data) => {
+        setPlayers(data);
+        setIsLoadingPlayers(false);
+        setHasPendingWrites(pending);
+        if (_globalCache) _globalCache.players = data;
+      }, 100));
+
+      unsubscribers.push(subscribeToLeaders((data) => {
+        if (!mounted) return;
+        setLeaders(data);
+        setIsLoadingLeaders(false);
+        if (_globalCache) _globalCache.leaders = data;
+      }));
+
+      unsubscribers.push(subscribeToMatches((data, pending) => {
+        if (!mounted) return;
+        setMatches(data);
+        setIsLoadingMatches(false);
+        if (_globalCache) _globalCache.matches = data;
+      }));
+
+      unsubscribers.push(subscribeToTournaments((data) => {
+        if (!mounted) return;
+        setTournaments(data);
+        if (_globalCache) _globalCache.tournaments = data;
+      }));
+
+      unsubscribers.push(subscribeToAppVersion((version) => {
+        if (mounted && version) {
+          setAppVersion(version);
+        }
+      }));
+
+    } else if (isPlayer) {
+      // ── PLAYER: Live players, leaders, tournaments. No match history. ──
+      unsubscribers.push(subscribeToPlayers((data, pending) => {
+        if (!mounted) return;
+        setPlayers(data);
+        setIsLoadingPlayers(false);
+        setHasPendingWrites(pending);
+        if (_globalCache) _globalCache.players = data;
+      }, 100));
+
+      unsubscribers.push(subscribeToLeaders((data) => {
+        if (!mounted) return;
+        setLeaders(data);
+        setIsLoadingLeaders(false);
+        if (_globalCache) _globalCache.leaders = data;
+      }));
+
+      unsubscribers.push(subscribeToTournaments((data) => {
+        if (!mounted) return;
+        setTournaments(data);
+        if (_globalCache) _globalCache.tournaments = data;
+      }, 20));
+
+      setIsLoadingMatches(false);
+
+    } else {
+      // ── GUEST: One-time fetches only — maximum quota protection ──────────
+      const loadGuestData = async () => {
+        try {
+          if (_globalCache && _globalCache.players.length > 0) {
+            setPlayers(_globalCache.players);
+            setLeaders(_globalCache.leaders);
+          } else {
+            const [guestPlayers, guestLeaders] = await Promise.all([
+              fetchPlayersOnce(15),
+              fetchLeadersOnce(),
+            ]);
+            if (mounted) {
+              setPlayers(guestPlayers);
+              setLeaders(guestLeaders);
+              if (_globalCache) {
+                _globalCache.players = guestPlayers;
+                _globalCache.leaders = guestLeaders;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[Guest] Data fetch failed:', e);
+        } finally {
           if (mounted) {
-            setLeaders(data);
-            if (_globalCache) _globalCache.leaders = data;
+            setIsLoadingPlayers(false);
             setIsLoadingLeaders(false);
           }
-        });
-
-        unsubMatches = subscribeToMatches((data) => {
-          if (mounted) {
-            setMatches(data);
-            if (_globalCache) _globalCache.matches = data;
-            setIsLoadingMatches(false);
-          }
-        });
-
-        unsubPlayers = subscribeToPlayers((data) => {
-          if (mounted) {
-            setPlayers(data);
-            if (_globalCache) _globalCache.players = data;
-            setIsLoadingPlayers(false);
-          }
-        }, 100);
-
-        unsubTournaments = subscribeToTournaments((data) => {
-          if (mounted) {
-            setTournaments(data);
-            if (_globalCache) _globalCache.tournaments = data;
-          }
-        }, 50);
-      }, 0);
-    }
-
-    // Initialize cache on first success
-    if (!_globalCache) {
-      _globalCache = {
-        players: [],
-        leaders: [],
-        matches: [],
-        tournaments: [],
-        systemLocks: {}
+        }
       };
+      loadGuestData();
+      setIsLoadingMatches(false);
     }
 
-    // Merge cleanups
-    const origUnsub = unsubPlayers;
-    unsubPlayers = () => { 
-      origUnsub(); 
-      unsubLeaders();
-      unsubMatches();
-      unsubTournaments();
-      unsubLocks(); 
-      unsubVersion();
-    };
+    if (!_globalCache) {
+      _globalCache = { players: [], leaders: [], matches: [], tournaments: [], systemLocks: {} };
+    }
 
-    // Fallback: don't hang forever if Firestore takes too long
     const timeout = setTimeout(() => {
       if (mounted) {
         setIsLoadingPlayers(false);
         setIsLoadingLeaders(false);
         setIsLoadingMatches(false);
-        setIsMinLoadTimePassed(true); // CRITICAL: Stop the black screen even if data hangs
-        console.warn('[System] Loading timeout reached. Releasing UI lock.');
+        setIsMinLoadTimePassed(true);
       }
-    }, 4500);
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // TOURNAMENT INTEGRATION: Handle messages from the embedded Tournament System
-    // ─────────────────────────────────────────────────────────────────────────
-    const handleTournamentMessage = (event: MessageEvent) => {
-      if (!event.data || typeof event.data !== 'object') return;
-
-      const { type, match } = event.data;
-
-      // 1. Respond to player data requests
-      if (type === 'REQUEST_PLAYERS' && event.source) {
-        (event.source as Window).postMessage({
-          type: 'PLAYERS_LIST',
-          players: playersRef.current
-        }, { targetOrigin: '*' });
-      }
-
-      // 2. Handle automated match recording
-      if (type === 'MATCH_COMPLETED' && match) {
-        const { p1Id, p1Score, p2Id, p2Score, tournament } = match;
-        const player1 = playersRef.current.find(p => p.id === p1Id);
-        const player2 = playersRef.current.find(p => p.id === p2Id);
-
-        if (player1) {
-          console.log('[Dashboard] Auto-recording tournament match:', match);
-          addMatch(player1, p1Score, p2Score, player2, matchesRef.current, tournament)
-            .catch(err => console.error('[Dashboard] Match recording failed:', err));
-        }
-      }
-    };
-
-    window.addEventListener('message', handleTournamentMessage);
+    }, 8000);
 
     return () => {
       mounted = false;
       window.removeEventListener('firestore-error', errorHandler);
-      window.removeEventListener('message', handleTournamentMessage);
-      unsubPlayers();
-      unsubLeaders();
-      unsubMatches();
-      unsubTournaments();
+      unsubscribers.forEach(u => u());
       clearTimeout(timeout);
       clearTimeout(minLoadTimer);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Sync refs for the message handler
   const playersRef = useRef(players);
   const matchesRef = useRef(matches);
   useEffect(() => { playersRef.current = players; }, [players]);
   useEffect(() => { matchesRef.current = matches; }, [matches]);
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // DERIVED STATE
-  // OVR is trusted from the stored Player document (computed from full match history
-  // during admin writes). We do NOT recompute from the capped 200-match feed.
-  //
-  // `elos` is still computed for the admin match-add flow (addMatch uses it for
-  // the two affected players) but is NOT used to override stored ovr values.
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  // Lightweight ELO map from the limited feed — used only for admin match-add UI
   const elos = React.useMemo(() => computeGlobalElo(players, matches), [players, matches]);
 
-  // Players are served as-is from Firestore — ovr is already correct
   const enrichedLeaders = leaders.map(l => {
     if (l.playerId) {
       const p = players.find(player => player.id === l.playerId);
