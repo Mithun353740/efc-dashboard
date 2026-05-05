@@ -308,7 +308,20 @@ export function TeamsTab({ tournament, isAdmin, onUpdate }: TeamsTabProps) {
                         />
                       </div>
                     </div>
-
+                    {/* Form Guide Full */}
+                    <div>
+                      <div className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-3 flex items-center gap-1.5">
+                        <Shield className="w-3 h-3" /> Full Form Guide
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {team.form.length === 0
+                          ? <span className="text-slate-600 text-xs font-bold">No results yet</span>
+                          : team.form.map((r, idx) => (
+                            <span key={idx} className={`text-[9px] font-black w-5 h-5 rounded flex items-center justify-center ${formColor[r]}`}>
+                              {r}
+                            </span>
+                          ))
+                        }
                       </div>
                     </div>
 
