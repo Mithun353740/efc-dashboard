@@ -7,6 +7,8 @@ import { ChevronDown, ChevronUp, TrendingUp, Shield, Star } from 'lucide-react';
 
 interface TeamsTabProps {
   tournament: Tournament;
+  isAdmin?: boolean;
+  onUpdate: (updated: Tournament) => void;
 }
 
 interface TeamWithStats extends Team {
@@ -62,13 +64,136 @@ const formColor: Record<string, string> = {
   L: 'bg-red-500 text-white',
 };
 
-export function TeamsTab({ tournament }: TeamsTabProps) {
+export function TeamsTab({ tournament, isAdmin, onUpdate }: TeamsTabProps) {
   const { players } = useFirebase();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAddTeam, setShowAddTeam] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const teams = useMemo(() => computeTeamStats(tournament), [tournament]);
 
+  const handleRemoveTeam = async (teamId: string) => {
+    const team = tournament.teams.find(t => t.id === teamId);
+    if (!team) return;
+
+    const fixtureCount = (tournament.fixtures || []).filter(f => f.homeId === teamId || f.awayId === teamId).length;
+    const playedCount = (tournament.fixtures || []).filter(f => (f.homeId === teamId || f.awayId === teamId) && f.status === 'completed').length;
+
+    let msg = `Remove ${team.name} from tournament?`;
+    if (playedCount > 0) {
+      msg += `\n\nWARNING: This team has played ${playedCount} matches. Removing them may cause standings inconsistencies.`;
+    } else if (fixtureCount > 0) {
+      msg += `\n\nThis will also remove ${fixtureCount} scheduled fixtures for this team.`;
+    }
+
+    if (!window.confirm(msg)) return;
+
+    const updatedTeams = tournament.teams.filter(t => t.id !== teamId);
+    const updatedFixtures = (tournament.fixtures || []).filter(f => f.homeId !== teamId && f.awayId !== teamId);
+    
+    const updated: Tournament = {
+      ...tournament,
+      teams: updatedTeams,
+      fixtures: updatedFixtures
+    };
+
+    const { saveTournament } = await import('../../lib/store');
+    await saveTournament(updated);
+    onUpdate(updated);
+  };
+
+  const handleAddTeam = async (player: any) => {
+    if (tournament.teams.some(t => t.id === player.id)) {
+      alert('Player already in tournament.');
+      return;
+    }
+
+    const newTeam: Team = {
+      id: player.id,
+      name: player.name,
+      shortName: player.name.substring(0, 3).toUpperCase(),
+    };
+
+    const updatedTeams = [...tournament.teams, newTeam];
+    const updated: Tournament = {
+      ...tournament,
+      teams: updatedTeams
+    };
+
+    const { saveTournament } = await import('../../lib/store');
+    await saveTournament(updated);
+    onUpdate(updated);
+    setShowAddTeam(false);
+    setSearchQuery('');
+  };
+
+  const availablePlayers = players.filter(p => !tournament.teams.some(t => t.id === p.id));
+  const filteredAvailable = availablePlayers.filter(p => 
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ).slice(0, 8);
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
+      {/* Admin Add Team Section */}
+      {isAdmin && (
+        <div className="bg-[#0a0a12] border border-indigo-500/20 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+             <div>
+               <h3 className="text-sm font-black text-white uppercase tracking-tight">Manage Roster</h3>
+               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Manually add or remove competitors</p>
+             </div>
+             <button 
+               onClick={() => setShowAddTeam(!showAddTeam)}
+               className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 transition-all"
+             >
+               {showAddTeam ? 'Close Search' : 'Add Team'}
+             </button>
+          </div>
+
+          <AnimatePresence>
+            {showAddTeam && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden space-y-4"
+              >
+                <input 
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search players by name..."
+                  className="w-full bg-[#050508] border border-[#1e1e32] rounded-xl px-4 py-3 text-sm font-bold text-white focus:border-indigo-500 focus:outline-none"
+                />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                   {filteredAvailable.map(p => (
+                     <button
+                       key={p.id}
+                       onClick={() => handleAddTeam(p)}
+                       className="p-3 rounded-xl border border-[#1e1e32] bg-[#050508] hover:border-indigo-500/50 text-center transition-all group"
+                     >
+                        <div className="w-10 h-10 mx-auto rounded-lg overflow-hidden mb-2 bg-white/5 border border-white/10 group-hover:border-indigo-500/30">
+                          {p.image ? (
+                            <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xs font-black text-slate-600">
+                              {p.name.substring(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-[10px] font-black text-slate-400 truncate group-hover:text-white">{p.name}</div>
+                     </button>
+                   ))}
+                   {searchQuery && filteredAvailable.length === 0 && (
+                     <div className="col-span-full py-4 text-center text-xs font-bold text-slate-600 uppercase tracking-widest">No players found</div>
+                   )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      <div className="space-y-3">
       {teams.map((team, i) => {
         const isExpanded = expandedId === team.id;
         const lastFive = team.form.slice(-5);
@@ -184,22 +309,20 @@ export function TeamsTab({ tournament }: TeamsTabProps) {
                       </div>
                     </div>
 
-                    {/* Form Guide Full */}
-                    <div>
-                      <div className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-3 flex items-center gap-1.5">
-                        <Shield className="w-3 h-3" /> Full Form Guide
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {team.form.length === 0
-                          ? <span className="text-slate-600 text-xs font-bold">No results yet</span>
-                          : team.form.map((r, idx) => (
-                            <span key={idx} className={`text-[9px] font-black w-5 h-5 rounded flex items-center justify-center ${formColor[r]}`}>
-                              {r}
-                            </span>
-                          ))
-                        }
                       </div>
                     </div>
+
+                    {/* Admin Actions */}
+                    {isAdmin && (
+                      <div className="pt-4 border-t border-[#1e1e32] flex justify-end">
+                        <button
+                          onClick={() => handleRemoveTeam(team.id)}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all"
+                        >
+                          <Shield className="w-3 h-3" /> Kick from Tournament
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}

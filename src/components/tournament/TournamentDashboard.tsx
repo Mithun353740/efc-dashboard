@@ -37,6 +37,8 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
   const [editMaxTeams, setEditMaxTeams] = useState(initialTournament.maxTeams ? String(initialTournament.maxTeams) : '');
   const [editMatchDayStart, setEditMatchDayStart] = useState(initialTournament.matchDayStart || '');
   const [editMatchDayEnd, setEditMatchDayEnd] = useState(initialTournament.matchDayEnd || '');
+  const [editName, setEditName] = useState(initialTournament.name);
+  const [editLogo, setEditLogo] = useState(initialTournament.logo || '');
   const [dateSaveMsg, setDateSaveMsg] = useState('');
 
   const handleUpdate = (updated: Tournament) => setTournament(updated);
@@ -54,6 +56,8 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
     setDateSaveMsg('');
     const updated: Tournament = {
       ...tournament,
+      name: editName,
+      logo: editLogo || undefined,
       startingDate: editStartDate || undefined,
       maxTeams: editMaxTeams && !isNaN(Number(editMaxTeams)) && Number(editMaxTeams) > 1
         ? Number(editMaxTeams)
@@ -221,7 +225,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
                 {activeTab === 'fixtures' && <FixturesTab tournament={tournament} isAdmin={isAdmin} onUpdate={handleUpdate} />}
                 {activeTab === 'standings' && <StandingsTab tournament={tournament} />}
                 {activeTab === 'fantasy' && <FantasyStandings tournament={tournament} />}
-                {activeTab === 'teams' && <TeamsTab tournament={tournament} />}
+                {activeTab === 'teams' && <TeamsTab tournament={tournament} isAdmin={isAdmin} onUpdate={handleUpdate} />}
                 {activeTab === 'scorers' && <StatsTab tournament={tournament} />}
                 {activeTab === 'bracket' && <BracketView tournament={tournament} />}
                 {activeTab === 'history' && <TournamentHistory onOpenTournament={(id) => {
@@ -246,6 +250,33 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
                      <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-[2rem] p-8 space-y-6">
                        <div className="flex items-center gap-3 mb-2">
                          <CalendarDays size={18} className="text-indigo-400" />
+                         <h4 className="font-black text-white uppercase tracking-tighter">Basic Settings</h4>
+                       </div>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tournament Name</label>
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={e => setEditName(e.target.value)}
+                              className="w-full bg-[#050508] border border-[#1e1e32] rounded-xl px-4 py-3 text-white font-bold focus:border-indigo-500 focus:outline-none transition-all"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Logo URL (Optional)</label>
+                            <input
+                              type="text"
+                              value={editLogo}
+                              onChange={e => setEditLogo(e.target.value)}
+                              placeholder="https://..."
+                              className="w-full bg-[#050508] border border-[#1e1e32] rounded-xl px-4 py-3 text-white font-bold focus:border-indigo-500 focus:outline-none transition-all"
+                            />
+                          </div>
+                       </div>
+
+                       <div className="flex items-center gap-3 mb-2 pt-4">
+                         <ShieldCheck size={18} className="text-indigo-400" />
                          <h4 className="font-black text-white uppercase tracking-tighter">Registration Settings</h4>
                        </div>
 
