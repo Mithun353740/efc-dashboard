@@ -1491,10 +1491,10 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     transferWindows: 2
   });
 
-  const loadAllSeasons = async () => {
+  const loadAllSeasons = async (specificGlobal?: string) => {
     setHLoading(true);
     try {
-      const activeGlobal = gSeasons.find(g => g.status === 'active')?.name || newSeasonForm.globalSeason;
+      const activeGlobal = specificGlobal || gSeasons.find(g => g.status === 'active')?.name || newSeasonForm.globalSeason;
       const ss = await fetchClubSeasons(activeGlobal);
       setHSeasons(ss);
     } catch (e) { console.error(e); }
@@ -1525,8 +1525,15 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   }, []);
 
   React.useEffect(() => {
-    if (gSeasons.length > 0) loadAllSeasons();
-  }, [newSeasonForm.globalSeason, gSeasons]);
+    if (gSeasons.length > 0) {
+      if (subTab === 'history' && selectedGlobalId) {
+        const name = gSeasons.find(g => g.id === selectedGlobalId)?.name;
+        if (name) loadAllSeasons(name);
+      } else {
+        loadAllSeasons();
+      }
+    }
+  }, [newSeasonForm.globalSeason, gSeasons, subTab, selectedGlobalId]);
 
   const handleStartNewSeason = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1619,18 +1626,24 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const loadHistory = async () => {
     setHLoading(true);
     try {
-      const ss = await fetchClubSeasons(newSeasonForm.globalSeason);
+      const globalName = gSeasons.find(g => g.id === selectedGlobalId)?.name || newSeasonForm.globalSeason;
+      const ss = await fetchClubSeasons(globalName);
       setHSeasons(ss);
-      if (ss.length > 0 && !hSelectedSeasonId) {
-        setHSelectedSeasonId(ss[0].id);
+      
+      // Auto-select first season if current selection is not in the new list
+      if (ss.length > 0) {
+        const stillExists = ss.find(s => s.id === hSelectedSeasonId);
+        if (!stillExists) setHSelectedSeasonId(ss[0].id);
+      } else {
+        setHSelectedSeasonId(null);
       }
     } catch (e) { console.error(e); }
     finally { setHLoading(false); }
   };
 
   React.useEffect(() => {
-    if (subTab === 'history') loadHistory();
-  }, [subTab]);
+    if (subTab === 'history' && selectedGlobalId) loadHistory();
+  }, [subTab, selectedGlobalId, gSeasons]);
 
   React.useEffect(() => {
     const loadSeasonMatches = async () => {

@@ -1099,6 +1099,8 @@ export async function saveClubConfig(config: ClubSystemConfig): Promise<void> {
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
   try {
     await setDoc(doc(db, 'settings', 'clubConfig'), config);
+    invalidateCache('club_config');
+
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, 'settings/clubConfig');
     throw err;
@@ -1964,7 +1966,9 @@ export async function startClubSeason(globalSeason: string, seasonNumber: number
   };
   await setDoc(doc(db, 'clubSeasons', id), season);
   // Update the active season reference in clubConfig
-  await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: id, activeInternalSeasonLabel: season.label }, { merge: true });
+    await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: id, activeInternalSeasonLabel: season.label }, { merge: true });
+  invalidateCache('club_config');
+
   return season;
 }
 
@@ -1974,7 +1978,9 @@ export async function endClubSeason(seasonId: string, standingsSnapshot: ClubSea
   await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   await setDoc(doc(db, 'clubSeasons', seasonId), { status: 'completed', endedAt: Date.now(), standingsSnapshot }, { merge: true });
-  await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: null, activeInternalSeasonLabel: null }, { merge: true });
+    await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: null, activeInternalSeasonLabel: null }, { merge: true });
+  invalidateCache('club_config');
+
 }
 
 /** Admin: Broadcast a system notification to all club owners' inboxes. */
