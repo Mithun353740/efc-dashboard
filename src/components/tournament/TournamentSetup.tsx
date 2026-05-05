@@ -32,10 +32,12 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
 
   const generateTournament = async () => {
     if (!format || !name) return;
+    // Deduplicate selected players just in case (Set already handles this, but be safe)
+    const uniquePlayerIds = Array.from(new Set(Array.from(selectedPlayers)));
     setIsGenerating(true);
 
     try {
-      const teams: Team[] = Array.from(selectedPlayers).map((pId) => {
+      const teams: Team[] = uniquePlayerIds.map((pId) => {
         const player = players.find(p => p.id === pId);
         return {
           id: pId as string,
@@ -44,35 +46,40 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
         };
       });
 
-      // Pad to power of 2 if knockout
-      if (format === 'knockout') {
-        let size = 2;
-        while (size < teams.length) size *= 2;
-        let counter = 1;
-        while (teams.length < size) {
-          teams.push({
-            id: `bye-${counter}`,
-            name: `BYE ${counter}`,
-            shortName: 'BYE',
-          });
-          counter++;
-        }
-      }
-
       let fixtures: any[] = [];
       let groups: any[] = [];
       const currentStage = format === 'groups' ? 'groups' : format;
 
-      if (format === 'league') {
-        fixtures = bergerRoundRobin(teams, 2, 'league', 0); // 2 legs
-      } else if (format === 'round_robin') {
-        fixtures = bergerRoundRobin(teams, 1, 'round_robin', 0); // 1 leg
-      } else if (format === 'knockout') {
-        fixtures = seededKnockout(teams, 1, 1);
-      } else if (format === 'groups') {
-        const result = generateGroupStage(teams, 4);
-        groups = result.groups;
-        fixtures = result.fixtures;
+      // Only generate fixtures if players are pre-seeded.
+      // If no players selected, the tournament is saved as an open-registration
+      // shell — fixtures will be generated once all players have registered.
+      if (teams.length >= 2) {
+        // Pad to power of 2 if knockout
+        if (format === 'knockout') {
+          let size = 2;
+          while (size < teams.length) size *= 2;
+          let counter = 1;
+          while (teams.length < size) {
+            teams.push({
+              id: `bye-${counter}`,
+              name: `BYE ${counter}`,
+              shortName: 'BYE',
+            });
+            counter++;
+          }
+        }
+
+        if (format === 'league') {
+          fixtures = bergerRoundRobin(teams, 2, 'league', 0);
+        } else if (format === 'round_robin') {
+          fixtures = bergerRoundRobin(teams, 1, 'round_robin', 0);
+        } else if (format === 'knockout') {
+          fixtures = seededKnockout(teams, 1, 1);
+        } else if (format === 'groups') {
+          const result = generateGroupStage(teams, 4);
+          groups = result.groups;
+          fixtures = result.fixtures;
+        }
       }
 
       const newTournament: Tournament = {
@@ -189,7 +196,7 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
               className="flex-1 max-w-3xl"
             >
               <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Tournament Details</h2>
-              <p className="text-slate-400 mb-10 font-bold tracking-widest text-xs uppercase">Name your competition and assign competitors</p>
+              <p className="text-slate-400 mb-10 font-bold tracking-widest text-xs uppercase">Name your competition — players register from the homepage</p>
 
               <div className="space-y-8">
                 <div className="grid grid-cols-2 gap-6">
@@ -266,10 +273,15 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
 
                 <div>
                   <div className="flex justify-between items-end mb-4">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500">Roster Selection</label>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
-                      {selectedPlayers.size} Teams Selected
-                    </span>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500">Pre-Seed Players <span className="text-indigo-400">(Optional)</span></label>
+                      <p className="text-[9px] text-slate-600 font-bold mt-1 uppercase tracking-widest">Players can also register from the homepage tournament card</p>
+                    </div>
+                    {selectedPlayers.size > 0 && (
+                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
+                        {selectedPlayers.size} selected
+                      </span>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-h-[400px] overflow-y-auto pr-2 pb-4">
                     {players.map(p => {
@@ -312,7 +324,7 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
                 </button>
                 <button 
                   onClick={handleNext}
-                  disabled={!name || selectedPlayers.size < 2}
+                  disabled={!name}
                   className="flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-white text-black hover:bg-slate-200"
                 >
                   Review <ArrowRight className="w-4 h-4" />
@@ -349,8 +361,10 @@ export function TournamentSetup({ onComplete, onCancel }: TournamentSetupProps) 
                     <div className="text-xl font-black text-indigo-400 tracking-tight capitalize">{format?.replace('_', ' ')}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Competitors</div>
-                    <div className="text-xl font-black text-white tracking-tight">{selectedPlayers.size} Teams</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Pre-Seeded Players</div>
+                    <div className="text-xl font-black text-white tracking-tight">
+                      {selectedPlayers.size > 0 ? `${selectedPlayers.size} Players` : 'None — open registration'}
+                    </div>
                   </div>
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Season</div>
