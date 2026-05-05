@@ -343,6 +343,7 @@ export function TeamsTab({ tournament, isAdmin, onUpdate }: TeamsTabProps) {
           </motion.div>
         );
       })}
+      </div>
     </div>
   );
 }
