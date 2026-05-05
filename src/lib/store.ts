@@ -1113,7 +1113,7 @@ export async function fetchClubs(force = false): Promise<Club[]> {
   
   return fetchWithCache(cacheKey, async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc')));
+      const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(100)));
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
     } catch (err) {
       handleFirestoreError(err, OperationType.LIST, 'clubs');
@@ -1122,8 +1122,8 @@ export async function fetchClubs(force = false): Promise<Club[]> {
   });
 }
 
-export function subscribeToClubs(callback: (clubs: Club[]) => void) {
-  const q = query(collection(db, 'clubs'), orderBy('name', 'asc'));
+export function subscribeToClubs(callback: (clubs: Club[]) => void, limitCount = 50) {
+    const q = query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(limitCount));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Club)));
   }, (err) => handleFirestoreError(err, OperationType.GET, 'clubs'));

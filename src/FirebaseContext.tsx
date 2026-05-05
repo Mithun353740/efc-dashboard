@@ -232,19 +232,21 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   const elos = React.useMemo(() => computeGlobalElo(players, matches), [players, matches]);
 
-  const enrichedLeaders = leaders.map(l => {
+  const rankedPlayers = React.useMemo(() => sortRankedPlayers(players), [players]);
+
+  const enrichedLeaders = React.useMemo(() => leaders.map(l => {
     if (l.playerId) {
       const p = players.find(player => player.id === l.playerId);
       if (p) return { ...l, name: p.name, image: p.image };
     }
     return l;
-  });
+  }), [leaders, players]);
 
   const isLoading = isLoadingPlayers || isLoadingLeaders || isLoadingMatches || !isMinLoadTimePassed;
 
-  const value = {
+  const value = React.useMemo(() => ({
     players,
-    rankedPlayers: sortRankedPlayers(players),
+    rankedPlayers,
     leaders: enrichedLeaders,
     matches,
     tournaments,
@@ -254,7 +256,19 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     dbError,
     hasPendingWrites,
     appVersion
-  };
+  }), [
+    players,
+    rankedPlayers,
+    enrichedLeaders,
+    matches,
+    tournaments,
+    systemLocks,
+    elos,
+    isLoading,
+    dbError,
+    hasPendingWrites,
+    appVersion
+  ]);
 
   return (
     <FirebaseContext.Provider value={value}>
