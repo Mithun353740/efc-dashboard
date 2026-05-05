@@ -134,12 +134,7 @@ const CACHE_DOC_PATH = 'settings/meta'; // Unified path for all cache invalidati
 /**
  * Called after every admin write to signal the last update time.
  */
-async function updateLastUpdated(): Promise<void> {}, { merge: true });
-  } catch (error) {
-    // Non-critical G�� if this fails, cache just stays valid a bit longer
-    console.warn('[Meta] Could not update lastUpdated timestamp:', error);
-  }
-}
+async function updateLastUpdated(): Promise<void> {}
 
 export enum OperationType {
   CREATE = 'create',
