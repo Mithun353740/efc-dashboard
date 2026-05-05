@@ -59,6 +59,20 @@ export function calculateRankingStats(player: Player) {
   };
 }
 
+/**
+ * Sorts players based on their calculated ranking score.
+ */
+export function sortRankedPlayers(players: Player[]) {
+  return [...players].sort((a, b) => {
+    const statsA = calculateRankingStats(a);
+    const statsB = calculateRankingStats(b);
+    if (statsB.finalScore !== statsA.finalScore) {
+      return statsB.finalScore - statsA.finalScore;
+    }
+    return statsB.points - statsA.points;
+  });
+}
+
 export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>) => void) {
   const docRef = doc(db, 'settings', 'locks');
   return onSnapshot(docRef, (docSnap) => {
