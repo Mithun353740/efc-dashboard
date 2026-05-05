@@ -143,7 +143,7 @@ export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPa
               isAdmin={isAdmin}
               isRegistrationLocked={isRegistrationLocked}
               loggedInPlayerId={loggedInPlayerId}
-              onRegister={handleRegisterClick}
+              onRegister={isAdmin ? undefined : handleRegisterClick}
             />
           </motion.div>
         )}

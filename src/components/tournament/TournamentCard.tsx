@@ -79,7 +79,7 @@ export function TournamentCard({
 
   // Determine registration button state
   const isPlayerLoggedIn = Boolean(loggedInPlayerId);
-  const showRegButton = isPlayerLoggedIn && !tournament.archived;
+  const showRegButton = isPlayerLoggedIn && !tournament.archived && !isAdmin;
   const regButtonLabel = isRegistered ? 'VIEW →' : isFull ? 'FULL' : 'REGISTER';
   const regButtonStyle = isRegistered
     ? 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/30'
