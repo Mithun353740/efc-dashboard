@@ -2075,6 +2075,47 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     finally { setMatchBusy(false); }
   };
 
+  const handleAutoGenerateClubFixtures = async () => {
+    const t = tournaments.find(x => x.id === fForm.tournamentId);
+    if (!t) { flashMatch('❌ Please select a tournament first', false); return; }
+    if (t.participatingClubIds.length < 2) { flashMatch('❌ Tournament needs at least 2 clubs', false); return; }
+
+    const confirmMsg = `Generate full Home & Away season fixtures for ${t.name}? This will create matches for all participating clubs.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setMatchBusy(true);
+    try {
+      const tourneyClubs = clubs.filter(c => t.participatingClubIds.includes(c.id));
+      const teams = tourneyClubs.map(c => ({ id: c.id, name: c.name, shortName: c.shortName }));
+      const generated = bergerRoundRobin(teams, 2, 'league', 0);
+      const batch = writeBatch(db);
+      const newFixtures: any[] = [];
+      generated.forEach(gf => {
+        if (!gf.homeId || !gf.awayId || gf.homeId === '__bye__' || gf.awayId === '__bye__') return;
+        const hc = tourneyClubs.find(c => c.id === gf.homeId);
+        const ac = tourneyClubs.find(c => c.id === gf.awayId);
+        if (!hc || !ac) return;
+        const nf: any = {
+          id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
+          tournamentId: t.id, tournamentName: t.name,
+          season: t.season || selectedSeason?.id || config.season,
+          homeClubId: hc.id, homeClubName: hc.name,
+          awayClubId: ac.id, awayClubName: ac.name,
+          matchupType: fForm.matchupType, lineupSize: Number(fForm.lineupSize) || 4, subLimit: Number(fForm.subLimit) || 2,
+          status: 'scheduled', homeLineupIds: [], awayLineupIds: [], subMatches: [],
+          createdAt: Date.now(), matchday: gf.round
+        };
+        batch.set(doc(db, 'clubFixtures', nf.id), nf);
+        newFixtures.push(nf);
+      });
+      await batch.commit();
+      invalidateCache('club_fixtures');
+      setFixtures([...newFixtures, ...fixtures]);
+      flashMatch(`✅ Generated ${newFixtures.length} fixtures`, true);
+    } catch (e: any) { flashMatch('❌ ' + e.message, false); }
+    finally { setMatchBusy(false); }
+  };
+
   const [editingFixtureId, setEditingFixtureId] = React.useState<string|null>(null);
   const [fEditForm, setFEditForm] = React.useState({ deadlineDate: '', extension: '0', matchday: '1' });
 
