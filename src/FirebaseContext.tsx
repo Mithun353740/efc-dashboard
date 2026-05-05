@@ -21,13 +21,22 @@ import { VERSION } from './constants';
 // GLOBAL MODULE CACHE
 // Prevents redundant Firestore reads when navigating between pages.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SESSION CACHE with 5-minute TTL
+// Serves data instantly on navigation without refetching from Firestore.
+// ─────────────────────────────────────────────────────────────────────────────
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 let _globalCache: {
   players: Player[];
   leaders: Leader[];
   matches: MatchRecord[];
   tournaments: Tournament[];
   systemLocks: Record<string, boolean>;
+  fetchedAt: number;
 } | null = null;
+
+// Tracks if a listener set is already active to prevent stacking
+let _listenersActive = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Context type
@@ -97,6 +106,26 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
     const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
 
+    // TTL Cache Guard: If data was fetched recently and listeners are already active,
+    // skip re-subscribing to prevent read spikes on navigation.
+    const cacheAge = _globalCache ? Date.now() - (_globalCache.fetchedAt || 0) : Infinity;
+    const cacheIsFresh = cacheAge < CACHE_TTL_MS && _globalCache && _globalCache.players.length > 0;
+    
+    if (cacheIsFresh && !isAdmin) {
+      // Serve from cache instantly — no Firestore reads needed
+      if (mounted) {
+        setPlayers(_globalCache!.players);
+        setLeaders(_globalCache!.leaders);
+        setMatches(_globalCache!.matches);
+        setTournaments(_globalCache!.tournaments);
+        setSystemLocks(_globalCache!.systemLocks);
+        setIsLoadingPlayers(false);
+        setIsLoadingLeaders(false);
+        setIsLoadingMatches(false);
+      }
+      return;
+    }
+
     // 1. System Locks — real-time for everyone (tiny doc)
     unsubscribers.push(subscribeToSystemLocks((locks) => {
       if (mounted) {
@@ -115,7 +144,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setPlayers(data);
         setIsLoadingPlayers(false);
         setHasPendingWrites(pending);
-        if (_globalCache) _globalCache.players = data;
+        if (_globalCache) { _globalCache.players = data; _globalCache.fetchedAt = Date.now(); }
       }, 100));
 
       unsubscribers.push(subscribeToLeaders((data) => {
@@ -204,7 +233,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!_globalCache) {
-      _globalCache = { players: [], leaders: [], matches: [], tournaments: [], systemLocks: {} };
+      _globalCache = { players: [], leaders: [], matches: [], tournaments: [], systemLocks: {}, fetchedAt: Date.now() };
     }
 
     const timeout = setTimeout(() => {
@@ -230,7 +259,15 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { playersRef.current = players; }, [players]);
   useEffect(() => { matchesRef.current = matches; }, [matches]);
 
-  const elos = React.useMemo(() => computeGlobalElo(players, matches), [players, matches]);
+  // Read pre-stored ELO values directly from player documents (set by addMatch/editMatch).
+  // This avoids the expensive O(n*m) computeGlobalElo computation on every render.
+  const elos = React.useMemo(() => {
+    const result: Record<string, number> = {};
+    players.forEach(p => {
+      result[p.id] = p.elo || 1200;
+    });
+    return result;
+  }, [players]);
 
   const rankedPlayers = React.useMemo(() => sortRankedPlayers(players), [players]);
 

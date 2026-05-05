@@ -97,6 +97,17 @@ export interface Player {
    * Monotonic integer. Bump STATS_VERSION in store.ts to force global recompute on logic change.
    */
   statsVersion?: number;
+
+  /**
+   * Pre-computed ELO rating. Stored on the document after each match so the frontend
+   * never needs to recompute from full match history. Default: 1200.
+   */
+  elo?: number;
+
+  /**
+   * Internal club season reference — used by ClubFixture season field.
+   */
+  season?: string;
 }
 
 // ─── CLUB ZONE TYPES ──────────────────────────────────────────────────────────
@@ -301,6 +312,7 @@ export interface ClubFixture {
   id: string;
   tournamentId: string;
   tournamentName: string;
+  season?: string;         // Club season label — used for global stat propagation
   matchday?: number;
   homeClubId: string;
   awayClubId: string;

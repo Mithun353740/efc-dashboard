@@ -622,6 +622,7 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[], el
   };
 
   updatedPlayer.ovr = calculateOvrHybrid(updatedPlayer, elo);
+  updatedPlayer.elo = Math.round(elo); // Store computed ELO on document for fast reads
   return updatedPlayer;
 }
 
@@ -872,13 +873,14 @@ export async function editMatch(
     batch.set(doc(db, 'players', p2.id), computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200));
   }
 
-  // Dynamic Manager Rating updates (Edit logic)
+  // Dynamic Manager Rating updates (Edit logic) — use targeted queries not full collection fetch
   try {
-    const allClubsSnap = await getDocs(collection(db, 'clubs'));
-    const allClubs = allClubsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Club));
-    
-    const p1Club = allClubs.find(c => c.squadIds?.includes(p1?.id || ''));
-    const p2Club = p2 ? allClubs.find(c => c.squadIds?.includes(p2.id)) : undefined;
+    const [p1ClubSnap, p2ClubSnap] = await Promise.all([
+      getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1?.id || ''))),
+      p2 ? getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p2.id))) : Promise.resolve({ docs: [] } as any),
+    ]);
+    const p1Club = p1ClubSnap.docs.length > 0 ? { id: p1ClubSnap.docs[0].id, ...p1ClubSnap.docs[0].data() } as Club : undefined;
+    const p2Club = p2ClubSnap.docs.length > 0 ? { id: p2ClubSnap.docs[0].id, ...p2ClubSnap.docs[0].data() } as Club : undefined;
 
     const getChange = (s1: number, s2: number) => {
       if (s1 > s2) return 2;
@@ -951,13 +953,14 @@ export async function deleteMatchFromHistory(
     batch.set(doc(db, 'players', p2.id), computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200));
   }
 
-  // Dynamic Manager Rating updates (Delete logic)
+  // Dynamic Manager Rating updates (Delete logic) — use targeted queries not full collection fetch
   try {
-    const allClubsSnap = await getDocs(collection(db, 'clubs'));
-    const allClubs = allClubsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Club));
-    
-    const p1Club = allClubs.find(c => c.squadIds?.includes(p1?.id || ''));
-    const p2Club = p2 ? allClubs.find(c => c.squadIds?.includes(p2.id)) : undefined;
+    const [p1ClubSnap, p2ClubSnap] = await Promise.all([
+      getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1?.id || ''))),
+      p2 ? getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p2.id))) : Promise.resolve({ docs: [] } as any),
+    ]);
+    const p1Club = p1ClubSnap.docs.length > 0 ? { id: p1ClubSnap.docs[0].id, ...p1ClubSnap.docs[0].data() } as Club : undefined;
+    const p2Club = p2ClubSnap.docs.length > 0 ? { id: p2ClubSnap.docs[0].id, ...p2ClubSnap.docs[0].data() } as Club : undefined;
 
     const getChange = (s1: number, s2: number) => {
       if (s1 > s2) return 2;
