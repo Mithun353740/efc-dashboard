@@ -219,7 +219,7 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
     const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
   
   // Filter for Club Zone matches (matches played in current season)
-  const clubMatches = matches.filter(m => m.season === config?.season).sort((a,b) => a.timestamp - b.timestamp);
+  const clubMatches = matches.filter(m => m.seasonId === config?.season).sort((a,b) => a.timestamp - b.timestamp);
   const myClubMatches = clubMatches.filter(m => m.p1Id === myClub.ownerId || m.p2Id === myClub.ownerId);
   const recentMatches = myClubMatches.slice(-5).reverse();
   
