@@ -3166,8 +3166,8 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
         <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h3 className="text-xl font-black tracking-tight mb-1">LIVE AUCTION CONTROL</h3>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manage player distribution and live bidding sessions</p>
+              <h3 className="text-xl font-black tracking-tight mb-1">CLUBS MANAGEMENT</h3>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manage player distribution and club assignments</p>
             </div>
             {auctionState && auctionState.status !== 'ended' && (
               <button onClick={adminEndAuction} className="px-4 py-2 bg-red-500/10 text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">
@@ -3182,7 +3182,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                 <Gavel size={32} />
               </div>
               <h4 className="text-lg font-black text-white uppercase mb-2">No Active Session</h4>
-              <p className="text-slate-400 text-xs font-bold max-w-xs mx-auto mb-8">Set the base price and bid increment to start a new auction session for all clubs.</p>
+              <p className="text-slate-400 text-xs font-bold max-w-xs mx-auto mb-8">Set the base price and bid increment to start a new clubs assignment session.</p>
               
               <div className="max-w-sm mx-auto grid grid-cols-2 gap-4 text-left">
                 <div className="space-y-1">
@@ -3201,16 +3201,16 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                   }}
                   className="col-span-2 py-4 bg-amber-500 text-black font-black text-xs tracking-widest rounded-xl hover:scale-[1.02] active:scale-95 transition-all uppercase"
                 >
-                  Start Auction Session
+                  Start Clubs Session
                 </button>
               </div>
 
               {/* Auction Schedule & Admin Settings (Moved here for better UX) */}
               <div className="max-w-sm mx-auto mt-12 pt-8 border-t border-white/10 space-y-6 text-left">
-                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">PRE-AUCTION SETTINGS</h4>
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">PRE-CLUBS SETTINGS</h4>
                 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Auction Start Time (Countdown)</label>
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Clubs Start Time (Countdown)</label>
                   <input 
                     type="datetime-local"
                     value={config.auctionStartTime ? (() => {
