@@ -83,7 +83,17 @@ export default function TournamentRanking() {
       })
       .filter(Boolean) as Player[];
 
-    return sortRankedPlayers(tournamentPlayers);
+    return [...tournamentPlayers].sort((a, b) => {
+      const ptsA = (a.win * 3) + a.draw;
+      const ptsB = (b.win * 3) + b.draw;
+      if (ptsB !== ptsA) return ptsB - ptsA;
+      
+      const gdA = a.goalsScored - a.goalsConceded;
+      const gdB = b.goalsScored - b.goalsConceded;
+      if (gdB !== gdA) return gdB - gdA;
+      
+      return b.ovr - a.ovr;
+    });
   }, [rankedPlayers, selectedSeason, selectedTournament]);
 
   return (

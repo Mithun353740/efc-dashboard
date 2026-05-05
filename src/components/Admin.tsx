@@ -1894,32 +1894,34 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
   // lazy-load club season matches only when MATCHES subtab is opened
   const loadMatches = React.useCallback(async () => {
-    if (!config.season) return;
-    const ms = await fetchClubSeasonMatches(config.season);
+    const sId = selectedSeason?.id || config.activeInternalSeasonId;
+    if (!sId) return;
+    const ms = await fetchClubSeasonMatches(sId);
     setClubMatches(ms.sort((a, b) => b.timestamp - a.timestamp));
     setMatchesLoaded(true);
-  }, [config.season]);
+  }, [selectedSeason?.id, config.activeInternalSeasonId]);
 
   const loadTournaments = React.useCallback(async () => {
-    if (!config.season) return;
-    const ts = await fetchClubTournaments(config.season);
+    const sId = selectedSeason?.id || config.activeInternalSeasonId;
+    if (!sId) return;
+    const ts = await fetchClubTournaments(sId);
     setTournaments(ts.sort((a, b) => b.createdAt - a.createdAt));
     setTLoaded(true);
-  }, [config.season]);
+  }, [selectedSeason?.id, config.activeInternalSeasonId]);
 
   const loadFixtures = React.useCallback(async () => {
-    if (!config.season) return;
-    // Client side filter by season to save complex composite indexes right now
-    const fs = await fetchClubFixtures(config.season);
+    const sId = selectedSeason?.id || config.activeInternalSeasonId;
+    if (!sId) return;
+    const fs = await fetchClubFixtures(sId);
     setFixtures(fs.sort((a, b) => b.createdAt - a.createdAt));
     setFLoaded(true);
-  }, [config.season]);
+  }, [selectedSeason?.id, config.activeInternalSeasonId]);
 
   React.useEffect(() => {
-    if (subTab === 'matches' && !matchesLoaded) loadMatches();
-    if (subTab === 'tournaments' && !tLoaded) loadTournaments();
-    if (subTab === 'fixtures' && !fLoaded) loadFixtures();
-  }, [subTab, matchesLoaded, tLoaded, fLoaded, loadMatches, loadTournaments, loadFixtures]);
+    if (subTab === 'matches' && (!matchesLoaded || selectedSeason?.id)) loadMatches();
+    if (subTab === 'tournaments' && (!tLoaded || selectedSeason?.id)) loadTournaments();
+    if (subTab === 'fixtures' && (!fLoaded || selectedSeason?.id)) loadFixtures();
+  }, [subTab, matchesLoaded, tLoaded, fLoaded, loadMatches, loadTournaments, loadFixtures, selectedSeason?.id]);
 
   const flashMatch = (text: string, ok: boolean) => {
     setMatchMsg({ text, ok });
@@ -1937,7 +1939,8 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     if (!p1 || !mForm.p1Score || !mForm.p2Score) { flashMatch('❌ Select both players and scores', false); return; }
     setMatchBusy(true);
     try {
-      await addMatch(p1, Number(mForm.p1Score), Number(mForm.p2Score), p2, [], config.season, undefined, config.season, config.currentMatchday);
+      const sId = selectedSeason?.id || config.activeInternalSeasonId || config.season;
+      await addMatch(p1, Number(mForm.p1Score), Number(mForm.p2Score), p2, [], config.season, undefined, sId, config.currentMatchday);
       flashMatch('✅ Match added', true);
       resetMForm();
       await loadMatches();
@@ -1977,7 +1980,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       const nt: ClubTournament = {
         id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
         name: tSetupForm.name.toUpperCase(),
-        season: selectedSeason?.id || config.season,
+        season: selectedSeason?.id || config.activeInternalSeasonId || config.season,
         type: tSetupForm.type,
         participatingClubIds: tSetupForm.participatingClubIds,
         status: 'active',
@@ -2054,6 +2057,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
         deadline
       };
       await saveClubFixture(nf);
+      invalidateCache('club_fixtures'); // Proactively clear fixtures cache
       setFixtures([nf, ...fixtures]);
       flashMatch('✅ Fixture Scheduled', true);
     } catch (e: any) { flashMatch('❌ ' + e.message, false); }
@@ -2106,7 +2110,8 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       const p1 = players.find(p => p.id === sm.p1Id);
       const p2 = players.find(p => p.id === sm.p2Id);
       if (p1) {
-        await addMatch(p1, s1, s2, p2, [], f.tournamentName || config.season, p2?.name || 'Unknown', config.season, config.currentMatchday);
+        const sId = selectedSeason?.id || config.activeInternalSeasonId || config.season;
+        await addMatch(p1, s1, s2, p2, [], f.tournamentName || config.season, p2?.name || 'Unknown', sId, config.currentMatchday);
       }
 
       const nf = { ...f };
