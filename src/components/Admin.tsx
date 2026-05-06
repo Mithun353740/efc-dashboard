@@ -1504,9 +1504,16 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const loadAllSeasons = async (specificGlobal?: string) => {
     setHLoading(true);
     try {
-      const activeGlobal = specificGlobal || gSeasons.find(g => g.status === 'active')?.name || newSeasonForm.globalSeason;
-      const ss = await fetchClubSeasons(activeGlobal);
-      setHSeasons(ss);
+      if (!specificGlobal && viewState === 'landing') {
+        // Landing page: fetch EVERYTHING that is active/upcoming regardless of global year
+        const ss = await fetchAllActiveClubSeasons();
+        setHSeasons(ss);
+      } else {
+        // Specific view: fetch for the targeted global year
+        const activeGlobal = specificGlobal || gSeasons.find(g => g.status === 'active')?.name || newSeasonForm.globalSeason;
+        const ss = await fetchClubSeasons(activeGlobal);
+        setHSeasons(ss);
+      }
     } catch (e) { console.error(e); }
     finally { setHLoading(false); }
   };
@@ -1557,6 +1564,13 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       }
     }
   }, [hSeasons, viewState, selectedSeason]);
+
+  // Refresh seasons list when returning to landing view
+  React.useEffect(() => {
+    if (viewState === 'landing') {
+      loadAllSeasons();
+    }
+  }, [viewState]);
 
   const handleStartNewSeason = async (e: React.FormEvent) => {
     e.preventDefault();

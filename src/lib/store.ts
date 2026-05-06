@@ -1950,6 +1950,18 @@ export async function fetchClubSeasons(globalSeason: string): Promise<ClubSeason
   }
 }
 
+/** Fetches ALL active or upcoming seasons across all global years for the landing dashboard. */
+export async function fetchAllActiveClubSeasons(): Promise<ClubSeason[]> {
+  try {
+    const q = query(collection(db, 'clubSeasons'), where('status', 'in', ['active', 'upcoming']), limit(50));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'clubSeasons-active');
+    return [];
+  }
+}
+
 /** Admin: Start a new internal season. 1 write. */
 export async function startClubSeason(globalSeason: string, seasonNumber: number, length?: number, transferWindows?: number): Promise<ClubSeason> {
   
