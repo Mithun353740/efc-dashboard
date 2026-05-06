@@ -121,10 +121,23 @@ export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPa
   return (
     <div className="relative min-h-screen bg-[#050508]">
       {view === 'list' && (
-        <div className="sticky top-0 z-[40] bg-[#050508]/80 backdrop-blur-md border-b border-white/5 py-4 px-4 flex items-center justify-center gap-2 overflow-x-auto no-scrollbar">
-          <button onClick={() => setActiveTab('live')} className={cn("px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap", activeTab === 'live' ? "bg-brand-purple text-brand-dark shadow-[0_0_15px_rgba(139,92,246,0.3)]" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white")}>Live Tournaments</button>
-          <button onClick={() => setActiveTab('rankings')} className={cn("px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap", activeTab === 'rankings' ? "bg-brand-purple text-brand-dark shadow-[0_0_15px_rgba(139,92,246,0.3)]" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white")}>Standings</button>
-          <button onClick={() => setActiveTab('history')} className={cn("px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap", activeTab === 'history' ? "bg-brand-purple text-brand-dark shadow-[0_0_15px_rgba(139,92,246,0.3)]" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white")}>History</button>
+        <div className="sticky top-0 z-[40] bg-[#050508]/90 backdrop-blur-md border-b border-white/5">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar px-4 py-3 sm:justify-center">
+            {(['live', 'rankings', 'history'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  'whitespace-nowrap flex-shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all',
+                  activeTab === tab
+                    ? 'bg-brand-purple text-brand-dark shadow-[0_0_15px_rgba(139,92,246,0.35)]'
+                    : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                )}
+              >
+                {tab === 'live' ? 'Live Tournaments' : tab === 'rankings' ? 'Standings' : 'History'}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
