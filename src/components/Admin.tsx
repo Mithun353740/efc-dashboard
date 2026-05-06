@@ -1842,7 +1842,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
         shortName: fFormExtended.shortName.toUpperCase().slice(0,3),
         primaryColor: fFormExtended.primaryColor,
         secondaryColor: fFormExtended.secondaryColor,
-        logo: fLogoFile !== undefined ? fLogoFile : existingClub?.logo,
+        logo: fLogoFile || existingClub?.logo || null,
         ownerId: existingClub ? existingClub.ownerId : null,
         ownerName: existingClub ? existingClub.ownerName : null,
         budget: existingClub ? existingClub.budget : 50000000,
@@ -2566,6 +2566,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                   <button onClick={() => {
                     setEditingClubId(club.id);
                     setFFormExtended({ name: club.name, shortName: club.shortName || '', primaryColor: club.primaryColor || '#8b5cf6', secondaryColor: club.secondaryColor || '#f59e0b' });
+                    setFLogoFile(club.logo || null);
                     setShowFForm(true);
                   }} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-lg">
                     <Edit3 size={12} />
