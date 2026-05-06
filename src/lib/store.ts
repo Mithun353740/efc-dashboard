@@ -2131,11 +2131,33 @@ export async function assignClubOwner(clubId: string, player: Player): Promise<v
 }
 
 export async function unassignClubOwner(clubId: string): Promise<void> {
-  
   await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
-  await setDoc(doc(db, 'clubs', clubId), { ownerId: null, ownerName: null }, { merge: true });
-  
+
+  // Fetch club first so we know who the current owner is
+  const clubSnap = await getDoc(doc(db, 'clubs', clubId));
+  const batch = writeBatch(db);
+
+  // Clear owner fields on the club document
+  batch.update(doc(db, 'clubs', clubId), { ownerId: null, ownerName: null });
+
+  // Also clear the player's owner flags so they appear as available again
+  if (clubSnap.exists()) {
+    const clubData = clubSnap.data();
+    if (clubData.ownerId) {
+      batch.update(doc(db, 'players', clubData.ownerId), {
+        isClubOwner: false,
+        clubId: null,
+        clubName: null,
+        primaryColor: null,
+        secondaryColor: null,
+      });
+    }
+  }
+
+  await batch.commit();
+  // Bust the cache so the next fetchClubs() call reads fresh from Firestore
+  invalidateCache('clubs_all');
 }
 
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
