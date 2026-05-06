@@ -2113,9 +2113,13 @@ export async function fetchGlobalSeasons(): Promise<GlobalSeason[]> {
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
 export async function assignClubOwner(clubId: string, player: Player): Promise<void> {
-  
   await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  
+  const clubSnap = await getDoc(doc(db, 'clubs', clubId));
+  if (!clubSnap.exists()) throw new Error('Club not found');
+  const clubData = clubSnap.data() as Club;
+
   const batch = writeBatch(db);
   batch.update(doc(db, 'clubs', clubId), { 
     ownerId: player.id, 
@@ -2123,11 +2127,12 @@ export async function assignClubOwner(clubId: string, player: Player): Promise<v
   });
   batch.update(doc(db, 'players', player.id), { 
     clubId, 
-    clubName: (await getDoc(doc(db, 'clubs', clubId))).data()?.name || 'Club',
-    isClubOwner: true 
+    clubName: clubData.name,
+    isClubOwner: true,
+    primaryColor: clubData.primaryColor,
+    secondaryColor: clubData.secondaryColor
   });
   await batch.commit();
-  
 }
 
 export async function unassignClubOwner(clubId: string): Promise<void> {

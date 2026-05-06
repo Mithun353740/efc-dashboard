@@ -2623,7 +2623,10 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                           {showOwnerDrop && focusedClubId === club.id && (
                             <div className="mt-2 space-y-1 max-h-32 overflow-y-auto no-scrollbar bg-[#0f172a] border border-white/10 rounded-xl p-1 shadow-2xl">
                               {players
-                                .filter(p => !p.isClubOwner && p.name.toLowerCase().includes(ownerSearch.toLowerCase()))
+                                .filter(p => {
+                                  const isActuallyOwner = fClubs.some(c => c.ownerId === p.id);
+                                  return !isActuallyOwner && p.name.toLowerCase().includes(ownerSearch.toLowerCase());
+                                })
                                 .slice(0, 5)
                                 .map(p => (
                                   <button key={p.id} onClick={async () => {
