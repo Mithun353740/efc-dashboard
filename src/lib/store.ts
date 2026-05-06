@@ -1962,6 +1962,14 @@ export async function fetchAllActiveClubSeasons(): Promise<ClubSeason[]> {
   }
 }
 
+/** Real-time listener for active/upcoming club seasons. */
+export function subscribeToActiveClubSeasons(callback: (seasons: ClubSeason[]) => void) {
+  const q = query(collection(db, 'clubSeasons'), where('status', 'in', ['active', 'upcoming']), limit(50));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason)));
+  }, (err) => handleFirestoreError(err, OperationType.GET, 'clubSeasons-active-sub'));
+}
+
 /** Admin: Start a new internal season. 1 write. */
 export async function startClubSeason(globalSeason: string, seasonNumber: number, length?: number, transferWindows?: number): Promise<ClubSeason> {
   
