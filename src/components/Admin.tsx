@@ -1490,6 +1490,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const [fLogoFile, setFLogoFile] = React.useState<string | null>(null);
   const [fFormExtended, setFFormExtended] = React.useState({ name: '', shortName: '', primaryColor: '#8b5cf6', secondaryColor: '#f59e0b' });
   const [editingClubId, setEditingClubId] = React.useState<string | null>(null);
+  const hasAutoSelected = React.useRef(false);
 
   // Start New Season Form
   const [showNewSeasonForm, setShowNewSeasonForm] = React.useState(false);
@@ -1545,6 +1546,17 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       }
     }
   }, [newSeasonForm.globalSeason, gSeasons, subTab, selectedGlobalId]);
+
+  // Auto-select active season on initial mount
+  React.useEffect(() => {
+    if (!hasAutoSelected.current && hSeasons.length > 0 && viewState === 'landing' && !selectedSeason) {
+      const active = hSeasons.find(s => s.status === 'active');
+      if (active) {
+        handleGoToSeason(active);
+        hasAutoSelected.current = true;
+      }
+    }
+  }, [hSeasons, viewState, selectedSeason]);
 
   const handleStartNewSeason = async (e: React.FormEvent) => {
     e.preventDefault();
