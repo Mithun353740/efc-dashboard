@@ -1445,6 +1445,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const [msg, setMsg] = React.useState({ text: '', type: '' });
   const [ownerSearch, setOwnerSearch] = React.useState('');
   const [showOwnerDrop, setShowOwnerDrop] = React.useState(false);
+  const [focusedClubId, setFocusedClubId] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({ 
     name: '', 
     shortName: '', 
@@ -2608,29 +2609,43 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                           <input 
                             placeholder="Assign owner..." 
                             className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-bold text-white outline-none focus:border-amber-500"
+                            value={focusedClubId === club.id ? ownerSearch : ''}
                             onChange={(e) => {
-                              const val = e.target.value.toLowerCase();
-                              if (!val) { resetForm(); return; }
-                              // We'll reuse the owner search logic if possible or just do a simple inline one
+                              setOwnerSearch(e.target.value);
+                              setShowOwnerDrop(true);
                             }}
-                            onFocus={() => setShowOwnerDrop(true)}
+                            onFocus={() => {
+                              setFocusedClubId(club.id);
+                              setShowOwnerDrop(true);
+                              setOwnerSearch('');
+                            }}
                           />
-                          <div className="mt-2 space-y-1 max-h-32 overflow-y-auto no-scrollbar">
-                            {players.filter(p => !p.isClubOwner).slice(0, 5).map(p => (
-                              <button key={p.id} onClick={async () => {
-                                if (!window.confirm(`Assign ${p.name} as owner of ${club.name}?`)) return;
-                                try {
-                                  setLoading(true);
-                                  await assignClubOwner(club.id, p);
-                                  setMsg({ text: `✅ ${p.name} assigned to ${club.name}`, type: 'success' });
-                                  loadRegistry();
-                                } catch (err: any) { setMsg({ text: err.message, type: 'error' }); }
-                                finally { setLoading(false); }
-                              }} className="w-full text-left p-2 hover:bg-white/5 rounded text-[10px] font-black text-slate-400 hover:text-white border border-white/5 uppercase">
-                                + {p.name}
-                              </button>
-                            ))}
-                          </div>
+                          {showOwnerDrop && focusedClubId === club.id && (
+                            <div className="mt-2 space-y-1 max-h-32 overflow-y-auto no-scrollbar bg-[#0f172a] border border-white/10 rounded-xl p-1 shadow-2xl">
+                              {players
+                                .filter(p => !p.isClubOwner && p.name.toLowerCase().includes(ownerSearch.toLowerCase()))
+                                .slice(0, 5)
+                                .map(p => (
+                                  <button key={p.id} onClick={async () => {
+                                    if (!window.confirm(`Assign ${p.name} as owner of ${club.name}?`)) return;
+                                    try {
+                                      setLoading(true);
+                                      await assignClubOwner(club.id, p);
+                                      setMsg({ text: `✅ ${p.name} assigned to ${club.name}`, type: 'success' });
+                                      setShowOwnerDrop(false);
+                                      setOwnerSearch('');
+                                      loadRegistry();
+                                    } catch (err: any) { setMsg({ text: err.message, type: 'error' }); }
+                                    finally { setLoading(false); }
+                                  }} className="w-full text-left p-2 hover:bg-white/10 rounded text-[10px] font-black text-slate-400 hover:text-white border border-white/5 uppercase transition-colors">
+                                    + {p.name}
+                                  </button>
+                                ))}
+                              {players.filter(p => !p.isClubOwner && p.name.toLowerCase().includes(ownerSearch.toLowerCase())).length === 0 && (
+                                <div className="p-3 text-center text-[10px] font-bold text-slate-500 uppercase">No players found</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
