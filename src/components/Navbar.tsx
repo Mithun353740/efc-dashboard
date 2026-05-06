@@ -20,13 +20,15 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Derive player image and club owner status from live Firestore data
-  const { playerImage, isClubOwner } = useMemo(() => {
-    if (!loggedInPlayerId || !isPlayer) return { playerImage: '', isClubOwner: false };
+  // Derive player image, club owner status, and system admin status from live Firestore data
+  const { playerImage, isClubOwner, isSystemAdmin } = useMemo(() => {
+    const isAdminLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
+    if (!loggedInPlayerId || !isPlayer) return { playerImage: '', isClubOwner: false, isSystemAdmin: isAdminLoggedIn };
     const p = players.find(p => p.id === loggedInPlayerId);
     return { 
       playerImage: p?.image || '', 
-      isClubOwner: p?.isClubOwner === true 
+      isClubOwner: p?.isClubOwner === true,
+      isSystemAdmin: isAdminLoggedIn || p?.role === 'admin'
     };
   }, [players, loggedInPlayerId, isPlayer]);
 
@@ -121,7 +123,7 @@ export default function Navbar() {
           { label: 'ANALYTICS', path: '/stats' },
           { label: 'TOURNAMENTS', path: '/tournament' },
           { label: 'CLUB ZONE', path: '/club', club: true },
-          ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
+          ...(isSystemAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
         ].map((item: any) => (
           item.externalUrl ? (
             <a
@@ -213,7 +215,7 @@ export default function Navbar() {
                         Account Settings
                       </button>
 
-                      {isAdmin && (
+                      {isSystemAdmin && (
                         <button 
                           onClick={() => {
                             navigate('/admin');
@@ -280,7 +282,7 @@ export default function Navbar() {
                 { label: 'ANALYTICS', path: '/stats' },
                 { label: 'TOURNAMENTS', path: '/tournament' },
                 { label: 'CLUB ZONE', path: '/club', club: true },
-                ...(isAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
+                ...(isSystemAdmin ? [{ label: 'CONTROL CENTER', path: '/admin' }] : [])
               ].map((item: any) => (
                 item.externalUrl ? (
                   <a

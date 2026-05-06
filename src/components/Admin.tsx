@@ -23,8 +23,12 @@ export default function Admin() {
   
   React.useEffect(() => {
     const checkAuth = async () => {
-      const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
-      if (!isAdmin) {
+      const isAdminLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
+      const playerLoggedIn = localStorage.getItem('playerLoggedIn') === 'true';
+      const playerId = localStorage.getItem('playerId');
+      const assignedAdmin = playerLoggedIn && playerId && players.find(p => p.id === playerId)?.role === 'admin';
+
+      if (!isAdminLoggedIn && !assignedAdmin) {
         setAuthStatus('unauthenticated');
         return;
       }

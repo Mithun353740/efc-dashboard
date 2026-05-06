@@ -48,8 +48,14 @@ function Home() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
-  return isAdmin ? <>{children}</> : <Navigate to="/login" />;
+  const { players } = useFirebase();
+  const isAdminLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
+  const playerLoggedIn = localStorage.getItem('playerLoggedIn') === 'true';
+  const playerId = localStorage.getItem('playerId');
+  
+  const assignedAdmin = playerLoggedIn && playerId && players.find(p => p.id === playerId)?.role === 'admin';
+
+  return (isAdminLoggedIn || assignedAdmin) ? <>{children}</> : <Navigate to="/login" />;
 }
 
 function AppContent() {
