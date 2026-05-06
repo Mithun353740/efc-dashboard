@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Player, Leader, MatchRecord, Tournament } from './types';
 import {
+  subscribeToAppVersion,
+  subscribeToSystemLocks,
   subscribeToPlayers,
   subscribeToLeaders,
   subscribeToMatches,
-  subscribeToAppVersion,
-  subscribeToSystemLocks,
   subscribeToTournaments,
   sortRankedPlayers,
   testFirestoreConnection,
@@ -13,19 +13,17 @@ import {
   addMatch,
   fetchPlayersOnce,
   fetchLeadersOnce,
+  fetchMatchesOnce,
+  fetchTournamentsOnce,
   ensureAdminSession,
 } from './lib/store';
 import { VERSION } from './constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GLOBAL MODULE CACHE
-// Prevents redundant Firestore reads when navigating between pages.
+// SESSION CACHE — 15-minute TTL
+// One fetch per session for non-admin users. Zero re-reads on navigation.
 // ─────────────────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-// SESSION CACHE with 5-minute TTL
-// Serves data instantly on navigation without refetching from Firestore.
-// ─────────────────────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 let _globalCache: {
   players: Player[];
   leaders: Leader[];
@@ -34,9 +32,6 @@ let _globalCache: {
   systemLocks: Record<string, boolean>;
   fetchedAt: number;
 } | null = null;
-
-// Tracks if a listener set is already active to prevent stacking
-let _listenersActive = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Context type
@@ -63,10 +58,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [matches, setMatches] = useState<MatchRecord[]>(_globalCache?.matches || []);
   const [tournaments, setTournaments] = useState<Tournament[]>(_globalCache?.tournaments || []);
   const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>(_globalCache?.systemLocks || {});
-  const [isLoadingPlayers, setIsLoadingPlayers] = useState(!_globalCache);
-  const [isLoadingLeaders, setIsLoadingLeaders] = useState(!_globalCache);
-  const [isLoadingMatches, setIsLoadingMatches] = useState(!_globalCache);
-  const [isMinLoadTimePassed, setIsMinLoadTimePassed] = useState(false);
+  const [isLoading, setIsLoading] = useState(!_globalCache || _globalCache.players.length === 0);
   const [dbError, setDbError] = useState<string | null>(null);
   const [hasPendingWrites, setHasPendingWrites] = useState(false);
   const [appVersion, setAppVersion] = useState<string>(VERSION);
@@ -75,19 +67,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
     const unsubscribers: (() => void)[] = [];
 
-    // Minimum delay for branding aesthetics
-    const minLoadTimer = setTimeout(() => {
-      if (mounted) setIsMinLoadTimePassed(true);
-    }, 1000);
+    // Minimum branding delay
+    const minTimer = setTimeout(() => {
+      if (mounted) setIsLoading(false);
+    }, 1200);
 
-    // Error handler
+    // Global error handler
     const errorHandler = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (!mounted || !customEvent.detail?.error) return;
       const errStr = String(customEvent.detail.error).toLowerCase();
-      setIsLoadingPlayers(false);
-      setIsLoadingLeaders(false);
-      setIsLoadingMatches(false);
+      setIsLoading(false);
       if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
         setDbError('QUOTA_EXCEEDED');
       } else {
@@ -96,7 +86,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     };
     window.addEventListener('firestore-error', errorHandler);
 
-    // Anonymous auth for all users
+    // Always ensure anonymous auth
     import('./firebase').then(({ loginAnonymously, auth }) => {
       if (!auth.currentUser) {
         loginAnonymously().catch(err => console.warn('[Firebase] Anonymous login failed:', err));
@@ -104,60 +94,41 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     });
 
     const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
-    const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
 
-    // TTL Cache Guard: If data was fetched recently and listeners are already active,
-    // skip re-subscribing to prevent read spikes on navigation.
-    const cacheAge = _globalCache ? Date.now() - (_globalCache.fetchedAt || 0) : Infinity;
-    const cacheIsFresh = cacheAge < CACHE_TTL_MS && _globalCache && _globalCache.players.length > 0;
-    
-    if (cacheIsFresh && !isAdmin) {
-      // Serve from cache instantly — no Firestore reads needed
-      if (mounted) {
-        setPlayers(_globalCache!.players);
-        setLeaders(_globalCache!.leaders);
-        setMatches(_globalCache!.matches);
-        setTournaments(_globalCache!.tournaments);
-        setSystemLocks(_globalCache!.systemLocks);
-        setIsLoadingPlayers(false);
-        setIsLoadingLeaders(false);
-        setIsLoadingMatches(false);
-      }
-      return;
-    }
-
-    // 1. System Locks — real-time for everyone (tiny doc)
+    // ── ALWAYS: System locks (tiny single doc) ────────────────────────────────
     unsubscribers.push(subscribeToSystemLocks((locks) => {
-      if (mounted) {
-        setSystemLocks(locks);
-        if (_globalCache) _globalCache.systemLocks = locks;
-      }
+      if (!mounted) return;
+      setSystemLocks(locks);
+      if (_globalCache) _globalCache.systemLocks = locks;
+    }));
+
+    // ── ALWAYS: App version (tiny single doc) ─────────────────────────────────
+    unsubscribers.push(subscribeToAppVersion((version) => {
+      if (mounted && version) setAppVersion(version);
     }));
 
     if (isAdmin) {
-      // ── ADMIN: Full real-time subscriptions ──────────────────────────────
-      ensureAdminSession(); 
+      // ── ADMIN: Real-time subscriptions (1 admin only, cost acceptable) ──────
+      ensureAdminSession();
       testFirestoreConnection();
 
       unsubscribers.push(subscribeToPlayers((data, pending) => {
         if (!mounted) return;
         setPlayers(data);
-        setIsLoadingPlayers(false);
         setHasPendingWrites(pending);
+        setIsLoading(false);
         if (_globalCache) { _globalCache.players = data; _globalCache.fetchedAt = Date.now(); }
       }, 100));
 
       unsubscribers.push(subscribeToLeaders((data) => {
         if (!mounted) return;
         setLeaders(data);
-        setIsLoadingLeaders(false);
         if (_globalCache) _globalCache.leaders = data;
       }));
 
-      unsubscribers.push(subscribeToMatches((data, pending) => {
+      unsubscribers.push(subscribeToMatches((data) => {
         if (!mounted) return;
         setMatches(data);
-        setIsLoadingMatches(false);
         if (_globalCache) _globalCache.matches = data;
       }));
 
@@ -167,82 +138,64 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (_globalCache) _globalCache.tournaments = data;
       }));
 
-      unsubscribers.push(subscribeToAppVersion((version) => {
-        if (mounted && version) {
-          setAppVersion(version);
-        }
-      }));
-
-    } else if (isPlayer) {
-      // ── PLAYER: Live players, leaders, tournaments. No match history. ──
-      unsubscribers.push(subscribeToPlayers((data, pending) => {
-        if (!mounted) return;
-        setPlayers(data);
-        setIsLoadingPlayers(false);
-        setHasPendingWrites(pending);
-        if (_globalCache) _globalCache.players = data;
-      }, 100));
-
-      unsubscribers.push(subscribeToLeaders((data) => {
-        if (!mounted) return;
-        setLeaders(data);
-        setIsLoadingLeaders(false);
-        if (_globalCache) _globalCache.leaders = data;
-      }));
-
-      unsubscribers.push(subscribeToTournaments((data) => {
-        if (!mounted) return;
-        setTournaments(data);
-        if (_globalCache) _globalCache.tournaments = data;
-      }, 20));
-
-      setIsLoadingMatches(false);
-
     } else {
-      // ── GUEST: One-time fetches only — maximum quota protection ──────────
-      const loadGuestData = async () => {
-        try {
-          if (_globalCache && _globalCache.players.length > 0) {
-            setPlayers(_globalCache.players);
-            setLeaders(_globalCache.leaders);
-          } else {
-            const [guestPlayers, guestLeaders] = await Promise.all([
-              fetchPlayersOnce(15),
+      // ── PLAYER / GUEST: ONE-TIME FETCH — zero ongoing listener cost ──────────
+      // Check if cache is still fresh (within TTL)
+      const cacheAge = _globalCache ? Date.now() - (_globalCache.fetchedAt || 0) : Infinity;
+      const cacheIsFresh = cacheAge < CACHE_TTL_MS && _globalCache && _globalCache.players.length > 0;
+
+      if (cacheIsFresh) {
+        // Serve instantly from memory — 0 Firestore reads
+        setPlayers(_globalCache!.players);
+        setLeaders(_globalCache!.leaders);
+        setMatches(_globalCache!.matches);
+        setTournaments(_globalCache!.tournaments);
+        setSystemLocks(_globalCache!.systemLocks);
+        setIsLoading(false);
+      } else {
+        // Fetch once, cache for 15 minutes
+        const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
+        const playerLimit = isPlayer ? 100 : 15; // guests get fewer
+
+        const loadOnce = async () => {
+          try {
+            const [p, l, m, t] = await Promise.all([
+              fetchPlayersOnce(playerLimit),
               fetchLeadersOnce(),
+              isPlayer ? fetchMatchesOnce(50) : Promise.resolve([] as MatchRecord[]),
+              fetchTournamentsOnce(20),
             ]);
-            if (mounted) {
-              setPlayers(guestPlayers);
-              setLeaders(guestLeaders);
-              if (_globalCache) {
-                _globalCache.players = guestPlayers;
-                _globalCache.leaders = guestLeaders;
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('[Guest] Data fetch failed:', e);
-        } finally {
-          if (mounted) {
-            setIsLoadingPlayers(false);
-            setIsLoadingLeaders(false);
-          }
-        }
-      };
-      loadGuestData();
-      setIsLoadingMatches(false);
-    }
 
-    if (!_globalCache) {
-      _globalCache = { players: [], leaders: [], matches: [], tournaments: [], systemLocks: {}, fetchedAt: Date.now() };
-    }
+            if (!mounted) return;
 
-    const timeout = setTimeout(() => {
-      if (mounted) {
-        setIsLoadingPlayers(false);
-        setIsLoadingLeaders(false);
-        setIsLoadingMatches(false);
-        setIsMinLoadTimePassed(true);
+            setPlayers(p);
+            setLeaders(l);
+            setMatches(m);
+            setTournaments(t);
+
+            // Populate cache so next navigation costs 0 reads
+            _globalCache = {
+              players: p,
+              leaders: l,
+              matches: m,
+              tournaments: t,
+              systemLocks: _globalCache?.systemLocks || {},
+              fetchedAt: Date.now(),
+            };
+          } catch (err) {
+            console.warn('[FirebaseContext] One-time fetch failed:', err);
+          } finally {
+            if (mounted) setIsLoading(false);
+          }
+        };
+
+        loadOnce();
       }
+    }
+
+    // Safety timeout — never block UI more than 8s
+    const timeout = setTimeout(() => {
+      if (mounted) setIsLoading(false);
     }, 8000);
 
     return () => {
@@ -250,22 +203,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('firestore-error', errorHandler);
       unsubscribers.forEach(u => u());
       clearTimeout(timeout);
-      clearTimeout(minLoadTimer);
+      clearTimeout(minTimer);
     };
   }, []);
 
-  const playersRef = useRef(players);
-  const matchesRef = useRef(matches);
-  useEffect(() => { playersRef.current = players; }, [players]);
-  useEffect(() => { matchesRef.current = matches; }, [matches]);
-
-  // Read pre-stored ELO values directly from player documents (set by addMatch/editMatch).
-  // This avoids the expensive O(n*m) computeGlobalElo computation on every render.
   const elos = React.useMemo(() => {
     const result: Record<string, number> = {};
-    players.forEach(p => {
-      result[p.id] = p.elo || 1200;
-    });
+    players.forEach(p => { result[p.id] = p.elo || 1200; });
     return result;
   }, [players]);
 
@@ -279,8 +223,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     return l;
   }), [leaders, players]);
 
-  const isLoading = isLoadingPlayers || isLoadingLeaders || isLoadingMatches || !isMinLoadTimePassed;
-
   const value = React.useMemo(() => ({
     players,
     rankedPlayers,
@@ -293,19 +235,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     dbError,
     hasPendingWrites,
     appVersion
-  }), [
-    players,
-    rankedPlayers,
-    enrichedLeaders,
-    matches,
-    tournaments,
-    systemLocks,
-    elos,
-    isLoading,
-    dbError,
-    hasPendingWrites,
-    appVersion
-  ]);
+  }), [players, rankedPlayers, enrichedLeaders, matches, tournaments, systemLocks, elos, isLoading, dbError, hasPendingWrites, appVersion]);
 
   return (
     <FirebaseContext.Provider value={value}>
@@ -320,4 +250,9 @@ export function useFirebase() {
     throw new Error('useFirebase must be used within a FirebaseProvider');
   }
   return context;
+}
+
+/** Call this after any admin write to force non-admin users to re-fetch on next navigation. */
+export function invalidateGlobalCache() {
+  if (_globalCache) _globalCache.fetchedAt = 0;
 }

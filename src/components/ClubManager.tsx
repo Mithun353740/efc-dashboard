@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import {
@@ -9,7 +9,7 @@ import {
   addToShortlist, removeFromShortlist, sendTransferProposal,
   setReleaseClause, removeReleaseClause, triggerReleaseClause,
   calculatePlayerForm, calculateBasePrize, getFormGrade,
-  sendPlayerInboxMessage, subscribeToClubs
+  sendPlayerInboxMessage
 } from '../lib/store';
 import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture, AuctionState, ClubInboxMessage, PlayerInboxMessage } from '../types';
 import { getPlayerGrade, GRADE_COLORS } from '../lib/utils';
@@ -575,16 +575,11 @@ export default function ClubManager() {
 
   // Real-time clubs subscription
   useEffect(() => {
-    // Initial load will use cache if available thanks to fetchClubs/Config implementation in store.ts
+    // One-time load — fetchClubs uses module-level cache so subsequent
+    // navigations cost 0 Firestore reads (no persistent listener needed).
     load();
-
-    const unsub = subscribeToClubs((cs) => {
-      setClubs(cs || []);
-      if (_clubCache) _clubCache.clubs = cs || [];
-    });
-
-    return () => unsub();
   }, []);
+
 
   // Subscribe to inbox when owner is identified
   useEffect(() => {

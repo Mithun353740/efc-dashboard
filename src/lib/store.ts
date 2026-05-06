@@ -2365,3 +2365,28 @@ export async function fetchLeadersOnce(): Promise<Leader[]> {
     return [];
   }
 }
+
+/** One-shot fetch — no real-time listener. Replaces subscribeToMatches for non-admin users. */
+export async function fetchMatchesOnce(limitCount = 50): Promise<MatchRecord[]> {
+  try {
+    const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, 'matches');
+    return [];
+  }
+}
+
+/** One-shot fetch — no real-time listener. Replaces subscribeToTournaments for non-admin users. */
+export async function fetchTournamentsOnce(limitCount = 20): Promise<Tournament[]> {
+  try {
+    const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Tournament));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, 'tournaments');
+    return [];
+  }
+}
+
