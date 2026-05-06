@@ -109,7 +109,7 @@ export default function Login() {
         window.dispatchEvent(new StorageEvent('storage', { key: 'playerLoggedIn', newValue: 'true' }));
         window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: 'player' }));
 
-        navigate('/stats');
+        navigate('/');
       } else {
         setError('Invalid player email or password');
       }

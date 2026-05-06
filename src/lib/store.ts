@@ -1615,6 +1615,19 @@ export async function placeBid(clubId: string, clubName: string, bidAmount: numb
     leadingClubName: clubName,
     minNextBid: bidAmount + currentState.bidIncrement,
     currentTurnIndex: nextTurnIndex,
+    bidDeadlineAt: Date.now() + 90_000, // Reset 90s countdown on each bid
+  }, { merge: true });
+}
+
+/** Auction admin: Force-advance to the next club's turn (timeout or manual skip). */
+export async function adminNextTurn(currentState: AuctionState): Promise<void> {
+  await ensureAdminSession();
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const activeBidders = currentState.biddingOrder.filter(id => !currentState.foldedClubs.includes(id));
+  const nextTurnIndex = (currentState.currentTurnIndex + 1) % Math.max(activeBidders.length, 1);
+  await setDoc(AUCTION_DOC, {
+    currentTurnIndex: nextTurnIndex,
+    bidDeadlineAt: Date.now() + 90_000,
   }, { merge: true });
 }
 
@@ -1657,6 +1670,7 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
     status: 'active',
     soldAt: null,
     currentTurnIndex: (currentState.currentTurnIndex + 1) % Math.max(activeBidders.length, 1),
+    bidDeadlineAt: Date.now() + 90_000, // Reset timer on fold too
   }, { merge: true });
 }
 
@@ -1684,9 +1698,8 @@ export async function adminConfirmSold(currentState: AuctionState, winningClub: 
 
 /** Admin: Skip the current player (unsold / folded). */
 export async function adminSkipPlayer(): Promise<void> {
-  
   await ensureAdminSession();
-  await setDoc(AUCTION_DOC, { status: 'folded', currentPlayer: null, leadingClubId: null, leadingClubName: null, currentBid: 0, foldedClubs: [] }, { merge: true });
+  await setDoc(AUCTION_DOC, { status: 'folded', currentPlayer: null, leadingClubId: null, leadingClubName: null, currentBid: 0, foldedClubs: [], bidDeadlineAt: null }, { merge: true });
 }
 
 /** Admin: End the entire auction session. */

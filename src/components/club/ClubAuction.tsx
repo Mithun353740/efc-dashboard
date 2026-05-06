@@ -5,7 +5,7 @@ import { AuctionState, Club, Player, ClubSystemConfig } from '../../types';
 import { getPlayerGrade, GRADE_COLORS, GRADE_BASE_PRICES } from '../../lib/utils';
 import {
   subscribeToAuction, placeBid, foldBid,
-  adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, adminStartAuction,
+  adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, adminStartAuction, adminNextTurn,
 } from '../../lib/store';
 
 function fmtCoins(n: number) {
@@ -43,7 +43,9 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
   // Confetti state
   const [showSold, setShowSold] = useState(false);
   const prevStatusRef = useRef<string>('');
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null); // Auction schedule countdown
+  const [turnTimeLeft, setTurnTimeLeft] = useState<number | null>(null); // Per-turn 90s countdown
+  const [nextTurnBusy, setNextTurnBusy] = useState(false);
 
   useEffect(() => {
     if (!config?.auctionStartTime || (auctionState?.status !== 'idle' && auctionState?.status !== 'ended')) {
@@ -61,7 +63,20 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [config?.auctionStartTime, auctionState?.status]);
+  }, [config?.auctionStartTime, auctionState?.status]);  // Per-turn 90s countdown from Firestore bidDeadlineAt
+  useEffect(() => {
+    if (!auctionState?.bidDeadlineAt || auctionState.status !== 'active') {
+      setTurnTimeLeft(null);
+      return;
+    }
+    const tick = () => {
+      const diff = auctionState.bidDeadlineAt! - Date.now();
+      setTurnTimeLeft(Math.max(0, diff));
+    };
+    tick();
+    const interval = setInterval(tick, 500);
+    return () => clearInterval(interval);
+  }, [auctionState?.bidDeadlineAt, auctionState?.status]);
 
   const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000);
@@ -149,8 +164,67 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
         )}
       </AnimatePresence>
 
+      {/* ── ADMIN ACTION BAR (sticky, never overlaps layout) ── */}
+      {canOperateControls && auctionState.status !== 'idle' && (
+        <div className="sticky top-0 z-30 bg-[#0a0a1a]/95 backdrop-blur border-b border-violet-500/20 px-4 py-3">
+          <div className="max-w-4xl mx-auto flex flex-wrap items-center gap-3">
+            {/* Reveal player */}
+            <select
+              value={revealPlayerId}
+              onChange={e => setRevealPlayerId(e.target.value)}
+              className="flex-1 min-w-[180px] bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold outline-none"
+            >
+              <option value="">Select player to reveal...</option>
+              {unownedPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.ovr} OVR)</option>)}
+            </select>
+            <button
+              onClick={async () => {
+                if (!revealPlayerId) return;
+                const p = allPlayers.find(pl => pl.id === revealPlayerId)!;
+                await adminRevealCard({ id: p.id, name: p.name, image: p.image, ovr: p.ovr, currentClubId: p.clubId || null, currentClubName: p.clubName || null }, auctionState.basePrice, auctionState.bidIncrement);
+                setRevealPlayerId('');
+              }}
+              className="px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1"
+            >
+              <Play size={13} /> REVEAL
+            </button>
+            <button
+              disabled={!auctionState.leadingClubId || !winningClub}
+              onClick={async () => { if (winningClub) await adminConfirmSold(auctionState, winningClub); }}
+              className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 rounded-xl text-[10px] font-black uppercase transition-all disabled:opacity-30 flex items-center gap-1"
+            >
+              <Hammer size={13} /> SOLD
+            </button>
+            <button
+              onClick={adminSkipPlayer}
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1"
+            >
+              <SkipForward size={13} /> SKIP
+            </button>
+            {/* Next Club turn button */}
+            {auctionState.status === 'active' && (
+              <button
+                disabled={nextTurnBusy}
+                onClick={async () => {
+                  const timerActive = turnTimeLeft !== null && turnTimeLeft > 0;
+                  if (timerActive) {
+                    const ok = window.confirm(`⚠️ The turn timer still has ${Math.ceil(turnTimeLeft! / 1000)}s left. Force advance to next club?`);
+                    if (!ok) return;
+                  }
+                  setNextTurnBusy(true);
+                  try { await adminNextTurn(auctionState); }
+                  finally { setNextTurnBusy(false); }
+                }}
+                className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded-xl text-[10px] font-black uppercase transition-all disabled:opacity-50 flex items-center gap-1"
+              >
+                <SkipForward size={13} /> NEXT CLUB
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="relative z-10 max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -284,41 +358,7 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
               ) : null}
             </AnimatePresence>
 
-            {/* Admin/Auction Admin controls below card */}
-            {canOperateControls && (
-              <div className="mt-6 w-full space-y-3">
-                {/* Reveal next card */}
-                <div className="flex gap-2">
-                  <select value={revealPlayerId} onChange={e => setRevealPlayerId(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none">
-                    <option value="">Select player to reveal...</option>
-                    {unownedPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.ovr} OVR)</option>)}
-                  </select>
-                  <button
-                    onClick={async () => {
-                      if (!revealPlayerId) return;
-                      const p = allPlayers.find(pl => pl.id === revealPlayerId)!;
-                      await adminRevealCard({ id: p.id, name: p.name, image: p.image, ovr: p.ovr, currentClubId: p.clubId || null, currentClubName: p.clubName || null }, auctionState.basePrice, auctionState.bidIncrement);
-                      setRevealPlayerId('');
-                    }}
-                    className="px-4 py-2.5 bg-violet-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-violet-600 transition-all"
-                  >
-                    <Play size={14} />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    disabled={!auctionState.leadingClubId || !winningClub}
-                    onClick={async () => { if (winningClub) await adminConfirmSold(auctionState, winningClub); }}
-                    className="py-2.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-30"
-                  >
-                    <Hammer size={12} className="inline mr-1" />Force Sold
-                  </button>
-                  <button onClick={adminSkipPlayer} className="py-2.5 bg-white/5 hover:bg-white/10 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-                    <SkipForward size={12} className="inline mr-1" />Skip
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Admin controls below card REMOVED — now in sticky top bar */}
           </div>
 
           {/* Right panel */}
@@ -346,9 +386,21 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
               <p className="text-[10px] text-slate-600 mt-2 font-bold">Min next bid: {fmtCoins(auctionState.minNextBid)}</p>
             </div>
 
-            {/* Turn indicator */}
+            {/* Turn indicator + countdown */}
             <div className="bg-[#0a0a14] border border-white/10 rounded-3xl p-5">
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Bidding Order</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Bidding Order</p>
+                {/* Per-turn countdown */}
+                {turnTimeLeft !== null && auctionState.status === 'active' && (
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black ${
+                    turnTimeLeft <= 15000 ? 'bg-red-500/20 text-red-400 animate-pulse' :
+                    turnTimeLeft <= 45000 ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    ⏱ {Math.ceil(turnTimeLeft / 1000)}s
+                  </div>
+                )}
+              </div>
               <div className="space-y-2">
                 {auctionState.biddingOrder.map((clubId, idx) => {
                   const club = allClubs.find(c => c.id === clubId);

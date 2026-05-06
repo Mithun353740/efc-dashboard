@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Trash2, Edit3, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield } from 'lucide-react';
+import { Search, Plus, Trash2, Edit3, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
@@ -1203,7 +1203,9 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
   const [msg, setMsg] = React.useState({ type: '', text: '' });
   const [isLoading, setIsLoading] = React.useState(false);
   const [showRoleWarning, setShowRoleWarning] = React.useState(false);
+  const [showPassword, setShowPassword] = React.useState(false);
   const [assignedPlayerIds, setAssignedPlayerIds] = React.useState<string[]>([]);
+  const formRef = React.useRef<HTMLDivElement>(null);
 
   const fetchAssignedPlayers = React.useCallback(async () => {
     // Redundant - we now use the players array from context which already has emails
@@ -1217,6 +1219,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
     setSelectedPlayer(p);
     setSearch(p.name);
     setMsg({ type: '', text: '' });
+    setShowPassword(false);
     try {
       const snap = await getDoc(doc(db, 'players', p.id));
       if (snap.exists()) {
@@ -1228,6 +1231,8 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
     } catch (err) {
       console.error('Error fetching player credentials:', err);
     }
+    // Scroll form panel into view on mobile/small screens
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
 
   const handleSave = async () => {
@@ -1247,7 +1252,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       {/* Search & Select */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+      <div ref={formRef} className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
         <h3 className="text-xl font-black tracking-tight mb-2">PLAYER CREDENTIALS</h3>
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">Set login email, password & admin role</p>
         <div className="relative mb-6">
@@ -1307,7 +1312,12 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
             </div>
             <div className="space-y-1">
               <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2"><Lock size={10} className="text-brand-purple" />PASSWORD</label>
-              <input type="text" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Set login password" />
+              <div className="relative">
+                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 pr-12 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Set login password" />
+                <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1">

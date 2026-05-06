@@ -181,6 +181,7 @@ export interface AuctionState {
   startedAt: number | null;
   soldAt: number | null;
   adminId: string | null;
+  bidDeadlineAt?: number | null; // Timestamp when current club's turn expires (90s per turn)
 }
 
 // ─── INTERNAL CLUB SEASONS ────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import {
@@ -19,11 +19,11 @@ import ClubAuction from './club/ClubAuction';
 import ClubInbox from './club/ClubInbox';
 import PlayerInbox from './club/PlayerInbox';
 
-// ─── Module-level cache (persists across route changes, cleared on write) ─────
+// â”€â”€â”€ Module-level cache (persists across route changes, cleared on write) â”€â”€â”€â”€â”€
 let _clubCache: { clubs: Club[]; config: ClubSystemConfig | null; listings: MarketListing[] } | null = null;
 export function invalidateClubCache() { _clubCache = null; }
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function cn(...classes: (string | boolean | undefined)[]) {
   return classes.filter(Boolean).join(' ');
@@ -50,7 +50,7 @@ function ovrColor(ovr: number) {
   return '#64748b';
 }
 
-// ─── Club Logo component ──────────────────────────────────────────────────────
+// â”€â”€â”€ Club Logo component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ClubLogo({ club, size = 'md' }: { club: Club; size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
   const dim = { 'xs': 'w-6 h-6', 'sm': 'w-10 h-10', 'md': 'w-16 h-16', 'lg': 'w-24 h-24', 'xl': 'w-32 h-32' }[size];
@@ -75,7 +75,7 @@ function ClubLogo({ club, size = 'md' }: { club: Club; size?: 'xs' | 'sm' | 'md'
   );
 }
 
-// ─── FIFA Player Card ─────────────────────────────────────────────────────────
+// â”€â”€â”€ FIFA Player Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; size?: 'sm' | 'md' | 'lg' }) {
   const form = getFormGrade(player.form || []);
@@ -150,7 +150,7 @@ function FifaCard({ player, club, size = 'md' }: { player: Player; club?: Club; 
   );
 }
 
-// ─── Locked Screen ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Locked Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function LockedScreen() {
   return (
@@ -169,7 +169,7 @@ function LockedScreen() {
   );
 }
 
-// ─── Club Stats Bar ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Club Stats Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ClubStatBar({ label, val, icon }: { label: string; val: string | number; icon: React.ReactNode }) {
   return (
@@ -183,7 +183,7 @@ function ClubStatBar({ label, val, icon }: { label: string; val: string | number
   );
 }
 
-// ─── Stat Circle ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Stat Circle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatCircle({ label, value, color, icon }: { label: string; value: number; color: string; icon: React.ReactNode }) {
   const r = 28; const circ = 2 * Math.PI * r;
@@ -209,7 +209,7 @@ function StatCircle({ label, value, color, icon }: { label: string; value: numbe
   );
 }
 
-// ─── Overview Tab ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Overview Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, setActiveTab }: { 
   myClub: Club; squad: Player[]; allClubs: Club[]; config: ClubSystemConfig | null; matches: MatchRecord[];
@@ -263,7 +263,7 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
   return (
     <div className="space-y-3 sm:space-y-4">
 
-      {/* ── ROW 1: Training Day Hero + Notifications ── */}
+      {/* â”€â”€ ROW 1: Training Day Hero + Notifications â”€â”€ */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4">
 
         {/* Training Day Panel */}
@@ -369,7 +369,7 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
         </div>
       </div>
 
-      {/* ── ROW 2: Top Scorers + Weekly Schedule + Budget ── */}
+      {/* â”€â”€ ROW 2: Top Scorers + Weekly Schedule + Budget â”€â”€ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
 
         {/* Top Scorers */}
@@ -474,7 +474,7 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
         </motion.div>
       </div>
 
-      {/* ── ROW 3: Club Standings ── */}
+      {/* â”€â”€ ROW 3: Club Standings â”€â”€ */}
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
         className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-6"
@@ -486,7 +486,7 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
             <p className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white">STANDINGS</p>
           </div>
           <button onClick={() => setActiveTab('rankings')} className="text-[9px] font-black uppercase tracking-widest text-amber-500 hover:text-amber-400 transition-colors">
-            Full Table →
+            Full Table â†’
           </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -507,7 +507,7 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
 }
 
 
-// ─── Main Component (shell + tab router) ─────────────────────────────────────
+// â”€â”€â”€ Main Component (shell + tab router) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 export default function ClubManager() {
@@ -521,7 +521,7 @@ export default function ClubManager() {
   // Inbox state
   const [inboxMessages, setInboxMessages] = useState<ClubInboxMessage[]>([]);
   const [inboxUnread, setInboxUnread] = useState(0);
-  // Auction live watcher — minimal: only subscribes when on auction tab
+  // Auction live watcher â€” minimal: only subscribes when on auction tab
   const [auctionLive, setAuctionLive] = useState(false);
   // Shortlist modal state
   const [shortlistPlayer, setShortlistPlayer] = useState<Player | null>(null);
@@ -625,7 +625,7 @@ export default function ClubManager() {
     { id: 'overview', label: 'HUB', icon: <LayoutDashboard size={14} /> },
     { id: 'squad', label: 'SQUAD', icon: <Users size={14} /> },
     { id: 'market', label: 'TRANSFERS', icon: <ShoppingCart size={14} /> },
-    { id: 'auction', label: auctionLive ? '🔴 LIVE AUCTION' : 'AUCTION', icon: <Hammer size={14} /> },
+    { id: 'auction', label: auctionLive ? 'ðŸ”´ LIVE AUCTION' : 'AUCTION', icon: <Hammer size={14} /> },
     { id: 'rankings', label: 'STANDINGS', icon: <Trophy size={14} /> },
     { id: 'tournaments', label: 'MATCH DAY', icon: <Calendar size={14} /> },
     { id: 'inbox', label: isOwner ? 'CLUB OFFICE' : 'MY INBOX', icon: <Bell size={14} />, badge: inboxUnread > 0 ? inboxUnread : null },
@@ -634,7 +634,7 @@ export default function ClubManager() {
   return (
     <div className="min-h-screen bg-[#020617] text-white selection:bg-amber-500/30 pb-10">
 
-      {/* ── FIFA MANAGER STYLE HEADER ── */}
+      {/* â”€â”€ FIFA MANAGER STYLE HEADER â”€â”€ */}
       <div className="sticky top-[60px] md:top-[80px] z-[50]"
         style={{ background: 'linear-gradient(180deg, #0a0e1a 0%, #060a14 100%)', borderBottom: `2px solid ${myClub?.primaryColor || '#8b5cf6'}40` }}>
 
@@ -666,7 +666,7 @@ export default function ClubManager() {
           <div className="flex items-center gap-2 shrink-0">
             <div className="px-2.5 py-1 rounded font-black text-sm sm:text-base text-white leading-none"
               style={{ background: myClub?.primaryColor || '#8b5cf6' }}>
-              {myPlayer?.ovr || '—'}
+              {myPlayer?.ovr || 'â€”'}
             </div>
             {/* Budget pill */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
@@ -850,7 +850,7 @@ export default function ClubManager() {
           </motion.div>
         )}
 
-        {/* ─── Contract Renewal Modal ─── */}
+        {/* â”€â”€â”€ Contract Renewal Modal â”€â”€â”€ */}
         <AnimatePresence>
           {proposalStep === 'renewal' && shortlistPlayer && myClub && (
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -895,9 +895,9 @@ export default function ClubManager() {
                         body: `Your club owner, ${myClub.ownerName}, has offered you a new contract renewal for ${offerDuration} matches with a ${Number(offerAmount).toLocaleString()} VCC bonus.`,
                         data: { clubId: myClub.id, clubName: myClub.name, salary: Number(offerAmount), duration: Number(offerDuration) }
                       });
-                      setMsg({ text: '✅ Renewal offer sent!', type: 'success' });
+                      setMsg({ text: 'âœ… Renewal offer sent!', type: 'success' });
                       setProposalStep(null); setShortlistPlayer(null);
-                    } catch(e: any) { setMsg({ text: '❌ ' + e.message, type: 'error' }); }
+                    } catch(e: any) { setMsg({ text: 'âŒ ' + e.message, type: 'error' }); }
                     finally { setLoading(false); }
                   }} className="py-4 bg-brand-purple text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-purple/20 transition-all">Send Offer</button>
                 </div>
@@ -931,14 +931,14 @@ export default function ClubManager() {
                     )}
                     <div className="flex-1">
                       <p className="font-black text-white">{shortlistPlayer.name}</p>
-                      <p className="text-[10px] text-slate-400 font-bold">{shortlistPlayer.ovr} OVR · {sellerClub?.name || 'Unknown Club'}</p>
+                      <p className="text-[10px] text-slate-400 font-bold">{shortlistPlayer.ovr} OVR Â· {sellerClub?.name || 'Unknown Club'}</p>
                       {(() => { const g = getPlayerGrade(shortlistPlayer); return <span className="text-xs font-black" style={{ color: GRADE_COLORS[g] }}>Grade {g}</span>; })()}
                     </div>
                   </div>
 
                   {/* Offer type toggle */}
                   <div className="flex gap-2 mb-4">
-                    <button onClick={() => setOfferType('money')} className={`flex-1 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all ${offerType === 'money' ? 'bg-violet-500 text-white' : 'bg-white/5 text-slate-400'}`}>💰 Money</button>
+                    <button onClick={() => setOfferType('money')} className={`flex-1 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all ${offerType === 'money' ? 'bg-violet-500 text-white' : 'bg-white/5 text-slate-400'}`}>ðŸ’° Money</button>
                     <button onClick={() => setOfferType('swap')} className={`flex-1 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all ${offerType === 'swap' ? 'bg-amber-500 text-black' : 'bg-white/5 text-slate-400'}`}><ArrowLeftRight size={12} className="inline mr-1" />Swap</button>
                   </div>
 
@@ -966,9 +966,9 @@ export default function ClubManager() {
                           sellerClubId: sellerClub.id, sellerClubName: sellerClub.name, sellerOwnerId: sellerClub.ownerId,
                           currentOffer: { type: offerType, amount: offerType === 'money' ? Number(offerAmount) : null, swapPlayerId: offerType === 'swap' ? offerAmount : null, swapPlayerName: swapPlayer?.name || null, sentBy: 'buyer', note: offerNote, sentAt: Date.now() },
                         });
-                        setMsg({ text: `✅ Proposal sent to ${sellerClub.name}!`, type: 'success' });
+                        setMsg({ text: `âœ… Proposal sent to ${sellerClub.name}!`, type: 'success' });
                         setProposalStep(null); setShortlistPlayer(null); setOfferAmount(''); setOfferNote('');
-                      } catch(e: any) { setMsg({ text: '❌ ' + e.message, type: 'error' }); }
+                      } catch(e: any) { setMsg({ text: 'âŒ ' + e.message, type: 'error' }); }
                     }} className="py-3 bg-violet-500 hover:bg-violet-400 text-white rounded-2xl text-[10px] font-black uppercase transition-all">Send Proposal</button>
                   </div>
                 </motion.div>
@@ -977,7 +977,7 @@ export default function ClubManager() {
           })()}
         </AnimatePresence>
 
-        {/* ─── Release Clause Modal ─── */}
+        {/* â”€â”€â”€ Release Clause Modal â”€â”€â”€ */}
         <AnimatePresence>
           {releaseTarget && myClub && (() => {
             const hasClause = !!releaseTarget.releaseClause?.active;
@@ -1018,7 +1018,7 @@ export default function ClubManager() {
                         <button onClick={async () => {
                           if (!releaseAmount) return;
                           await setReleaseClause(releaseTarget.id, { amount: Number(releaseAmount), active: true, setByClubId: myClub.id, setByClubName: myClub.name, setAt: Date.now() });
-                          setMsg({ text: `✅ Release clause set at ${Number(releaseAmount).toLocaleString()} coins.`, type: 'success' });
+                          setMsg({ text: `âœ… Release clause set at ${Number(releaseAmount).toLocaleString()} coins.`, type: 'success' });
                           setReleaseTarget(null); setReleaseAmount(''); load(true);
                         }} className="py-3 bg-amber-500 text-black rounded-2xl text-[10px] font-black uppercase">Set Clause</button>
                       </>
@@ -1056,7 +1056,7 @@ function NoClubScreen() {
   );
 }
 
-// ─── Squad Tab (with Shortlist + Release Clause) ──────────────────────────────
+// â”€â”€â”€ Squad Tab (with Shortlist + Release Clause) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, matches, onShortlistPlayer, onRenewContract, onSetReleaseClause, setMsg }: {
   myClub: Club; squad: Player[]; allClubs: Club[]; allPlayers: Player[];
@@ -1120,7 +1120,7 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, match
                       if (inShortlist) { await removeFromShortlist(myClub.id, p.id); setMsg({ text: 'Removed from shortlist.', type: 'success' }); }
                       else { await addToShortlist(myClub.id, p.id); setMsg({ text: `${p.name} added to shortlist!`, type: 'success' }); }
                     }} className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${inShortlist ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}>
-                      {inShortlist ? '★ Listed' : '☆ Shortlist'}
+                      {inShortlist ? 'â˜… Listed' : 'â˜† Shortlist'}
                     </button>
                     <button onClick={() => onShortlistPlayer(p)} className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 border border-violet-500/20 transition-all">
                       Propose
@@ -1242,7 +1242,7 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, match
   );
 }
 
-// ─── Transfer Market Tab ──────────────────────────────────────────────────────
+// â”€â”€â”€ Transfer Market Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefresh, setMsg, matches }:
   { listings: MarketListing[]; clubs: Club[]; myClub?: Club; players: Player[]; isOwner: boolean; config: ClubSystemConfig | null; onRefresh: () => void; setMsg: (m: { text: string; type: string }) => void; matches: MatchRecord[] }) {
@@ -1262,17 +1262,17 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
     setBusy(true);
     try {
       await listPlayerOnMarket({ id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2), playerId: player.id, playerName: player.name, playerImage: player.image, playerOvr: player.ovr, fromClubId: myClub.id, fromClubName: myClub.name, fromClubColor: myClub.primaryColor, price: Number(listPrice), listedAt: Date.now() });
-      flash('✅ Player listed on market', 'success');
+      flash('âœ… Player listed on market', 'success');
       setListingPlayerId(''); setListPrice('');
       onRefresh();
-    } catch (e: any) { flash('❌ ' + e.message, 'error'); }
+    } catch (e: any) { flash('âŒ ' + e.message, 'error'); }
     finally { setBusy(false); }
   };
 
   const handleDelist = async (l: MarketListing) => {
     setBusy(true);
-    try { await delistPlayerFromMarket(l.id, l.playerId); flash('✅ Player delisted', 'success'); onRefresh(); }
-    catch (e: any) { flash('❌ ' + e.message, 'error'); }
+    try { await delistPlayerFromMarket(l.id, l.playerId); flash('âœ… Player delisted', 'success'); onRefresh(); }
+    catch (e: any) { flash('âŒ ' + e.message, 'error'); }
     finally { setBusy(false); }
   };
 
@@ -1281,8 +1281,8 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
     const seller = clubs.find(c => c.id === l.fromClubId);
     if (!seller) return;
     setBusy(true);
-    try { await purchasePlayer(l, myClub, seller); flash(`✅ ${l.playerName} signed!`, 'success'); onRefresh(); }
-    catch (e: any) { flash('❌ ' + e.message, 'error'); }
+    try { await purchasePlayer(l, myClub, seller); flash(`âœ… ${l.playerName} signed!`, 'success'); onRefresh(); }
+    catch (e: any) { flash('âŒ ' + e.message, 'error'); }
     finally { setBusy(false); }
   };
 
@@ -1305,7 +1305,7 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
           <div className="flex flex-col xl:flex-row gap-3 md:gap-4">
             <select value={listingPlayerId} onChange={e => setListingPlayerId(e.target.value)} className="flex-1 bg-white/5 border border-white/10 p-3 md:p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none">
               <option value="">Select player to list...</option>
-              {mySquad.map(p => <option key={p.id} value={p.id} className="bg-[#0f172a]">{p.name} — OVR {p.ovr}</option>)}
+              {mySquad.map(p => <option key={p.id} value={p.id} className="bg-[#0f172a]">{p.name} â€” OVR {p.ovr}</option>)}
             </select>
             <div className="flex-1 relative">
               <input type="number" value={listPrice} onChange={e => setListPrice(e.target.value)} placeholder="Price (VCC)" className="w-full bg-white/5 border border-white/10 p-3 md:p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
@@ -1379,7 +1379,7 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
   );
 }
 
-// ─── Rankings Tab ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Rankings Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; players: Player[]; myClub?: Club; config: ClubSystemConfig | null }) {
   const [fixtures, setFixtures] = useState<ClubFixture[]>([]);
@@ -1452,7 +1452,7 @@ function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; player
         <div>
           <p className="font-black text-white text-sm">{config?.season || 'Club Season'}</p>
           <p className="text-[10px] font-bold text-slate-400">
-            Rankings based exclusively on club-season matches — completely separate from global stats.
+            Rankings based exclusively on club-season matches â€” completely separate from global stats.
             Matches must be recorded with tournament = <span className="text-amber-400 font-black">"{config?.season}"</span>
           </p>
         </div>
@@ -1504,7 +1504,7 @@ function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; player
                       <ClubLogo club={row.club} size="sm" />
                       <div>
                         <p className={`text-xs font-black ${myClub?.id === row.club.id ? 'text-amber-400' : 'text-white'}`}>{row.club.name}</p>
-                        <p className="text-[8px] text-slate-500">{row.club.ownerName || '—'}</p>
+                        <p className="text-[8px] text-slate-500">{row.club.ownerName || 'â€”'}</p>
                       </div>
                       {myClub?.id === row.club.id && (
                         <span className="text-[7px] font-black text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">YOU</span>
@@ -1531,7 +1531,7 @@ function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; player
                   <td className="px-2 md:px-3 py-4">
                     <div className="flex gap-0.5 justify-center">
                       {row.form.length === 0
-                        ? <span className="text-[8px] text-slate-600 font-bold">—</span>
+                        ? <span className="text-[8px] text-slate-600 font-bold">â€”</span>
                         : row.form.map((r, fi) => (
                           <span key={fi} className={`w-3 h-3 md:w-4 md:h-4 rounded text-[6px] md:text-[7px] font-black flex items-center justify-center
                             ${r === 'W' ? 'bg-emerald-500/30 text-emerald-400' : r === 'L' ? 'bg-red-500/30 text-red-400' : 'bg-slate-500/20 text-slate-400'}`}>
@@ -1571,7 +1571,7 @@ function RankingsTab({ clubs, players, myClub, config }: { clubs: Club[]; player
 }
 
 
-// ─── Tournaments Hub ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Tournaments Hub â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Module-level cache for club tournaments/fixtures keyed by season
 const _tournamentsCache: Record<string, { tournaments: ClubTournament[]; fixtures: ClubFixture[] }> = {};
@@ -1683,9 +1683,9 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
         return updated;
       });
       setSelFixtureId(null);
-      setMsg({ text: '✅ Lineup submitted', type: 'success' });
+      setMsg({ text: 'âœ… Lineup submitted', type: 'success' });
     } catch (e: any) {
-      setMsg({ text: '❌ ' + e.message, type: 'error' });
+      setMsg({ text: 'âŒ ' + e.message, type: 'error' });
     }
     setSubmitting(false);
   };
@@ -1716,9 +1716,9 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
       });
       setSelFixtureId(null);
       setMatchupSelection({});
-      setMsg({ text: '✅ Matchups locked!', type: 'success' });
+      setMsg({ text: 'âœ… Matchups locked!', type: 'success' });
     } catch (e: any) {
-      setMsg({ text: '❌ ' + e.message, type: 'error' });
+      setMsg({ text: 'âŒ ' + e.message, type: 'error' });
     }
     setSubmitting(false);
   };
@@ -1780,197 +1780,197 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
   const tFix = fixtures.filter(f => f.tournamentId === selectedTId);
   if (!tourney) { setSelectedTId(null); return null; }
 
-  return (
-    <div className="space-y-8">
-      {/* Detail Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <button onClick={() => setSelectedTId(null)} className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all">
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h3 className="text-3xl font-black text-white tracking-tighter uppercase italic">{tourney.name}</h3>
-              <span className={cn("text-[10px] font-black uppercase px-2 py-0.5 rounded",
-                tourney.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-              )}>{tourney.status}</span>
-            </div>
-            <p className="text-[10px] font-black text-slate-500 tracking-[0.3em] uppercase">TOURNAMENT HUB &bull; {tFix.length} FIXTURES</p>
+  // MY MATCHDAY â€” personalized to my club only
+  const myMatchday = myClub ? tFix.filter(f => f.homeClubId === myClub.id || f.awayClubId === myClub.id) : tFix;
+
+  // Compute standings from completed fixtures
+  const standingsMap: Record<string, { clubId: string; cname: string; p: number; w: number; d: number; l: number; gf: number; ga: number; pts: number }> = {};
+  const ensureRow = (id: string, name: string) => { if (!standingsMap[id]) standingsMap[id] = { clubId: id, cname: name, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }; };
+  tFix.forEach(f => { ensureRow(f.homeClubId, f.homeClubName); ensureRow(f.awayClubId, f.awayClubName); });
+  tFix.filter(f => f.status === 'completed').forEach(f => {
+    const hg = f.subMatches.reduce((s, m) => s + (m.p1Score || 0), 0);
+    const ag = f.subMatches.reduce((s, m) => s + (m.p2Score || 0), 0);
+    standingsMap[f.homeClubId].p++; standingsMap[f.awayClubId].p++;
+    standingsMap[f.homeClubId].gf += hg; standingsMap[f.homeClubId].ga += ag;
+    standingsMap[f.awayClubId].gf += ag; standingsMap[f.awayClubId].ga += hg;
+    if (hg > ag) { standingsMap[f.homeClubId].w++; standingsMap[f.homeClubId].pts += 3; standingsMap[f.awayClubId].l++; }
+    else if (ag > hg) { standingsMap[f.awayClubId].w++; standingsMap[f.awayClubId].pts += 3; standingsMap[f.homeClubId].l++; }
+    else { standingsMap[f.homeClubId].d++; standingsMap[f.homeClubId].pts++; standingsMap[f.awayClubId].d++; standingsMap[f.awayClubId].pts++; }
+  });
+  const standings = Object.values(standingsMap).sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga));
+
+  const [tDetailTab, setTDetailTab] = useState<'matchday' | 'table' | 'all'>('matchday');
+
+  // Inline fixture card (uses outer state setters)
+  const renderFixtureCard = (f: ClubFixture) => {
+    const isMeHome = myClub?.id === f.homeClubId;
+    const isMeAway = myClub?.id === f.awayClubId;
+    const isParticipant = isMeHome || isMeAway;
+    const myLu = isMeHome ? f.homeLineupIds : f.awayLineupIds;
+    const submitted = myLu.length === f.lineupSize;
+    const hc = clubs.find(c => c.id === f.homeClubId);
+    const ac = clubs.find(c => c.id === f.awayClubId);
+    const hg = f.subMatches.reduce((s, m) => s + (m.p1Score || 0), 0);
+    const ag = f.subMatches.reduce((s, m) => s + (m.p2Score || 0), 0);
+    return (
+      <div key={f.id} className={cn('bg-[#0f172a] border rounded-[1.5rem] overflow-hidden transition-all', isParticipant ? 'border-amber-500/30' : 'border-white/10 hover:border-white/20')}>
+        {/* Status bar */}
+        <div className="px-4 py-2 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+          <span className={cn('text-[8px] font-black tracking-widest px-2 py-0.5 rounded uppercase',
+            f.status === 'scheduled' ? 'bg-amber-500/20 text-amber-400' :
+            f.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
+            f.status === 'completed' ? 'bg-slate-500/20 text-slate-400' : 'bg-blue-500/20 text-blue-400'
+          )}>{f.status.replace('_', ' ')}</span>
+          <span className="text-[8px] font-black text-slate-600 uppercase">MD{f.matchday} Â· {f.lineupSize}v{f.lineupSize}</span>
+        </div>
+        {/* Teams */}
+        <div className="px-4 py-5 flex items-center gap-3">
+          <div className="flex-1 flex flex-col items-center gap-2">
+            {hc?.logo ? <img src={hc.logo} className="w-12 h-12 object-contain" alt="" /> : <div className="w-12 h-12 rounded-xl flex items-center justify-center font-black text-xs text-white" style={{ background: `linear-gradient(135deg,${hc?.primaryColor||'#333'},${hc?.secondaryColor||'#111'})` }}>{hc?.shortName}</div>}
+            <p className="text-[9px] font-black text-white uppercase text-center truncate w-full">{f.homeClubName}</p>
+          </div>
+          <div className="flex flex-col items-center shrink-0 px-2">
+            {f.status === 'completed'
+              ? <span className="text-xl font-black text-white">{hg} <span className="text-slate-600">-</span> {ag}</span>
+              : <span className="text-sm font-black text-slate-600 italic">VS</span>}
+          </div>
+          <div className="flex-1 flex flex-col items-center gap-2">
+            {ac?.logo ? <img src={ac.logo} className="w-12 h-12 object-contain" alt="" /> : <div className="w-12 h-12 rounded-xl flex items-center justify-center font-black text-xs text-white" style={{ background: `linear-gradient(135deg,${ac?.primaryColor||'#333'},${ac?.secondaryColor||'#111'})` }}>{ac?.shortName}</div>}
+            <p className="text-[9px] font-black text-white uppercase text-center truncate w-full">{f.awayClubName}</p>
           </div>
         </div>
-
-        {tourney.status !== 'active' && (
-          <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-3 text-amber-500">
-            <AlertCircle size={18} />
-            <div>
-              <p className="text-[10px] font-black uppercase">PAUSED BY FEDERATION</p>
-              {tourney.statusReason && <p className="text-[9px] font-bold opacity-70">{tourney.statusReason}</p>}
-            </div>
+        {/* Action area for participants */}
+        {isParticipant && f.status !== 'completed' && tourney?.status === 'active' && (
+          <div className="px-4 pb-4">
+            {(f.status === 'scheduled' || f.status === 'lineups_pending') && !submitted ? (
+              selFixtureId === f.id ? (
+                <div className="space-y-2">
+                  <p className="text-[9px] font-black text-amber-500 uppercase text-center">SELECT {f.lineupSize} PLAYERS</p>
+                  <div className="flex flex-wrap gap-1 justify-center">
+                    {squad.map(p => { const sel = lineupSelection.includes(p.id); return <button key={p.id} onClick={() => handleSelectLineup(p.id, f.lineupSize)} className={cn('px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase border', sel ? 'bg-amber-500 border-amber-500 text-black' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10')}>{p.name?.split(' ')?.[0]} {sel && 'âœ“'}</button>; })}
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => setSelFixtureId(null)} className="flex-1 py-2 bg-white/5 rounded-xl text-[9px] font-black uppercase text-slate-400">CANCEL</button>
+                    <button onClick={() => handleSubmitLineup(f)} disabled={lineupSelection.length !== f.lineupSize || submitting} className="flex-1 py-2 bg-amber-500 disabled:opacity-50 rounded-xl text-[9px] font-black uppercase text-black">SUBMIT</button>
+                  </div>
+                </div>
+              ) : <button onClick={() => { setSelFixtureId(f.id); setLineupSelection([]); }} className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 font-black text-[9px] rounded-xl uppercase tracking-widest">PREPARE LINEUP</button>
+            ) : f.status === 'matchups_pending' && isMeHome ? (
+              selFixtureId === f.id ? (
+                <div className="space-y-2">
+                  <p className="text-[9px] font-black text-purple-400 uppercase text-center">HOME ADVANTAGE â€” PAIR MATCHUPS</p>
+                  {f.awayLineupIds.map(aId => { const an = players.find(p => p.id === aId)?.name?.split(' ')?.[0] || '??'; return <div key={aId} className="flex items-center gap-2 bg-white/5 p-2 rounded-xl"><span className="text-[8px] font-black text-slate-400 w-14 text-right truncate">{an}</span><span className="text-[7px] text-slate-600 shrink-0">VS</span><select value={matchupSelection[aId]||''} onChange={e => setMatchupSelection({...matchupSelection,[aId]:e.target.value})} className="flex-1 bg-white/10 p-1.5 rounded-lg text-[8px] font-black text-white outline-none"><option value="">Pick...</option>{f.homeLineupIds.map(hId => { const taken = Object.keys(matchupSelection).find(k => matchupSelection[k]===hId&&k!==aId); const hp = players.find(x => x.id===hId); return <option key={hId} value={hId} disabled={!!taken}>{hp?.name?.split(' ')?.[0]} {taken?'(taken)':''}</option>; })}</select></div>; })}
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => setSelFixtureId(null)} className="flex-1 py-2 bg-white/5 rounded-xl text-[9px] font-black uppercase text-slate-400">CANCEL</button>
+                    <button onClick={() => handleSubmitMatchups(f)} disabled={Object.keys(matchupSelection).length!==f.awayLineupIds.length||submitting} className="flex-1 py-2 bg-purple-500 disabled:opacity-50 rounded-xl text-[9px] font-black uppercase text-white">LOCK</button>
+                  </div>
+                </div>
+              ) : <button onClick={() => { setSelFixtureId(f.id); setMatchupSelection({}); }} className="w-full py-2.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 font-black text-[9px] rounded-xl uppercase tracking-widest">MANAGE HOME ADVANTAGE</button>
+            ) : <p className="text-center text-[8px] font-black text-slate-600 uppercase">{submitted ? 'Lineup submitted â€” awaiting opponent' : f.status==='matchups_pending'&&isMeAway ? 'Home team pairing...' : 'Waiting...'}</p>}
           </div>
         )}
       </div>
+    );
+  };
 
-      {/* Fixtures Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {tFix.length === 0 ? (
-          <div className="col-span-full py-20 text-center bg-white/5 border border-white/10 rounded-[2rem]">
-            <Calendar size={32} className="text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-500 font-black uppercase text-xs">No fixtures scheduled for this tournament yet.</p>
-          </div>
-        ) : tFix.map(f => {
-          const isHome = myClub?.id === f.homeClubId;
-          const isAway = myClub?.id === f.awayClubId;
-          const isParticipant = isHome || isAway;
-          const myLineup = isHome ? f.homeLineupIds : f.awayLineupIds;
-          const oppLineup = isHome ? f.awayLineupIds : f.homeLineupIds;
-          const iHaveSubmitted = myLineup.length === f.lineupSize;
-          const oppHasSubmitted = oppLineup.length === f.lineupSize;
-
-          return (
-            <div key={f.id} className="bg-[#0f172a] border border-white/10 rounded-[2rem] overflow-hidden flex flex-col hover:border-white/20 transition-all">
-              {/* Header */}
-              <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                <span className={cn("text-[9px] font-black tracking-widest px-2 py-1 rounded uppercase",
-                  f.status === 'scheduled' ? 'bg-amber-500/20 text-amber-400' :
-                  f.status === 'lineups_pending' ? 'bg-blue-500/20 text-blue-400' :
-                  f.status === 'matchups_pending' ? 'bg-purple-500/20 text-purple-400' :
-                  f.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
-                  'bg-slate-500/20 text-slate-400'
-                )}>
-                  {f.status.replace('_', ' ')}
-                </span>
-                <span className="text-[9px] font-black text-slate-500 tracking-widest uppercase">{f.matchupType === 'home_away' ? 'HOME ADVANTAGE' : 'NEUTRAL'} &bull; {f.lineupSize}V{f.lineupSize}</span>
-              </div>
-
-              {/* Teams */}
-              <div className="p-6 md:p-8 flex items-center justify-between gap-2 md:gap-4">
-                <div className="flex-1 text-center">
-                  <div className="w-16 h-16 md:w-20 md:h-20 mx-auto rounded-xl md:rounded-2xl flex items-center justify-center text-white font-black text-sm md:text-xl mb-2 md:mb-3 shadow-2xl"
-                    style={{ background: `linear-gradient(135deg, ${clubs.find(c => c.id === f.homeClubId)?.primaryColor || '#000'}, ${clubs.find(c => c.id === f.homeClubId)?.secondaryColor || '#000'})` }}>
-                    {clubs.find(c => c.id === f.homeClubId)?.shortName}
-                  </div>
-                  <p className="text-[9px] md:text-[11px] font-black text-white uppercase truncate">{f.homeClubName}</p>
-                </div>
-
-                <div className="flex flex-col items-center gap-1 md:gap-2">
-                  <div className="text-xl md:text-3xl font-black text-white italic tracking-tighter">VS</div>
-                  {f.status === 'completed' && (
-                    <div className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 bg-white/5 rounded-full">
-                      <span className="text-[10px] md:text-xs font-black text-white">{f.subMatches.reduce((a, m) => a + (m.p1Score || 0), 0)}</span>
-                      <span className="text-slate-600">-</span>
-                      <span className="text-[10px] md:text-xs font-black text-white">{f.subMatches.reduce((a, m) => a + (m.p2Score || 0), 0)}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 text-center">
-                  <div className="w-16 h-16 md:w-20 md:h-20 mx-auto rounded-xl md:rounded-2xl flex items-center justify-center text-white font-black text-sm md:text-xl mb-2 md:mb-3 shadow-2xl"
-                    style={{ background: `linear-gradient(135deg, ${clubs.find(c => c.id === f.awayClubId)?.primaryColor || '#000'}, ${clubs.find(c => c.id === f.awayClubId)?.secondaryColor || '#000'})` }}>
-                    {clubs.find(c => c.id === f.awayClubId)?.shortName}
-                  </div>
-                  <p className="text-[9px] md:text-[11px] font-black text-white uppercase truncate">{f.awayClubName}</p>
-                </div>
-              </div>
-
-              {/* Action Area */}
-              <div className="p-6 bg-black/40 border-t border-white/5 flex-1 flex flex-col justify-end">
-                {isParticipant && (f.status === 'scheduled' || f.status === 'lineups_pending') && !iHaveSubmitted ? (
-                  tourney.status !== 'active' ? (
-                    <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-center">
-                      <Lock size={18} className="text-slate-500 mx-auto mb-2" />
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tournament {tourney.status}</p>
-                    </div>
-                  ) : selFixtureId === f.id ? (
-                    <div className="space-y-4">
-                      <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest text-center">SELECT {f.lineupSize} SQUAD MEMBERS</p>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        {squad.map(p => {
-                          const sel = lineupSelection.includes(p.id);
-                          return (
-                            <button key={p.id} onClick={() => handleSelectLineup(p.id, f.lineupSize)}
-                              className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all border",
-                                sel ? 'bg-amber-500 border-amber-500 text-black' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
-                              )}>
-                              {p.name?.split(' ')?.[0] || '??'} {sel && '✓'}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => setSelFixtureId(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black tracking-widest uppercase text-slate-400 transition-all">CANCEL</button>
-                        <button onClick={() => handleSubmitLineup(f)} disabled={lineupSelection.length !== f.lineupSize || submitting} className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 rounded-xl text-[10px] font-black tracking-widest uppercase text-black transition-all shadow-lg shadow-amber-500/20">SUBMIT</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button onClick={() => { setSelFixtureId(f.id); setLineupSelection([]); }} className="w-full py-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 font-black text-[10px] tracking-widest rounded-2xl transition-all uppercase">
-                      PREPARE SQUAD LINEUP
-                    </button>
-                  )
-                ) : isParticipant && f.status === 'matchups_pending' && isHome ? (
-                  tourney.status !== 'active' ? (
-                    <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-center">
-                      <Lock size={18} className="text-slate-500 mx-auto mb-2" />
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tournament {tourney.status}</p>
-                    </div>
-                  ) : selFixtureId === f.id ? (
-                    <div className="space-y-4">
-                      <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest text-center">HOME ADVANTAGE: PAIR MATCHUPS</p>
-                      <div className="space-y-3">
-                        {f.awayLineupIds.map(aId => {
-                          const aName = players.find(p => p.id === aId)?.name || 'Unknown';
-                          const selectedHId = matchupSelection[aId];
-                          return (
-                            <div key={aId} className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl border border-white/5">
-                              <span className="text-[10px] font-black text-slate-400 uppercase w-20 truncate text-right">{aName?.split(' ')?.[0] || '??'}</span>
-                              <span className="text-[10px] font-black text-slate-600">VS</span>
-                              <select value={selectedHId || ''} onChange={e => setMatchupSelection({...matchupSelection, [aId]: e.target.value})} 
-                                className="flex-1 bg-white/10 border-0 p-2 rounded-xl text-[10px] font-black text-white focus:ring-1 ring-amber-500 outline-none uppercase">
-                                <option value="" disabled className="text-black">Select Home Player</option>
-                                {f.homeLineupIds.map(hId => {
-                                  const assignedTo = Object.keys(matchupSelection).find(k => matchupSelection[k] === hId);
-                                  const disabled = assignedTo && assignedTo !== aId;
-                                  const p = players.find(x => x.id === hId);
-                                  return <option key={hId} value={hId} disabled={!!disabled} className="text-black">
-                                    {p?.name?.split(' ')?.[0] || '??'} {disabled ? '(Assigned)' : ''}
-                                  </option>;
-                                })}
-                              </select>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => setSelFixtureId(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black tracking-widest uppercase text-slate-400 transition-all">CANCEL</button>
-                        <button onClick={() => handleSubmitMatchups(f)} disabled={Object.keys(matchupSelection).length !== f.awayLineupIds.length || submitting} className="flex-1 py-3 bg-purple-500 hover:bg-purple-400 disabled:opacity-50 rounded-xl text-[10px] font-black tracking-widest uppercase text-white transition-all shadow-lg shadow-purple-500/20">LOCK FIXTURE</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button onClick={() => { setSelFixtureId(f.id); setMatchupSelection({}); }} className="w-full py-4 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 font-black text-[10px] tracking-widest rounded-2xl transition-all uppercase">
-                      MANAGE HOME ADVANTAGE
-                    </button>
-                  )
-                ) : (
-                  <div className="text-center">
-                    {f.status === 'active' ? (
-                      <p className="text-[10px] font-black text-emerald-400 tracking-[0.2em] uppercase flex items-center justify-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> FIXTURE LIVE
-                      </p>
-                    ) : f.status === 'completed' ? (
-                      <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] uppercase">FIXTURE ARCHIVED</p>
-                    ) : f.status === 'matchups_pending' && isAway ? (
-                      <p className="text-[10px] font-black text-purple-400 tracking-widest uppercase">Home team pairing lineups...</p>
-                    ) : iHaveSubmitted ? (
-                      <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Lineup Submitted. Waiting for opponent.</p>
-                    ) : (
-                      <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] uppercase italic">WAITING FOR OWNERS...</p>
-                    )}
-                  </div>
-                )}
-              </div>
+  return (
+    <div className="space-y-5">
+      {/* Tournament Header */}
+      <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#0f172a]">
+        <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-transparent pointer-events-none" />
+        <div className="relative z-10 p-5 md:p-7">
+          <button onClick={() => setSelectedTId(null)} className="flex items-center gap-2 text-[9px] font-black text-slate-500 hover:text-amber-400 uppercase tracking-widest mb-4 transition-colors">
+            <ArrowLeft size={12} /> ALL TOURNAMENTS
+          </button>
+          <div className="flex items-center gap-3">
+            <Trophy size={20} className="text-amber-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xl md:text-2xl font-black text-white tracking-tighter uppercase italic leading-none truncate">{tourney.name}</h3>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">{tFix.length} FIXTURES Â· {standings.length} CLUBS</p>
             </div>
-          );
-        })}
+            <span className={cn('text-[9px] font-black uppercase px-2 py-0.5 rounded shrink-0', tourney.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400')}>{tourney.status}</span>
+          </div>
+        </div>
       </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-1 p-1 bg-white/5 rounded-2xl border border-white/10">
+        {([
+          { id: 'matchday' as const, label: myClub ? 'MY MATCHDAY' : 'MATCHDAY' },
+          { id: 'table' as const, label: 'TABLE' },
+          { id: 'all' as const, label: 'ALL FIXTURES' },
+        ]).map(tab => (
+          <button key={tab.id} onClick={() => setTDetailTab(tab.id)}
+            className={cn('flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all', tDetailTab === tab.id ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-500 hover:text-white')}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* MY MATCHDAY */}
+      {tDetailTab === 'matchday' && (
+        myMatchday.length === 0
+          ? <div className="py-16 text-center bg-white/5 border border-white/10 rounded-[1.5rem]"><Calendar size={32} className="text-slate-600 mx-auto mb-3" /><p className="text-slate-500 font-black uppercase text-xs">{myClub ? `${myClub.name} has no fixtures in this tournament yet` : 'No fixtures'}</p></div>
+          : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{myMatchday.map(f => renderFixtureCard(f))}</div>
+      )}
+
+      {/* TABLE */}
+      {tDetailTab === 'table' && (
+        <div className="bg-[#0f172a] border border-white/10 rounded-[1.5rem] overflow-hidden">
+          <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 bg-white/[0.02]">
+            <Trophy size={13} className="text-amber-500" />
+            <p className="text-[9px] font-black text-white uppercase tracking-widest">LEAGUE STANDINGS</p>
+          </div>
+          {standings.length === 0
+            ? <div className="py-12 text-center text-slate-600 font-black uppercase text-xs">No completed fixtures yet â€” table will populate as results come in</div>
+            : <div className="overflow-x-auto">
+                <table className="w-full text-[8px] font-black uppercase">
+                  <thead><tr className="text-slate-600 border-b border-white/5">
+                    <th className="text-left px-3 py-2 w-6">#</th>
+                    <th className="text-left px-3 py-2">Club</th>
+                    <th className="px-2 py-2 text-center">P</th>
+                    <th className="px-2 py-2 text-center">W</th>
+                    <th className="px-2 py-2 text-center">D</th>
+                    <th className="px-2 py-2 text-center">L</th>
+                    <th className="px-2 py-2 text-center">GD</th>
+                    <th className="px-2 py-2 text-center text-amber-500">PTS</th>
+                  </tr></thead>
+                  <tbody>
+                    {standings.map((row, i) => {
+                      const rc = clubs.find(c => c.id === row.clubId);
+                      const isMe = myClub?.id === row.clubId;
+                      return (
+                        <tr key={row.clubId} className={cn('border-b border-white/5 transition-colors', isMe ? 'bg-amber-500/5' : 'hover:bg-white/[0.02]')}>
+                          <td className={cn('px-3 py-3 font-black', i === 0 ? 'text-amber-500' : 'text-slate-600')}>{i + 1}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              {rc?.logo ? <img src={rc.logo} className="w-5 h-5 object-contain rounded" alt="" /> : <div className="w-5 h-5 rounded flex items-center justify-center text-[6px] font-black text-white" style={{ background: rc?.primaryColor || '#333' }}>{rc?.shortName?.slice(0, 2)}</div>}
+                              <span className={isMe ? 'text-amber-400' : 'text-white'}>{row.cname}</span>
+                              {isMe && <span className="text-[6px] bg-amber-500/20 text-amber-500 px-1 rounded">YOU</span>}
+                            </div>
+                          </td>
+                          <td className="px-2 py-3 text-center text-slate-400">{row.p}</td>
+                          <td className="px-2 py-3 text-center text-emerald-400">{row.w}</td>
+                          <td className="px-2 py-3 text-center text-amber-400">{row.d}</td>
+                          <td className="px-2 py-3 text-center text-red-400">{row.l}</td>
+                          <td className={cn('px-2 py-3 text-center', (row.gf - row.ga) >= 0 ? 'text-emerald-400' : 'text-red-400')}>{row.gf - row.ga >= 0 ? '+' : ''}{row.gf - row.ga}</td>
+                          <td className="px-2 py-3 text-center text-amber-500 text-xs">{row.pts}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+          }
+        </div>
+      )}
+
+      {/* ALL FIXTURES */}
+      {tDetailTab === 'all' && (
+        tFix.length === 0
+          ? <div className="py-16 text-center bg-white/5 border border-white/10 rounded-[1.5rem]"><Calendar size={32} className="text-slate-600 mx-auto mb-3" /><p className="text-slate-500 font-black uppercase text-xs">No fixtures scheduled yet</p></div>
+          : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{tFix.map(f => renderFixtureCard(f))}</div>
+      )}
     </div>
   );
 }
