@@ -2106,12 +2106,38 @@ export async function deleteClubSeason(seasonId: string): Promise<void> {
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
 export async function startGlobalSeason(name: string): Promise<GlobalSeason> {
-  
   await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+
+  const batch = writeBatch(db);
+  
+  // 1. Mark all existing global seasons as 'completed'
+  const oldGsSnap = await getDocs(query(collection(db, 'globalSeasons'), where('status', '==', 'active')));
+  const oldActiveNames: string[] = [];
+  oldGsSnap.docs.forEach(d => {
+    batch.update(d.ref, { status: 'completed', endedAt: Date.now() });
+    oldActiveNames.push(d.data().name);
+  });
+
+  // 2. Mark all internal club seasons from those years as 'completed' 
+  // (Moves them to history automatically)
+  if (oldActiveNames.length > 0) {
+    const oldInternalSnap = await getDocs(query(
+      collection(db, 'clubSeasons'), 
+      where('globalSeason', 'in', oldActiveNames),
+      where('status', '!=', 'completed')
+    ));
+    oldInternalSnap.docs.forEach(d => {
+      batch.update(d.ref, { status: 'completed', endedAt: Date.now() });
+    });
+  }
+
+  // 3. Create the new Global Season
   const id = name.replace(/\//g, '_');
   const gs: GlobalSeason = { id, name, status: 'active', createdAt: Date.now() };
-  await setDoc(doc(db, 'globalSeasons', id), gs);
+  batch.set(doc(db, 'globalSeasons', id), gs);
+
+  await batch.commit();
   return gs;
 }
 
