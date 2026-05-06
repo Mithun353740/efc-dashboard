@@ -69,6 +69,7 @@ function AppContent() {
           <button onClick={() => window.location.reload()} className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded transition-all">RETRY</button>
         </div>
       )}
+      <AutoUpdater />
       <Navbar />
       <main className="flex-grow">
         <Routes>
