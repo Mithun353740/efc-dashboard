@@ -211,8 +211,9 @@ function StatCircle({ label, value, color, icon }: { label: string; value: numbe
 
 // â”€â”€â”€ Overview Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, setActiveTab, isOwner }: { 
-  myClub: Club; squad: Player[]; allClubs: Club[]; config: ClubSystemConfig | null; matches: MatchRecord[];
+function OverviewTab({ myClub, squad, allClubs, clubs, config, matches, fixtures, inboxUnread, setActiveTab, isOwner }: { 
+  myClub: Club; squad: Player[]; allClubs: Club[]; clubs: Club[]; config: ClubSystemConfig | null; matches: MatchRecord[];
+  fixtures: ClubFixture[];
   inboxUnread: number;
   setActiveTab: (t: 'overview' | 'squad' | 'market' | 'auction' | 'rankings' | 'tournaments' | 'inbox' | 'player_inbox') => void;
   isOwner: boolean;
@@ -842,8 +843,10 @@ export default function ClubManager() {
                     myClub={myClub} 
                     squad={squad} 
                     allClubs={clubs} 
+                    clubs={clubs}
                     config={config} 
                     matches={matches} 
+                    fixtures={fixtures}
                     inboxUnread={inboxUnread}
                     setActiveTab={setActiveTab}
                     isOwner={isOwner}
