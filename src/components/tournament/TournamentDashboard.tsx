@@ -14,7 +14,7 @@ import TournamentHistory from '../TournamentHistory';
 import { 
   Trophy, BarChart2, ListOrdered, Settings, ArrowLeft, Archive, 
   Trash2, Users, GitBranch, Goal, LayoutDashboard, History, 
-  ChevronRight, LogOut, ShieldCheck, Star, Menu, X, CalendarDays, Hash
+  ChevronRight, ShieldCheck, Star, X, CalendarDays, MoreHorizontal
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -32,7 +32,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [editStartDate, setEditStartDate] = useState(initialTournament.startingDate || '');
   const [editMaxTeams, setEditMaxTeams] = useState(initialTournament.maxTeams ? String(initialTournament.maxTeams) : '');
   const [editMatchDayStart, setEditMatchDayStart] = useState(initialTournament.matchDayStart || '');
@@ -88,24 +88,34 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#050508] text-white">
-      {/* Mobile Top Nav */}
-      <div className="lg:hidden flex items-center justify-between p-4 border-b border-[#1e1e32] sticky top-0 bg-[#0a0a12] z-[60]">
-        <div className="flex items-center gap-2">
-           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <Trophy size={16} />
-           </div>
-           <span className="font-black text-xs uppercase tracking-tight truncate max-w-[150px]">{tournament.name}</span>
+      {/* Mobile Top Bar */}
+      <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[#1e1e32] sticky top-0 bg-[#0a0a12] z-[60]">
+        <div className="flex items-center gap-2.5">
+          <button onClick={onBack} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+            <ArrowLeft size={15} />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <Trophy size={13} />
+            </div>
+            <div>
+              <div className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.2em] leading-none">Tournament</div>
+              <div className="font-black text-[11px] uppercase tracking-tight text-white truncate max-w-[180px] leading-tight mt-0.5">{tournament.name}</div>
+            </div>
+          </div>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-400">
-           {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => { setActiveTab('settings'); setShowMoreMenu(false); }}
+            className={`p-2 rounded-lg transition-colors ${activeTab === 'settings' ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-500 hover:text-white'}`}
+          >
+            <Settings size={17} />
+          </button>
+        )}
       </div>
 
-      {/* Sidebar */}
-      <aside className={cn(
-        "fixed inset-0 lg:relative lg:inset-auto w-full lg:w-72 border-r border-[#1e1e32] bg-[#0a0a12] flex flex-col h-screen lg:h-screen lg:sticky lg:top-0 z-[100] lg:z-50 transition-transform lg:translate-x-0",
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      )}>
+      {/* Sidebar — desktop only */}
+      <aside className="hidden lg:flex lg:relative lg:w-72 border-r border-[#1e1e32] bg-[#0a0a12] flex-col h-screen lg:h-screen lg:sticky lg:top-0 z-50">
         {/* Logo Section */}
         <div className="p-8 border-b border-[#1e1e32] flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -117,9 +127,6 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
               <p className="text-[8px] font-black tracking-widest text-slate-500 uppercase mt-1">Manager</p>
             </div>
           </div>
-          <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden p-2 text-slate-500 hover:text-white transition-colors">
-            <X size={20} />
-          </button>
         </div>
 
         {/* Navigation */}
@@ -134,7 +141,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
+              onClick={() => setActiveTab(item.id)}
               className={cn(
                 "w-full flex items-center justify-between px-6 py-4 rounded-2xl transition-all group",
                 activeTab === item.id 
@@ -212,7 +219,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
         </header>
 
         {/* Scrollable Content */}
-        <div className="flex-1 p-4 md:p-8 lg:p-10 overflow-y-auto no-scrollbar">
+        <div className="flex-1 p-4 md:p-8 lg:p-10 overflow-y-auto no-scrollbar pb-24 lg:pb-10">
            <AnimatePresence mode="wait">
              <motion.div
                key={activeTab}
@@ -372,6 +379,90 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
              </motion.div>
            </AnimatePresence>
         </div>
+
+        {/* ── Mobile Bottom Tab Bar ──────────────────────────────────────── */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-[80] bg-[#0a0a12]/95 backdrop-blur-xl border-t border-[#1e1e32] flex items-stretch h-16 safe-area-bottom">
+          {([
+            { id: 'dashboard', label: 'Home',    icon: <LayoutDashboard size={20} /> },
+            { id: 'fixtures',  label: 'Matches', icon: <CalendarDays size={20} /> },
+            { id: 'standings', label: 'Stats',   icon: <BarChart2 size={20} /> },
+            { id: 'teams',     label: 'Squads',  icon: <Users size={20} /> },
+          ] as { id: Tab; label: string; icon: React.ReactNode }[]).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setShowMoreMenu(false); }}
+              className={cn(
+                'flex-1 flex flex-col items-center justify-center gap-1 text-[9px] font-black uppercase tracking-widest transition-all relative',
+                activeTab === tab.id && !showMoreMenu
+                  ? 'text-indigo-400'
+                  : 'text-slate-600 hover:text-slate-400'
+              )}
+            >
+              {activeTab === tab.id && !showMoreMenu && (
+                <motion.div layoutId="mobileTabIndicator" className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-indigo-500" />
+              )}
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+          {/* MORE */}
+          <button
+            onClick={() => setShowMoreMenu(v => !v)}
+            className={cn(
+              'flex-1 flex flex-col items-center justify-center gap-1 text-[9px] font-black uppercase tracking-widest transition-all relative',
+              showMoreMenu ? 'text-indigo-400' : 'text-slate-600 hover:text-slate-400'
+            )}
+          >
+            {showMoreMenu && (
+              <motion.div layoutId="mobileTabIndicator" className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-indigo-500" />
+            )}
+            <MoreHorizontal size={20} />
+            More
+          </button>
+        </nav>
+
+        {/* ── More Bottom Sheet ─────────────────────────────────────────── */}
+        <AnimatePresence>
+          {showMoreMenu && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setShowMoreMenu(false)}
+                className="lg:hidden fixed inset-0 z-[75] bg-black/50 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className="lg:hidden fixed bottom-16 left-0 right-0 z-[76] bg-[#0a0a12] border-t border-[#1e1e32] rounded-t-3xl p-4 pb-2"
+              >
+                <div className="w-10 h-1 bg-white/10 rounded-full mx-auto mb-4" />
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { id: 'scorers',  label: 'Scorers',  icon: <Goal size={22} /> },
+                    { id: 'fantasy',  label: 'Fantasy',  icon: <Star size={22} /> },
+                    ...(isKnockout ? [{ id: 'bracket' as Tab, label: 'Bracket', icon: <GitBranch size={22} /> }] : []),
+                    { id: 'history',  label: 'History',  icon: <History size={22} /> },
+                    ...(isAdmin ? [{ id: 'settings' as Tab, label: 'Settings', icon: <Settings size={22} /> }] : []),
+                  ] as { id: Tab; label: string; icon: React.ReactNode }[]).map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => { setActiveTab(item.id); setShowMoreMenu(false); }}
+                      className={cn(
+                        'flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl border transition-all text-[9px] font-black uppercase tracking-widest',
+                        activeTab === item.id
+                          ? 'bg-indigo-600/15 border-indigo-500/30 text-indigo-400'
+                          : 'bg-white/3 border-[#1e1e32] text-slate-500 hover:text-white hover:border-slate-600'
+                      )}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* Delete Confirmation Modal */}
         <AnimatePresence>

@@ -21,6 +21,7 @@ import {
   serverTimestamp,
   where,
   arrayUnion,
+  arrayRemove,
   increment
 } from 'firebase/firestore';
 
@@ -1401,19 +1402,14 @@ export async function deleteClubTournament(id: string): Promise<void> {
 }
 
 export async function fetchClubFixtures(seasonName: string): Promise<import('../types').ClubFixture[]> {
-  // Filter by season to avoid reading the entire collection
+  // FIX: Removed double-read fallback — it was costing 200 extra reads on any query failure.
+  // All fixtures MUST have a 'season' field. Old docs without it are treated as not found.
   try {
     const snap = await getDocs(query(collection(db, 'clubFixtures'), where('season', '==', seasonName), limit(200)));
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubFixture));
   } catch (err) {
-    // Fallback: if no 'season' field on old documents, fetch all (graceful degradation)
-    try {
-      const snap = await getDocs(query(collection(db, 'clubFixtures'), limit(200)));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubFixture));
-    } catch (err2) {
-      handleFirestoreError(err2, OperationType.LIST, 'clubFixtures');
-      return [];
-    }
+    handleFirestoreError(err, OperationType.LIST, 'clubFixtures');
+    return [];
   }
 }
 
@@ -1942,10 +1938,8 @@ export async function addToShortlist(clubId: string, playerId: string): Promise<
 
 export async function removeFromShortlist(clubId: string, playerId: string): Promise<void> {
   if (isQuotaExceeded) return;
-  const clubDoc = await getDoc(doc(db, 'clubs', clubId));
-  if (!clubDoc.exists()) return;
-  const current: string[] = clubDoc.data().shortlistedPlayerIds || [];
-  await setDoc(doc(db, 'clubs', clubId), { shortlistedPlayerIds: current.filter(id => id !== playerId) }, { merge: true });
+  // FIX: Use arrayRemove — saves 1 unnecessary getDoc read per shortlist removal
+  await setDoc(doc(db, 'clubs', clubId), { shortlistedPlayerIds: arrayRemove(playerId) }, { merge: true });
 }
 
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
@@ -2163,7 +2157,8 @@ export async function startGlobalSeason(name: string): Promise<GlobalSeason> {
 }
 
 export async function fetchGlobalSeasons(): Promise<GlobalSeason[]> {
-  const snap = await getDocs(query(collection(db, 'globalSeasons'), orderBy('createdAt', 'desc')));
+  // FIX: Added limit(20) — previously an UNBOUNDED collection scan on every admin load.
+  const snap = await getDocs(query(collection(db, 'globalSeasons'), orderBy('createdAt', 'desc'), limit(20)));
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as GlobalSeason));
 }
 
@@ -2245,6 +2240,22 @@ export function subscribeToPlayerInbox(recipientId: string, callback: (messages:
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as PlayerInboxMessage)));
   }, (err) => handleFirestoreError(err, OperationType.LIST, `playerInbox/${recipientId}`));
+}
+
+/**
+ * One-shot fetch for player inbox — no persistent listener.
+ * Replaces subscribeToPlayerInbox for normal users.
+ * Cost: 1 read per inbox open. Zero ongoing listener overhead.
+ */
+export async function fetchPlayerInboxMessages(recipientId: string, limitCount = 50): Promise<PlayerInboxMessage[]> {
+  try {
+    const q = query(collection(db, 'playerInbox'), where('recipientId', '==', recipientId), orderBy('createdAt', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as PlayerInboxMessage));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, `playerInbox/${recipientId}`);
+    return [];
+  }
 }
 
 export async function updatePlayerInboxStatus(msgId: string, status: PlayerInboxMessage['status']): Promise<void> {

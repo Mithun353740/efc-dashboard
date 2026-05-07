@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bell, Mail, MailOpen, X, Check, Clock, Shield, AlertCircle } from 'lucide-react';
+import { Bell, Mail, MailOpen, X, Check, Clock, Shield, AlertCircle, RefreshCw } from 'lucide-react';
 import { PlayerInboxMessage, Player, Club } from '../../types';
 import {
-  subscribeToPlayerInbox, updatePlayerInboxStatus, respondToContractRenewal, fetchClubs
+  fetchPlayerInboxMessages, updatePlayerInboxStatus, respondToContractRenewal, fetchClubs
 } from '../../lib/store';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -25,24 +25,34 @@ export default function PlayerInbox({ player, allClubs, onClose }: PlayerInboxPr
   const [messages, setMessages] = useState<PlayerInboxMessage[]>([]);
   const [activeMsg, setActiveMsg] = useState<PlayerInboxMessage | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [clubs, setClubs] = useState<Club[]>(allClubs || []);
 
-  useEffect(() => {
-    const unsub = subscribeToPlayerInbox(player.id, (msgs) => {
+  // One-shot fetch — no persistent listener. Cost: 1 read per open/refresh.
+  const loadMessages = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setIsRefreshing(true);
+    try {
+      const msgs = await fetchPlayerInboxMessages(player.id, 50);
       setMessages([...msgs].sort((a, b) => b.createdAt - a.createdAt));
-    });
-    
+    } catch (err) {
+      console.error('[PlayerInbox] fetch failed:', err);
+    } finally {
+      if (showSpinner) setIsRefreshing(false);
+    }
+  }, [player.id]);
+
+  useEffect(() => {
+    loadMessages();
     if (!allClubs) {
       fetchClubs().then(setClubs).catch(console.error);
     }
-    
-    return unsub;
-  }, [player.id, allClubs]);
+  }, [player.id, allClubs, loadMessages]);
 
   useEffect(() => {
     if (allClubs) setClubs(allClubs);
   }, [allClubs]);
+
 
   const handleOpenMsg = async (msg: PlayerInboxMessage) => {
     setActiveMsg(msg);
@@ -87,9 +97,19 @@ export default function PlayerInbox({ player, allClubs, onClose }: PlayerInboxPr
           </div>
         </div>
         {onClose && (
-          <button onClick={onClose} className="p-2 text-slate-500 hover:text-white transition-colors">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => loadMessages(true)}
+              disabled={isRefreshing}
+              title="Refresh inbox"
+              className="p-2 text-slate-500 hover:text-amber-400 transition-colors disabled:opacity-40"
+            >
+              <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+            </button>
+            <button onClick={onClose} className="p-2 text-slate-500 hover:text-white transition-colors">
+              <X size={18} />
+            </button>
+          </div>
         )}
       </div>
 
