@@ -53,13 +53,13 @@ export function StatsTab({ tournament }: StatsTabProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       {/* Top Scorers */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500 border border-yellow-500/20">
-            <Trophy size={20} />
+      <section className="space-y-3">
+        <div className="flex items-center gap-3 mb-3 sm:mb-6">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500 border border-yellow-500/20">
+            <Trophy size={18} />
           </div>
           <div>
-            <h2 className="text-lg font-black text-white uppercase tracking-tight">Golden Boot</h2>
+            <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight">Golden Boot</h2>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Top Goal Scorers</p>
           </div>
         </div>
@@ -73,24 +73,24 @@ export function StatsTab({ tournament }: StatsTabProps) {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.1 }}
-                className="bg-[#0a0a12] border border-[#1e1e32] rounded-2xl p-4 flex items-center justify-between"
+                className="bg-[#0a0a12] border border-[#1e1e32] rounded-2xl p-3 sm:p-4 flex items-center justify-between"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <span className="text-slate-600 font-black text-xs w-4">{i + 1}</span>
-                  <div className="w-12 h-12 rounded-xl overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex items-center justify-center">
+                  <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
                     {player?.image ? (
                       <img src={player.image} className="w-full h-full object-cover" alt={s.name} />
                     ) : (
-                      <User className="w-6 h-6 text-indigo-400" />
+                      <User className="w-5 h-5 text-indigo-400" />
                     )}
                   </div>
                   <div>
-                    <h3 className="font-black text-white text-sm">{s.name}</h3>
-                    <p className="text-[9px] font-bold text-slate-500 uppercase">{s.played} Matches Played</p>
+                    <h3 className="font-black text-white text-xs sm:text-sm">{s.name}</h3>
+                    <p className="text-[9px] font-bold text-slate-500 uppercase">{s.played} Played</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-black text-white">{s.goals}</div>
+                  <div className="text-xl sm:text-2xl font-black text-white">{s.goals}</div>
                   <div className="text-[9px] font-black text-yellow-500 uppercase">Goals</div>
                 </div>
               </motion.div>
@@ -100,13 +100,13 @@ export function StatsTab({ tournament }: StatsTabProps) {
       </section>
 
       {/* Best Defense */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20">
-            <Shield size={20} />
+      <section className="space-y-3">
+        <div className="flex items-center gap-3 mb-3 sm:mb-6">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20">
+            <Shield size={18} />
           </div>
           <div>
-            <h2 className="text-lg font-black text-white uppercase tracking-tight">Golden Glove</h2>
+            <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight">Golden Glove</h2>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Defensive Excellence</p>
           </div>
         </div>
@@ -120,24 +120,24 @@ export function StatsTab({ tournament }: StatsTabProps) {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.1 }}
-                className="bg-[#0a0a12] border border-[#1e1e32] rounded-2xl p-4 flex items-center justify-between"
+                className="bg-[#0a0a12] border border-[#1e1e32] rounded-2xl p-3 sm:p-4 flex items-center justify-between"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <span className="text-slate-600 font-black text-xs w-4">{i + 1}</span>
-                  <div className="w-12 h-12 rounded-xl overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex items-center justify-center">
+                  <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl overflow-hidden border border-[#1e1e32] bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
                     {player?.image ? (
                       <img src={player.image} className="w-full h-full object-cover" alt={s.name} />
                     ) : (
-                      <User className="w-6 h-6 text-indigo-400" />
+                      <User className="w-5 h-5 text-indigo-400" />
                     )}
                   </div>
                   <div>
-                    <h3 className="font-black text-white text-sm">{s.name}</h3>
+                    <h3 className="font-black text-white text-xs sm:text-sm">{s.name}</h3>
                     <p className="text-[9px] font-bold text-slate-500 uppercase">{s.cleanSheets} Clean Sheets</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-black text-white">{s.cleanSheets}</div>
+                  <div className="text-xl sm:text-2xl font-black text-white">{s.cleanSheets}</div>
                   <div className="text-[9px] font-black text-emerald-500 uppercase">CS</div>
                 </div>
               </motion.div>

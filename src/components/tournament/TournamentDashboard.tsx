@@ -182,8 +182,8 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-screen">
-        {/* Navbar */}
-        <header className="h-24 border-b border-[#1e1e32] bg-[#050508]/50 backdrop-blur-xl flex items-center justify-between px-10 sticky top-0 z-[40]">
+        {/* Navbar — desktop only (mobile uses top bar + bottom tab nav) */}
+        <header className="hidden lg:flex h-24 border-b border-[#1e1e32] bg-[#050508]/50 backdrop-blur-xl items-center justify-between px-10 sticky top-0 z-[40]">
           <div className="flex items-center gap-4">
             {/* Countdown — only shown on Dashboard tab */}
             {activeTab === 'dashboard' && (

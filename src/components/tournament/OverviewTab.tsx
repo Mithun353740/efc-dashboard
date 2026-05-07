@@ -56,26 +56,26 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
   const getTeam = (id: string | null) => teams.find(t => t.id === id);
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       {/* Top Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Matches', value: fixtures.length, icon: <ListOrdered className="w-5 h-5 text-blue-400" />, color: 'from-blue-500/20 to-transparent' },
-          { label: 'Played', value: completedFixtures.length, icon: <Activity className="w-5 h-5 text-emerald-400" />, color: 'from-emerald-500/20 to-transparent' },
-          { label: 'Teams', value: teams.length, icon: <Users className="w-5 h-5 text-purple-400" />, color: 'from-purple-500/20 to-transparent' },
-          { label: 'Goals', value: totalGoals, icon: <Goal className="w-5 h-5 text-amber-400" />, color: 'from-amber-500/20 to-transparent' },
+          { label: 'Matches', value: fixtures.length, icon: <ListOrdered className="w-4 h-4 text-blue-400" />, color: 'from-blue-500/20 to-transparent' },
+          { label: 'Played',  value: completedFixtures.length, icon: <Activity className="w-4 h-4 text-emerald-400" />, color: 'from-emerald-500/20 to-transparent' },
+          { label: 'Teams',   value: teams.length, icon: <Users className="w-4 h-4 text-purple-400" />, color: 'from-purple-500/20 to-transparent' },
+          { label: 'Goals',   value: totalGoals, icon: <Goal className="w-4 h-4 text-amber-400" />, color: 'from-amber-500/20 to-transparent' },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className={`bg-[#0a0a12] border border-[#1e1e32] rounded-[2rem] p-6 relative overflow-hidden group`}
+            className={`bg-[#0a0a12] border border-[#1e1e32] rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 relative overflow-hidden group`}
           >
             <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
             <div className="relative z-10">
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{stat.label}</div>
-              <div className="text-4xl font-black text-white tracking-tighter">{stat.value}</div>
+              <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 sm:mb-2 flex items-center gap-1.5">{stat.icon}{stat.label}</div>
+              <div className="text-3xl sm:text-4xl font-black text-white tracking-tighter">{stat.value}</div>
             </div>
           </motion.div>
         ))}
@@ -83,11 +83,11 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column */}
-        <div className="lg:col-span-2 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="lg:col-span-2 space-y-5 sm:space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8">
             {/* Recent Activity */}
-            <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-[2rem] p-8">
-              <div className="flex items-center justify-between mb-8">
+            <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-2xl sm:rounded-[2rem] p-4 sm:p-8">
+              <div className="flex items-center justify-between mb-4 sm:mb-8">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Recent Activity</h3>
                 <Activity className="w-4 h-4 text-indigo-500" />
               </div>
@@ -125,8 +125,8 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
             </div>
 
             {/* Next Engagements */}
-            <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-[2rem] p-8">
-              <div className="flex items-center justify-between mb-8">
+            <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-2xl sm:rounded-[2rem] p-4 sm:p-8">
+              <div className="flex items-center justify-between mb-4 sm:mb-8">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Next Engagements</h3>
                 <Calendar className="w-4 h-4 text-purple-500" />
               </div>
@@ -164,16 +164,16 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
             </div>
           </div>
 
-          {/* Performance Analytics (Placeholder Chart) */}
-          <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-[2rem] p-8">
-            <div className="flex items-center justify-between mb-8">
+          {/* Performance Analytics */}
+          <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-2xl sm:rounded-[2rem] p-4 sm:p-8">
+            <div className="flex items-center justify-between mb-4 sm:mb-8">
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Performance Analytics</h3>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-indigo-500" />
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Title Race Progression</span>
               </div>
             </div>
-            <div className="h-64 flex items-end justify-between gap-2 px-4">
+            <div className="h-40 sm:h-64 flex items-end justify-between gap-2 px-4">
                {/* Mock bars/lines */}
                {[40, 70, 45, 90, 65, 80, 55, 95, 75, 85].map((h, i) => (
                  <div key={i} className="flex-1 bg-indigo-600/10 rounded-t-lg relative group">
@@ -192,11 +192,11 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
         {/* Right Column */}
         <div className="space-y-8">
           {/* Top Scorer Spotlight */}
-          <div className="bg-gradient-to-br from-indigo-900/40 to-[#0a0a12] border border-indigo-500/30 rounded-[2.5rem] p-8 relative overflow-hidden group">
+          <div className="bg-gradient-to-br from-indigo-900/40 to-[#0a0a12] border border-indigo-500/30 rounded-2xl sm:rounded-[2.5rem] p-5 sm:p-8 relative overflow-hidden group">
             <div className="absolute -top-12 -right-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
-            <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center justify-between mb-5 sm:mb-10">
               <h3 className="text-[11px] font-black uppercase tracking-widest text-indigo-400">Golden Boot Race</h3>
-              <Trophy className="w-6 h-6 text-yellow-500 animate-pulse" />
+              <Trophy className="w-5 h-5 text-yellow-500 animate-pulse" />
             </div>
             
             {topScorer ? (
@@ -234,8 +234,8 @@ export function OverviewTab({ tournament }: OverviewTabProps) {
           </div>
 
           {/* Tournament Records */}
-          <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-[2rem] p-8">
-             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-8">Tournament Records</h3>
+          <div className="bg-[#0a0a12] border border-[#1e1e32] rounded-2xl sm:rounded-[2rem] p-5 sm:p-8">
+             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 sm:mb-8">Tournament Records</h3>
              <div className="space-y-6">
                 <div>
                   <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-3">Biggest Margin of Victory</div>

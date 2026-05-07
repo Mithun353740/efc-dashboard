@@ -120,17 +120,18 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
   const sortedRows = getSortedRows();
 
   return (
-    <div className="space-y-6">
-      {/* Filter Tabs */}
-      <div className="flex gap-2 p-1 bg-[#0a0a12] rounded-2xl border border-[#1e1e32]">
+    <div className="space-y-4">
+
+      {/* ── Filter Chips: horizontal scroll on mobile ──────────────── */}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
         {filterTabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setFilter(tab.id)}
-            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            className={`flex-shrink-0 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border ${
               filter === tab.id
-                ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.3)]'
-                : 'text-slate-500 hover:text-slate-300'
+                ? 'bg-indigo-600 border-indigo-500 text-white shadow-[0_0_16px_rgba(99,102,241,0.4)]'
+                : 'bg-[#0a0a12] border-[#1e1e32] text-slate-500 hover:text-white'
             }`}
           >
             {tab.label}
@@ -138,97 +139,144 @@ export function StandingsTab({ tournament }: StandingsTabProps) {
         ))}
       </div>
 
-      {/* Table Header */}
-      <div className="overflow-x-auto no-scrollbar"><div className="min-w-[600px]"><div className="grid grid-cols-[2rem_1fr_auto] items-center text-[9px] font-black uppercase tracking-[0.2em] text-slate-600 px-4 gap-4">
-        <span>#</span>
-        <span>Club</span>
-        <div className="flex gap-6 text-right">
-          {filter === 'cleansheets' ? (
-            <span className="w-8">CS</span>
-          ) : filter === 'home' ? (
-            <><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GF</span><span className="w-8">PTS</span></>
-          ) : filter === 'away' ? (
-            <><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GF</span><span className="w-8">PTS</span></>
-          ) : (
-            <><span className="w-6">P</span><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GD</span><span className="w-8">PTS</span></>
-          )}
+      {/* ── MOBILE TABLE (< lg) ─────────────────────────────────────── */}
+      <div className="lg:hidden">
+        {/* Column header */}
+        <div className="grid grid-cols-[1.25rem_1fr_2.25rem] items-center px-2 pb-2 gap-2">
+          <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest text-center">#</span>
+          <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Team</span>
+          <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest text-right">
+            {filter === 'cleansheets' ? 'CS' : 'PTS'}
+          </span>
         </div>
-      </div></div></div>
 
-      {/* Rows */}
-      <div className="overflow-x-auto no-scrollbar pb-4"><div className="space-y-2 min-w-[600px]">
-        {sortedRows.map((row, i) => {
-          const isTopThree = i < 3;
-          return (
-            <motion.div
-              key={row.team.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-              className={`grid grid-cols-[2rem_1fr_auto] items-center px-4 py-4 rounded-2xl border gap-4 transition-all ${
-                isTopThree
-                  ? 'border-indigo-500/20 bg-indigo-500/5'
-                  : 'border-[#1e1e32] bg-[#0a0a12]'
-              }`}
-            >
-              {/* Position */}
-              <div className="flex items-center justify-center">
-                {getMedal(i)}
-              </div>
+        <div className="space-y-1.5">
+          {sortedRows.map((row, i) => {
+            const isTopThree = i < 3;
+            const player = players.find(p => p.id === row.team.id);
+            const pts  = filter === 'home' ? row.homePts  : filter === 'away' ? row.awayPts  : filter === 'cleansheets' ? row.cs : row.pts;
+            const w    = filter === 'home' ? row.homeWon  : filter === 'away' ? row.awayWon  : row.won;
+            const d    = filter === 'home' ? row.homeDraw : filter === 'away' ? row.awayDraw : row.drawn;
+            const l    = filter === 'home' ? row.homeLost : filter === 'away' ? row.awayLost : row.lost;
+            const played = w + d + l;
+            return (
+              <motion.div
+                key={row.team.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.03 }}
+                className={`px-3 py-2.5 rounded-xl border transition-all ${
+                  isTopThree
+                    ? 'border-indigo-500/20 bg-indigo-500/5'
+                    : 'border-[#1e1e32] bg-[#0a0a12]'
+                }`}
+              >
+                {/* Primary row: position · avatar · name · pts */}
+                <div className="grid grid-cols-[1.25rem_1fr_2.25rem] items-center gap-2">
+                  <div className="flex items-center justify-center">{getMedal(i)}</div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    {player?.image ? (
+                      <img src={player.image} className="w-6 h-6 rounded-lg object-cover border border-[#1e1e32] flex-shrink-0" alt={row.team.name} />
+                    ) : (
+                      <div className="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-[8px] flex-shrink-0">
+                        {(row.team.shortName ?? row.team.name.substring(0, 3)).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="font-black text-xs text-white truncate leading-none">{row.team.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-sm font-black ${filter === 'cleansheets' ? 'text-emerald-400' : 'text-indigo-400'}`}>{pts}</span>
+                  </div>
+                </div>
 
-              {/* Team */}
-              <div className="flex items-center gap-3 min-w-0">
-                {(() => {
-                  const player = players.find(p => p.id === row.team.id);
-                  if (player?.image) {
-                    return <img src={player.image} className="w-9 h-9 rounded-xl object-cover border border-[#1e1e32] flex-shrink-0" alt={row.team.name} />;
-                  }
-                  return (
-                    <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs flex-shrink-0">
-                      {row.team.shortName ?? row.team.name.substring(0, 3).toUpperCase()}
-                    </div>
-                  );
-                })()}
-                <span className="font-black text-sm text-white truncate">{row.team.name}</span>
-              </div>
-
-              {/* Stats */}
-              <div className="flex gap-6 text-right font-black text-sm">
-                {filter === 'cleansheets' ? (
-                  <span className="w-8 text-emerald-400">{row.cs}</span>
-                ) : filter === 'home' ? (
-                  <>
-                    <span className="w-6 text-slate-300">{row.homeWon}</span>
-                    <span className="w-6 text-slate-400">{row.homeDraw}</span>
-                    <span className="w-6 text-slate-500">{row.homeLost}</span>
-                    <span className="w-10 text-slate-400">{row.homeGF}</span>
-                    <span className="w-8 text-indigo-400">{row.homePts}</span>
-                  </>
-                ) : filter === 'away' ? (
-                  <>
-                    <span className="w-6 text-slate-300">{row.awayWon}</span>
-                    <span className="w-6 text-slate-400">{row.awayDraw}</span>
-                    <span className="w-6 text-slate-500">{row.awayLost}</span>
-                    <span className="w-10 text-slate-400">{row.awayGF}</span>
-                    <span className="w-8 text-indigo-400">{row.awayPts}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="w-6 text-slate-400">{row.played}</span>
-                    <span className="w-6 text-slate-300">{row.won}</span>
-                    <span className="w-6 text-slate-400">{row.drawn}</span>
-                    <span className="w-6 text-slate-500">{row.lost}</span>
-                    <span className={`w-10 ${row.gd > 0 ? 'text-emerald-400' : row.gd < 0 ? 'text-red-400' : 'text-slate-500'}`}>
-                      {row.gd > 0 ? '+' : ''}{row.gd}
-                    </span>
-                    <span className="w-8 text-indigo-400">{row.pts}</span>
-                  </>
+                {/* Secondary row: P · W · D · L · GD */}
+                {filter !== 'cleansheets' && (
+                  <div className="flex items-center gap-3 mt-1.5 pl-8">
+                    <span className="text-[9px] font-bold text-slate-600">P <span className="text-slate-400">{filter === 'overall' ? row.played : played}</span></span>
+                    <span className="text-[9px] font-bold text-slate-600">W <span className="text-emerald-400">{w}</span></span>
+                    <span className="text-[9px] font-bold text-slate-600">D <span className="text-slate-400">{d}</span></span>
+                    <span className="text-[9px] font-bold text-slate-600">L <span className="text-red-400">{l}</span></span>
+                    {filter === 'overall' && (
+                      <span className={`text-[9px] font-bold ${row.gd > 0 ? 'text-emerald-400' : row.gd < 0 ? 'text-red-400' : 'text-slate-500'}`}>
+                        GD {row.gd > 0 ? '+' : ''}{row.gd}
+                      </span>
+                    )}
+                  </div>
                 )}
-              </div>
-            </motion.div>
-          );
-        })}
-      </div></div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── DESKTOP TABLE (≥ lg): preserved exactly ─────────────────── */}
+      <div className="hidden lg:block">
+        {/* Table Header */}
+        <div className="overflow-x-auto no-scrollbar"><div className="min-w-[600px]"><div className="grid grid-cols-[2rem_1fr_auto] items-center text-[9px] font-black uppercase tracking-[0.2em] text-slate-600 px-4 gap-4">
+          <span>#</span>
+          <span>Club</span>
+          <div className="flex gap-6 text-right">
+            {filter === 'cleansheets' ? (
+              <span className="w-8">CS</span>
+            ) : filter === 'home' ? (
+              <><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GF</span><span className="w-8">PTS</span></>
+            ) : filter === 'away' ? (
+              <><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GF</span><span className="w-8">PTS</span></>
+            ) : (
+              <><span className="w-6">P</span><span className="w-6">W</span><span className="w-6">D</span><span className="w-6">L</span><span className="w-10">GD</span><span className="w-8">PTS</span></>
+            )}
+          </div>
+        </div></div></div>
+
+        {/* Rows */}
+        <div className="overflow-x-auto no-scrollbar pb-4"><div className="space-y-2 min-w-[600px]">
+          {sortedRows.map((row, i) => {
+            const isTopThree = i < 3;
+            return (
+              <motion.div
+                key={row.team.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
+                className={`grid grid-cols-[2rem_1fr_auto] items-center px-4 py-4 rounded-2xl border gap-4 transition-all ${
+                  isTopThree
+                    ? 'border-indigo-500/20 bg-indigo-500/5'
+                    : 'border-[#1e1e32] bg-[#0a0a12]'
+                }`}
+              >
+                <div className="flex items-center justify-center">{getMedal(i)}</div>
+                <div className="flex items-center gap-3 min-w-0">
+                  {(() => {
+                    const player = players.find(p => p.id === row.team.id);
+                    if (player?.image) {
+                      return <img src={player.image} className="w-9 h-9 rounded-xl object-cover border border-[#1e1e32] flex-shrink-0" alt={row.team.name} />;
+                    }
+                    return (
+                      <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs flex-shrink-0">
+                        {row.team.shortName ?? row.team.name.substring(0, 3).toUpperCase()}
+                      </div>
+                    );
+                  })()}
+                  <span className="font-black text-sm text-white truncate">{row.team.name}</span>
+                </div>
+                <div className="flex gap-6 text-right font-black text-sm">
+                  {filter === 'cleansheets' ? (
+                    <span className="w-8 text-emerald-400">{row.cs}</span>
+                  ) : filter === 'home' ? (
+                    <><span className="w-6 text-slate-300">{row.homeWon}</span><span className="w-6 text-slate-400">{row.homeDraw}</span><span className="w-6 text-slate-500">{row.homeLost}</span><span className="w-10 text-slate-400">{row.homeGF}</span><span className="w-8 text-indigo-400">{row.homePts}</span></>
+                  ) : filter === 'away' ? (
+                    <><span className="w-6 text-slate-300">{row.awayWon}</span><span className="w-6 text-slate-400">{row.awayDraw}</span><span className="w-6 text-slate-500">{row.awayLost}</span><span className="w-10 text-slate-400">{row.awayGF}</span><span className="w-8 text-indigo-400">{row.awayPts}</span></>
+                  ) : (
+                    <><span className="w-6 text-slate-400">{row.played}</span><span className="w-6 text-slate-300">{row.won}</span><span className="w-6 text-slate-400">{row.drawn}</span><span className="w-6 text-slate-500">{row.lost}</span><span className={`w-10 ${row.gd > 0 ? 'text-emerald-400' : row.gd < 0 ? 'text-red-400' : 'text-slate-500'}`}>{row.gd > 0 ? '+' : ''}{row.gd}</span><span className="w-8 text-indigo-400">{row.pts}</span></>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div></div>
+      </div>
+
     </div>
   );
 }
+
