@@ -15,11 +15,12 @@ type View = 'list' | 'setup' | 'dashboard';
 
 interface NativeTournamentPageProps {
   forcePublic?: boolean;
+  adminOverride?: boolean;
 }
 
-export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPageProps = {}) {
+export function NativeTournamentPage({ forcePublic = false, adminOverride = false }: NativeTournamentPageProps = {}) {
   const { systemLocks, tournaments, players } = useFirebase();
-  const isAdmin = forcePublic ? false : localStorage.getItem('adminLoggedIn') === 'true';
+  const isAdmin = forcePublic ? false : (adminOverride || localStorage.getItem('adminLoggedIn') === 'true');
   const isLocked = systemLocks?.tournaments && !isAdmin;
 
   // Registration lock: defaults to locked (true) if undefined in Firestore

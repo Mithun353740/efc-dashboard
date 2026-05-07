@@ -1011,7 +1011,7 @@ export default function Admin() {
                 key="tournaments"
                 className="fixed inset-0 z-[100] bg-[#050508] overflow-auto"
               >
-                <NativeTournamentPage forcePublic={false} />
+                <NativeTournamentPage forcePublic={false} adminOverride={true} />
                 {/* Overlay back button to return to dashboard */}
                 <button 
                   onClick={() => setActiveTab('players')}
