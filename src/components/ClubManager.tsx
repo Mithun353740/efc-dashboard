@@ -9,7 +9,7 @@ import {
   addToShortlist, removeFromShortlist, sendTransferProposal,
   setReleaseClause, removeReleaseClause, triggerReleaseClause,
   calculatePlayerForm, calculateBasePrize, getFormGrade,
-  sendPlayerInboxMessage
+  sendPlayerInboxMessage, applyDirectContract
 } from '../lib/store';
 import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture, AuctionState, ClubInboxMessage, PlayerInboxMessage } from '../types';
 import { getPlayerGrade, GRADE_COLORS, isAdminUser, cn } from '../lib/utils';
@@ -267,52 +267,82 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
       {/* â”€â”€ ROW 1: Training Day Hero + Notifications â”€â”€ */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4">
 
-        {/* Training Day Panel */}
+        {/* Next Matchday Hero Panel */}
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-          className="lg:col-span-3 relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10"
-          style={{ background: 'linear-gradient(135deg, #1a2744 0%, #0f1729 50%, #0a0f1e 100%)' }}
+          className="lg:col-span-3 relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 min-h-[200px]"
+          style={{ background: 'linear-gradient(135deg, #080c18 0%, #0a0e1a 50%, #060810 100%)' }}
         >
-          {/* Yellow accent strip top */}
+          {/* Color accent strip */}
           <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${myClub.primaryColor}, ${myClub.secondaryColor})` }} />
-          
           <div className="p-4 sm:p-6">
-            <div className="flex items-start justify-between mb-4 sm:mb-6">
-              <div>
-                <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-0.5">
-                  {todayStr}
-                </p>
-                <h3 className="text-lg sm:text-2xl font-black text-white uppercase tracking-tight">TRAINING DAY</h3>
-              </div>
-              <div className="px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest"
-                style={{ background: myClub.primaryColor + '30', color: myClub.primaryColor, border: `1px solid ${myClub.primaryColor}40` }}>
-                ACTIVE
-              </div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">NEXT MATCHDAY</p>
             </div>
-
-            {/* Stat Circles Row */}
-            <div className="flex items-center justify-around py-4 sm:py-6">
-              <StatCircle label="FITNESS" value={fitness} color="#4ade80" icon={<Zap size={16} />} />
-              <StatCircle label="SHARPNESS" value={sharpness} color="#f59e0b" icon={<Star size={16} />} />
-              <StatCircle label="MORALE" value={morale} color="#8b5cf6" icon={<TrendingUp size={16} />} />
-            </div>
-
-            {/* Recent form */}
-            <div className="mt-2 flex items-center gap-2">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mr-1">FORM</p>
-              {recentMatches.length === 0 ? (
-                <p className="text-[9px] text-slate-600 font-bold italic">No matches yet</p>
-              ) : recentMatches.map((m, i) => {
-                const win = (m.p1Id === myClub.ownerId && m.p1Score > m.p2Score) || (m.p2Id === myClub.ownerId && m.p2Score > m.p1Score);
-                const draw = m.p1Score === m.p2Score;
+            {(() => {
+              const now = Date.now();
+              const next = clubMatches
+                .filter(m => !m.p1Score && !m.p2Score && (m.p1Id === myClub.ownerId || m.p2Id === myClub.ownerId))
+                .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))[0];
+              const opp = next
+                ? allClubs.find(c => c.ownerId === (next.p1Id === myClub.ownerId ? next.p2Id : next.p1Id))
+                : null;
+              const oppOwnerPlayer = opp ? allClubs.find(c => c.id === opp.id) : null;
+              if (!next) {
                 return (
-                  <div key={i} className={cn('w-6 h-6 rounded flex items-center justify-center text-[9px] font-black',
-                    win ? 'bg-emerald-500 text-black' : draw ? 'bg-amber-500 text-black' : 'bg-red-500/80 text-white')}>
-                    {win ? 'W' : draw ? 'D' : 'L'}
+                  <div className="flex flex-col items-center justify-center py-8 gap-3">
+                    <div className="w-14 h-14 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center">
+                      <Calendar size={24} className="text-slate-500" />
+                    </div>
+                    <p className="text-sm font-black text-slate-500 uppercase tracking-widest">No Fixture Scheduled</p>
+                    <button onClick={() => setActiveTab('tournaments')} className="text-[9px] font-black text-amber-500 uppercase tracking-widest hover:text-amber-400 transition-colors">
+                      View Match Day →
+                    </button>
                   </div>
                 );
-              })}
-            </div>
+              }
+              const isHome = next.p1Id === myClub.ownerId;
+              return (
+                <div className="flex items-center gap-3 sm:gap-6">
+                  {/* My Club */}
+                  <div className="flex flex-col items-center gap-2 flex-1">
+                    <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl border-2 flex items-center justify-center text-white font-black text-lg"
+                      style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}80, ${myClub.secondaryColor}60)`, borderColor: myClub.primaryColor + '80' }}>
+                      {myClub.shortName || myClub.name.slice(0,3).toUpperCase()}
+                    </div>
+                    <p className="text-[9px] font-black text-white uppercase tracking-widest truncate max-w-[80px] text-center">{myClub.name}</p>
+                  </div>
+                  {/* VS badge */}
+                  <div className="flex flex-col items-center gap-1 shrink-0">
+                    <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                      <span className="text-amber-400 font-black text-xs sm:text-sm">VS</span>
+                    </div>
+                    {next.timestamp && (
+                      <p className="text-[8px] font-bold text-slate-500">
+                        {new Date(next.timestamp).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      </p>
+                    )}
+                  </div>
+                  {/* Opponent Club */}
+                  <div className="flex flex-col items-center gap-2 flex-1">
+                    {opp ? (
+                      <>
+                        <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl border-2 flex items-center justify-center text-white font-black text-lg"
+                          style={{ background: `linear-gradient(135deg, ${opp.primaryColor}80, ${opp.secondaryColor}60)`, borderColor: opp.primaryColor + '80' }}>
+                          {opp.shortName || opp.name.slice(0,3).toUpperCase()}
+                        </div>
+                        <p className="text-[9px] font-black text-white uppercase tracking-widest truncate max-w-[80px] text-center">{opp.name}</p>
+                      </>
+                    ) : (
+                      <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center">
+                        <Users size={24} className="text-white/20" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </motion.div>
 
@@ -647,31 +677,53 @@ export default function ClubManager() {
             </div>
           )}
 
-          {/* Manager + Club Name */}
+          {/* Club Info */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              {myPlayer?.image && <img src={myPlayer.image} className="w-5 h-5 rounded-full object-cover border border-white/20" alt="Manager" />}
-              <p className="text-[10px] sm:text-xs font-black text-white uppercase tracking-tight truncate leading-none">
-                {myPlayer?.name || 'MANAGER'}
-              </p>
-            </div>
-            <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate mt-0.5">
+            {/* Club name always top */}
+            <p className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest truncate">
               {myClub?.name || 'No Club Assigned'}
             </p>
+            {/* Owner label or manager label below */}
+            <div className="flex items-center gap-2">
+              {!isOwner && myClub ? (
+                // Player view: show club owner name
+                <p className="text-[10px] sm:text-xs font-bold text-slate-300 truncate leading-none">
+                  Manager: {myClub.ownerName}
+                </p>
+              ) : (
+                // Owner/admin view: show own name
+                <div className="flex items-center gap-2">
+                  {myPlayer?.image && <img src={myPlayer.image} className="w-5 h-5 rounded-full object-cover border border-white/20" alt="Manager" />}
+                  <p className="text-[10px] sm:text-xs font-black text-white uppercase tracking-tight truncate leading-none">
+                    {myPlayer?.name || 'MANAGER'}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* OVR Rating Badge */}
+          {/* Right badge: Player chip OR OVR + Budget */}
           <div className="flex items-center gap-2 shrink-0">
-            <div className="px-2.5 py-1 rounded font-black text-sm sm:text-base text-white leading-none"
-              style={{ background: myClub?.primaryColor || '#8b5cf6' }}>
-              {myPlayer?.ovr || 'â€”'}
-            </div>
-            {/* Budget pill */}
-            {(isOwner || isAdmin) && (
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
-                <DollarSign size={10} className="text-amber-500" />
-                <span className="text-[10px] font-black text-amber-400">{fmtBudget(myClub?.budget || 0)}</span>
+            {!isOwner && myClub ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-purple/20 border border-brand-purple/40 rounded-full">
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-purple animate-pulse" />
+                <span className="text-[10px] font-black text-brand-purple uppercase tracking-widest">
+                  {myPlayer?.name?.split(' ')[0] || 'PLAYER'}
+                </span>
               </div>
+            ) : (
+              <>
+                <div className="px-2.5 py-1 rounded font-black text-sm sm:text-base text-white leading-none"
+                  style={{ background: myClub?.primaryColor || '#8b5cf6' }}>
+                  {myPlayer?.ovr || '—'}
+                </div>
+                {(isOwner || isAdmin) && (
+                  <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
+                    <DollarSign size={10} className="text-amber-500" />
+                    <span className="text-[10px] font-black text-amber-400">{fmtBudget(myClub?.budget || 0)}</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -851,60 +903,93 @@ export default function ClubManager() {
           </motion.div>
         )}
 
-        {/* â”€â”€â”€ Contract Renewal Modal â”€â”€â”€ */}
+
+        {/* ─── Contract Renewal Modal (smart: direct apply if first contract, proposal if existing) ─── */}
         <AnimatePresence>
-          {proposalStep === 'renewal' && shortlistPlayer && myClub && (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-              <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0a14] border border-white/10 rounded-3xl p-8 z-10">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <p className="text-[10px] font-black text-brand-purple uppercase tracking-[0.2em]">Contract Management</p>
-                    <h3 className="text-xl font-black text-white italic truncate uppercase">Renew {shortlistPlayer.name}</h3>
+          {proposalStep === 'renewal' && shortlistPlayer && myClub && (() => {
+            const hasNoContract = !shortlistPlayer.clubContract || (shortlistPlayer.clubContract.amount || 0) === 0;
+            return (
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0a14] border border-white/10 rounded-3xl p-8 z-10">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: hasNoContract ? '#f59e0b' : '#8b5cf6' }}>
+                        {hasNoContract ? '⚡ FIRST CONTRACT' : 'Contract Renewal'}
+                      </p>
+                      <h3 className="text-xl font-black text-white italic truncate uppercase">{shortlistPlayer.name}</h3>
+                    </div>
+                    <button onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="p-2 text-slate-500 hover:text-white"><X size={20} /></button>
                   </div>
-                  <button onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="p-2 text-slate-500 hover:text-white"><X size={20} /></button>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Bonus Amount (VCC)</label>
-                    <input type="number" value={offerAmount} onChange={e => setOfferAmount(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-brand-purple" placeholder="e.g. 500,000" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Duration (Matches)</label>
-                    <select value={offerDuration} onChange={e => setOfferDuration(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-brand-purple">
-                      <option value="1">1 Match</option>
-                      <option value="3">3 Matches</option>
-                      <option value="5">5 Matches</option>
-                      <option value="10">10 Matches</option>
-                      <option value="25">FULL SEASON (25)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="mt-8 grid grid-cols-2 gap-4">
-                  <button onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="py-4 bg-white/5 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Cancel</button>
-                  <button onClick={async () => {
-                    if (!offerAmount || !offerDuration) return;
-                    setLoading(true);
-                    try {
-                      await sendPlayerInboxMessage({
-                        recipientId: shortlistPlayer.id,
-                        senderId: playerId,
-                        type: 'contract_renewal',
-                        title: 'New Contract Offer Received',
-                        body: `Your club owner, ${myClub.ownerName}, has offered you a new contract renewal for ${offerDuration} matches with a ${Number(offerAmount).toLocaleString()} VCC bonus.`,
-                        data: { clubId: myClub.id, clubName: myClub.name, salary: Number(offerAmount), duration: Number(offerDuration) }
-                      });
-                      setMsg({ text: 'âœ… Renewal offer sent!', type: 'success' });
-                      setProposalStep(null); setShortlistPlayer(null);
-                    } catch(e: any) { setMsg({ text: 'âŒ ' + e.message, type: 'error' }); }
-                    finally { setLoading(false); }
-                  }} className="py-4 bg-brand-purple text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-purple/20 transition-all">Send Offer</button>
-                </div>
-              </motion.div>
-            </div>
-          )}
+                  {hasNoContract ? (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                        <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Auto-Apply Contract</p>
+                        <p className="text-xs text-slate-300 font-bold">
+                          First-time contract — terms set in the Control Center are applied instantly. No proposal needed.
+                        </p>
+                        <p className="text-[10px] font-black text-amber-300 mt-2 uppercase tracking-widest">
+                          Type: {config?.defaultContractType || 'matches'} · Amount: {config?.defaultContractAmount || 5}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="py-4 bg-white/5 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest">Cancel</button>
+                        <button onClick={async () => {
+                          if (!config) return;
+                          setLoading(true);
+                          try {
+                            await applyDirectContract(shortlistPlayer.id, config);
+                            setMsg({ text: '✅ Contract applied!', type: 'success' });
+                            setProposalStep(null); setShortlistPlayer(null);
+                          } catch(e) { setMsg({ text: '❌ ' + e.message, type: 'error' }); }
+                          finally { setLoading(false); }
+                        }} className="py-4 bg-amber-500 text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20">
+                          Apply Contract
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Bonus Amount (VCC)</label>
+                        <input type="number" value={offerAmount} onChange={e => setOfferAmount(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-brand-purple" placeholder="e.g. 500,000" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Duration (Matches)</label>
+                        <select value={offerDuration} onChange={e => setOfferDuration(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-brand-purple">
+                          <option value="1">1 Match</option>
+                          <option value="3">3 Matches</option>
+                          <option value="5">5 Matches</option>
+                          <option value="10">10 Matches</option>
+                          <option value="25">FULL SEASON (25)</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button onClick={() => { setProposalStep(null); setShortlistPlayer(null); }} className="py-4 bg-white/5 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest">Cancel</button>
+                        <button onClick={async () => {
+                          if (!offerAmount || !offerDuration) return;
+                          setLoading(true);
+                          try {
+                            await sendPlayerInboxMessage({
+                              recipientId: shortlistPlayer.id,
+                              senderId: playerId,
+                              type: 'contract_renewal',
+                              title: 'Contract Renewal Offer',
+                              body: myClub.ownerName + ' has offered you a renewal: ' + offerDuration + ' matches · ' + Number(offerAmount).toLocaleString() + ' VCC bonus.',
+                              data: { clubId: myClub.id, clubName: myClub.name, salary: Number(offerAmount), duration: Number(offerDuration) }
+                            });
+                            setMsg({ text: '✅ Renewal offer sent to player!', type: 'success' });
+                            setProposalStep(null); setShortlistPlayer(null);
+                          } catch(e) { setMsg({ text: '❌ ' + e.message, type: 'error' }); }
+                          finally { setLoading(false); }
+                        }} className="py-4 bg-brand-purple text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-purple/20">Send Offer</button>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              </div>
+            );
+          })()}
         </AnimatePresence>
         <AnimatePresence>
           {proposalStep && shortlistPlayer && myClub && (() => {

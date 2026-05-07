@@ -1344,7 +1344,7 @@ export async function purchasePlayer(
     squadIds: sellerClub.squadIds.filter(id => id !== listing.playerId),
   });
 
-  // Update player
+  // Update player — reset club-scoped stats & contract so first renewal is direct
   batch.update(doc(db, 'players', listing.playerId), {
     clubId: buyerClub.id,
     clubName: buyerClub.name,
@@ -1352,6 +1352,8 @@ export async function purchasePlayer(
     secondaryColor: buyerClub.secondaryColor,
     isListed: false,
     listingPrice: null,
+    clubContract: null,
+    clubStats: { goals: 0, matches: 0, wins: 0, losses: 0, draws: 0 },
   });
 
   // Delete listing
@@ -1466,26 +1468,47 @@ export async function updateFixtureSubMatch(
     status: allCompleted ? 'completed' : fixture.status 
   });
 
-  // If the fixture is completed, deduct matches from contracts for all participants
-  if (allCompleted && config.contractsActive && config.defaultContractType === 'matches') {
+  // When fixture completes: update global stats (affects ranking) + club-scoped stats + deduct contracts
+  if (allCompleted) {
     const allParticipantIds = [...new Set([
       ...newSubMatches.map(sm => sm.p1Id),
       ...newSubMatches.map(sm => sm.p2Id)
     ])];
-    
-    // Fetch each participant doc individually G�� more reads but correct.
-    // Using FieldValue.increment is not possible here since we need to check if amount hits 0.
-    // Each fixture has at most lineupSize*2 participants, typically 4-10 reads max.
     const playerFetches = allParticipantIds.map(pid => getDoc(doc(db, 'players', pid)));
     const playerSnaps = await Promise.all(playerFetches);
     playerSnaps.forEach(docSnap => {
       if (!docSnap.exists()) return;
       const p = docSnap.data() as import('../types').Player;
-      if (p.clubContract && p.clubContract.type === 'matches' && p.clubContract.amount > 0) {
-        batch.update(docSnap.ref, {
-          'clubContract.amount': p.clubContract.amount - 1
-        });
+      const updates: Record<string, any> = {};
+      // Contract deduction
+      if (config.contractsActive && config.defaultContractType === 'matches'
+          && p.clubContract && p.clubContract.type === 'matches' && p.clubContract.amount > 0) {
+        updates['clubContract.amount'] = p.clubContract.amount - 1;
       }
+      // Aggregate sub-match results for this player
+      let wG = 0, lG = 0, dG = 0, goalsG = 0, concG = 0;
+      newSubMatches.forEach(sm => {
+        const isP1 = sm.p1Id === p.id;
+        const isP2 = sm.p2Id === p.id;
+        if ((!isP1 && !isP2) || sm.p1Score === null || sm.p2Score === null) return;
+        const mine = isP1 ? sm.p1Score : sm.p2Score;
+        const opp  = isP1 ? sm.p2Score : sm.p1Score;
+        goalsG += mine; concG += opp;
+        if (mine > opp) wG++; else if (mine < opp) lG++; else dG++;
+      });
+      if (wG + lG + dG > 0) {
+        updates.win  = (p.win  || 0) + wG;
+        updates.loss = (p.loss || 0) + lG;
+        updates.draw = (p.draw || 0) + dG;
+        updates.goalsScored   = (p.goalsScored   || 0) + goalsG;
+        updates.goalsConceded = (p.goalsConceded || 0) + concG;
+        updates['clubStats.matches'] = ((p as any).clubStats?.matches || 0) + wG + lG + dG;
+        updates['clubStats.wins']    = ((p as any).clubStats?.wins    || 0) + wG;
+        updates['clubStats.losses']  = ((p as any).clubStats?.losses  || 0) + lG;
+        updates['clubStats.draws']   = ((p as any).clubStats?.draws   || 0) + dG;
+        updates['clubStats.goals']   = ((p as any).clubStats?.goals   || 0) + goalsG;
+      }
+      if (Object.keys(updates).length > 0) batch.update(docSnap.ref, updates);
     });
   }
 
@@ -1680,7 +1703,7 @@ export async function adminConfirmSold(currentState: AuctionState, winningClub: 
     budget: winningClub.budget - currentState.currentBid,
     squadIds: arrayUnion(currentState.currentPlayer.id)
   });
-  // Transfer player to new club
+  // Transfer player to new club — reset club-scoped stats & contract so first renewal is direct
   batch.update(doc(db, 'players', currentState.currentPlayer.id), {
     clubId: winningClub.id,
     clubName: winningClub.name,
@@ -1688,11 +1711,29 @@ export async function adminConfirmSold(currentState: AuctionState, winningClub: 
     secondaryColor: winningClub.secondaryColor,
     isListed: false,
     listingPrice: null,
+    clubContract: null,
+    clubStats: { goals: 0, matches: 0, wins: 0, losses: 0, draws: 0 },
   });
   // Mark auction as sold
   batch.set(AUCTION_DOC, { status: 'sold', soldAt: Date.now() }, { merge: true });
   await batch.commit();
   
+}
+
+/**
+ * Apply a contract directly to a player (first-time, no proposal needed).
+ * The contract terms come from the Control Center config defaults.
+ */
+export async function applyDirectContract(
+  playerId: string,
+  config: import('../types').ClubSystemConfig
+): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+  const type = config.defaultContractType || 'matches';
+  const amount = config.defaultContractAmount || 5;
+  await updateDoc(doc(db, 'players', playerId), {
+    clubContract: { type, amount }
+  });
 }
 
 /** Admin: Skip the current player (unsold / folded). */
