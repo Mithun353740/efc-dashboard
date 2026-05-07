@@ -325,6 +325,10 @@ export interface ClubFixture {
   status: 'scheduled' | 'lineups_pending' | 'matchups_pending' | 'active' | 'completed';
   homeLineupIds: string[]; // players selected by Home owner
   awayLineupIds: string[]; // players selected by Away owner
+  homeSubsUsed?: number;
+  awaySubsUsed?: number;
+  homeSwappedIds?: string[]; // IDs of players involved in a swap (in or out)
+  awaySwappedIds?: string[]; // IDs of players involved in a swap (in or out)
   subMatches: ClubFixtureSubMatch[]; // the actual 1v1 pairings
   createdAt: number;
   deadline?: number; // specific fixture deadline

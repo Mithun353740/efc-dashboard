@@ -1721,6 +1721,7 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
   const [lineupSelection, setLineupSelection] = useState<string[]>([]);
   const [matchupSelection, setMatchupSelection] = useState<Record<string, string>>({}); // { awayId: homeId }
   const [submitting, setSubmitting] = useState(false);
+  const [swapModal, setSwapModal] = useState<{ fixture: ClubFixture, subMatchId: string, outPlayerId: string } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -1823,6 +1824,59 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
     setSubmitting(false);
   };
 
+  
+  const handleExecuteSwap = async (inPlayerId: string) => {
+    if (!swapModal || !myClub) return;
+    setSubmitting(true);
+    try {
+      const f = swapModal.fixture;
+      const isHome = f.homeClubId === myClub.id;
+      
+      const inPlayer = squad.find(p => p.id === inPlayerId);
+      if (!inPlayer) throw new Error("Player not found");
+
+      const nf = { ...f };
+      const subArr = isHome ? (nf.homeSwappedIds || []) : (nf.awaySwappedIds || []);
+      
+      // Update subMatches
+      nf.subMatches = nf.subMatches.map(sm => {
+        if (sm.id === swapModal.subMatchId) {
+          if (isHome) {
+            return { ...sm, p1Id: inPlayer.id, p1Name: inPlayer.name || 'Unknown' };
+          } else {
+            return { ...sm, p2Id: inPlayer.id, p2Name: inPlayer.name || 'Unknown' };
+          }
+        }
+        return sm;
+      });
+
+      // Update lineupIds
+      if (isHome) {
+        nf.homeLineupIds = nf.homeLineupIds.filter(id => id !== swapModal.outPlayerId).concat(inPlayer.id);
+        nf.homeSubsUsed = (nf.homeSubsUsed || 0) + 1;
+        nf.homeSwappedIds = [...subArr, swapModal.outPlayerId, inPlayer.id];
+      } else {
+        nf.awayLineupIds = nf.awayLineupIds.filter(id => id !== swapModal.outPlayerId).concat(inPlayer.id);
+        nf.awaySubsUsed = (nf.awaySubsUsed || 0) + 1;
+        nf.awaySwappedIds = [...subArr, swapModal.outPlayerId, inPlayer.id];
+      }
+
+      await saveClubFixture(nf);
+      setFixtures(prev => {
+        const updated = prev.map(x => x.id === f.id ? nf : x);
+        if (config?.season && _tournamentsCache[config.season]) {
+          _tournamentsCache[config.season].fixtures = updated;
+        }
+        return updated;
+      });
+      setSwapModal(null);
+      setMsg({ text: '✅ Swap successful!', type: 'success' });
+    } catch (e: any) {
+      setMsg({ text: '❌ ' + e.message, type: 'error' });
+    }
+    setSubmitting(false);
+  };
+  
   const handleSubmitMatchups = async (f: ClubFixture) => {
     if (!myClub) return;
     setSubmitting(true);

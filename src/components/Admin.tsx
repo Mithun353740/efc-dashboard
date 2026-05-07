@@ -2919,6 +2919,17 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                 </div>
               </div>
             </div>
+            {/* Tactical constraints */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+               <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Lineup Size (e.g. 4 for 4v4)</label>
+                  <input type="number" value={fForm.lineupSize} onChange={e => setFForm({...fForm, lineupSize: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Sub/Swap Limit</label>
+                  <input type="number" value={fForm.subLimit} onChange={e => setFForm({...fForm, subLimit: e.target.value})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-amber-500 outline-none" />
+               </div>
+            </div>
             {/* Additional scheduling options */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                <div className="space-y-1">
