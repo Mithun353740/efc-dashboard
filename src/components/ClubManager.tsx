@@ -1769,6 +1769,11 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
   const activeTourneyIds = [...new Set(fixtures.map(f => f.tournamentId))];
 
   const handleSelectLineup = (playerId: string, max: number) => {
+    // Contract check inside handleSelectLineup
+    if (config?.contractsActive) {
+      const p = squad.find(x => x.id === playerId);
+      if (!p || !p.clubContract || p.clubContract.amount <= 0) return;
+    }
     if (lineupSelection.includes(playerId)) {
       setLineupSelection(lineupSelection.filter(id => id !== playerId));
     } else if (lineupSelection.length < max) {
@@ -2034,7 +2039,20 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
                 <div className="space-y-2">
                   <p className="text-[9px] font-black text-amber-500 uppercase text-center">SELECT {f.lineupSize} PLAYERS</p>
                   <div className="flex flex-wrap gap-1 justify-center">
-                    {squad.map(p => { const sel = lineupSelection.includes(p.id); return <button key={p.id} onClick={() => handleSelectLineup(p.id, f.lineupSize)} className={cn('px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase border', sel ? 'bg-amber-500 border-amber-500 text-black' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10')}>{p.name?.split(' ')?.[0]} {sel && 'âœ“'}</button>; })}
+                    {squad.map(p => { 
+  const sel = lineupSelection.includes(p.id); 
+  const hasContract = !config?.contractsActive || (p.clubContract && p.clubContract.amount > 0);
+  return (
+    <button key={p.id} onClick={() => handleSelectLineup(p.id, f.lineupSize)} disabled={!hasContract}
+      className={cn('px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase border disabled:opacity-30 disabled:cursor-not-allowed', 
+      sel ? 'bg-amber-500 border-amber-500 text-black' : 
+      !hasContract ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10')}
+      title={!hasContract ? "Contract Expired" : ""}
+    >
+      {p.name?.split(' ')?.[0]} {sel && '✓'} {!hasContract && '🔒'}
+    </button>
+  ); 
+})}
                   </div>
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => setSelFixtureId(null)} className="flex-1 py-2 bg-white/5 rounded-xl text-[9px] font-black uppercase text-slate-400">CANCEL</button>
@@ -2061,6 +2079,7 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
   };
 
   return (
+    <>
     <div className="space-y-5">
       {/* Tournament Header */}
       <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#0f172a]">
@@ -2159,5 +2178,53 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
           : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{tFix.map(f => renderFixtureCard(f))}</div>
       )}
     </div>
+
+      {/* Swap Modal overlay */}
+      {swapModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-1 text-center">SUBSTITUTE PLAYER</h3>
+            <p className="text-[10px] font-black text-amber-500 text-center uppercase tracking-widest mb-6">Select bench player to swap in</p>
+            
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2 mb-6">
+              {squad.filter(p => {
+                const f = swapModal.fixture;
+                const isHome = f.homeClubId === myClub?.id;
+                const activeIds = isHome ? f.homeLineupIds : f.awayLineupIds;
+                const swappedIds = isHome ? (f.homeSwappedIds || []) : (f.awaySwappedIds || []);
+                return !activeIds.includes(p.id) && !swappedIds.includes(p.id);
+              }).length === 0 ? (
+                <p className="text-center text-xs font-black text-slate-500 uppercase py-8">NO ELIGIBLE BENCH PLAYERS</p>
+              ) : squad.filter(p => {
+                const f = swapModal.fixture;
+                const isHome = f.homeClubId === myClub?.id;
+                const activeIds = isHome ? f.homeLineupIds : f.awayLineupIds;
+                const swappedIds = isHome ? (f.homeSwappedIds || []) : (f.awaySwappedIds || []);
+                return !activeIds.includes(p.id) && !swappedIds.includes(p.id);
+              }).map(p => {
+                const hasContract = !config?.contractsActive || (p.clubContract && p.clubContract.amount > 0);
+                return (
+                  <button key={p.id} onClick={() => handleExecuteSwap(p.id)} disabled={submitting || !hasContract}
+                    className={cn("w-full flex items-center justify-between p-3 rounded-xl border transition-colors disabled:opacity-50", hasContract ? "border-white/5 bg-white/5 hover:bg-white/10" : "border-red-500/20 bg-red-500/10 cursor-not-allowed")}>
+                    <div className="flex items-center gap-3">
+                      <span className={cn("text-xs font-black uppercase", hasContract ? "text-white" : "text-red-400")}>{p.name}</span>
+                      <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">OVR {p.ovr}</span>
+                    </div>
+                    <span className={cn("text-[9px] font-black uppercase tracking-widest", hasContract ? "text-slate-400" : "text-red-500")}>
+                      {hasContract ? "SWAP IN" : "NO CONTRACT"}
+                    </span>
+                  </button>
+                ); 
+              })}
+            </div>
+
+            <button onClick={() => setSwapModal(null)} className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest transition-colors">
+              CANCEL
+            </button>
+          </div>
+        </div>
+      )}
+
+    </>
   );
 }
