@@ -1217,8 +1217,20 @@ export default function ClubManager() {
           })()}
         </AnimatePresence>
       </div>
-    </div>
-  );
+    );
+  } catch (err) {
+    console.error("ClubManager Global Crash:", err);
+    return (
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 text-center">
+        <div className="space-y-4">
+          <AlertCircle size={48} className="text-red-500 mx-auto" />
+          <h2 className="text-xl font-black text-white uppercase tracking-widest">Zone Error</h2>
+          <p className="text-xs text-slate-500 font-bold italic">Something went wrong while initializing the Club Zone. Please try a hard refresh.</p>
+          <div className="text-[8px] text-slate-700 font-mono mt-4">v1.3 Error Detected</div>
+        </div>
+      </div>
+    );
+  }
 }
 
 
@@ -2284,19 +2296,5 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
       )}
 
     </>
-      </div>
-    );
-  } catch (err) {
-    console.error("ClubManager Global Crash:", err);
-    return (
-      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 text-center">
-        <div className="space-y-4">
-          <AlertCircle size={48} className="text-red-500 mx-auto" />
-          <h2 className="text-xl font-black text-white uppercase tracking-widest">Zone Error</h2>
-          <p className="text-xs text-slate-500 font-bold italic">Something went wrong while initializing the Club Zone. Please try a hard refresh.</p>
-          <div className="text-[8px] text-slate-700 font-mono mt-4">v1.3 Error Detected</div>
-        </div>
-      </div>
-    );
-  }
+  );
 }
