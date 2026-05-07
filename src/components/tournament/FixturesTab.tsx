@@ -20,6 +20,9 @@ interface ScoreEntry {
   fixtureId: string;
   home: string;
   away: string;
+  date: string;
+  time: string;
+  venue: string;
 }
 
 // Fisher-Yates shuffle (returns a NEW array)
@@ -45,8 +48,8 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
   const [isGenerating, setIsGenerating] = useState(false);
   const [genMsg, setGenMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  // Registration must be LOCKED (tournamentRegistration !== false means locked, since default is locked)
-  const registrationLocked = systemLocks?.tournamentRegistration !== false;
+  // Admin can always generate fixtures regardless of registration lock state
+  const registrationLocked = isAdmin || systemLocks?.tournamentRegistration !== false;
   const teams = tournament.teams || [];
   const hasFixtures = fixtures.length > 0;
 
@@ -122,25 +125,34 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
   const handleSaveScore = async () => {
     if (!editingScore) return;
     setSaving(true);
-    const home = parseInt(editingScore.home);
-    const away = parseInt(editingScore.away);
-    if (isNaN(home) || isNaN(away)) { setSaving(false); return; }
 
-    const updatedFixtures = fixtures.map(f =>
-      f.id === editingScore.fixtureId
-        ? { ...f, homeScore: home, awayScore: away, status: 'completed' as const, updatedAt: Date.now() }
-        : f
-    );
+    const homeNum = editingScore.home !== '' ? parseInt(editingScore.home) : null;
+    const awayNum = editingScore.away !== '' ? parseInt(editingScore.away) : null;
+    const hasValidScore = homeNum !== null && awayNum !== null && !isNaN(homeNum) && !isNaN(awayNum);
 
-    const fixture = fixtures.find(f => f.id === editingScore.fixtureId);
-    if (fixture && fixture.status !== 'completed') {
-      const p1 = players.find(p => p.id === fixture.homeId);
-      const p2 = players.find(p => p.id === fixture.awayId);
-      if (p1) {
-        try {
-          await addMatch(p1, home, away, p2, matches, tournament.name);
-        } catch (err) {
-          console.error('Failed to link tournament match to global stats:', err);
+    const updatedFixtures = fixtures.map(f => {
+      if (f.id !== editingScore.fixtureId) return f;
+      return {
+        ...f,
+        ...(hasValidScore ? { homeScore: homeNum, awayScore: awayNum, status: 'completed' as const } : {}),
+        date: editingScore.date || null,
+        time: editingScore.time || null,
+        venue: editingScore.venue || null,
+        updatedAt: Date.now(),
+      };
+    });
+
+    if (hasValidScore) {
+      const fixture = fixtures.find(f => f.id === editingScore.fixtureId);
+      if (fixture && fixture.status !== 'completed') {
+        const p1 = players.find(p => p.id === fixture.homeId);
+        const p2 = players.find(p => p.id === fixture.awayId);
+        if (p1) {
+          try {
+            await addMatch(p1, homeNum!, awayNum!, p2, matches, tournament.name);
+          } catch (err) {
+            console.error('Failed to link tournament match to global stats:', err);
+          }
         }
       }
     }
@@ -155,6 +167,15 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
   const handleResetScore = async (fixtureId: string) => {
     const updatedFixtures = fixtures.map(f =>
       f.id === fixtureId ? { ...f, homeScore: null, awayScore: null, status: 'upcoming' as const } : f
+    );
+    const updated: Tournament = { ...tournament, fixtures: updatedFixtures };
+    await saveTournament(updated);
+    onUpdate(updated);
+  };
+
+  const handleSetLive = async (fixtureId: string) => {
+    const updatedFixtures = fixtures.map(f =>
+      f.id === fixtureId ? { ...f, status: 'live' as const } : f
     );
     const updated: Tournament = { ...tournament, fixtures: updatedFixtures };
     await saveTournament(updated);
@@ -268,8 +289,8 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
               )}
             </div>
 
-            {/* Registration-locked warning */}
-            {!registrationLocked && (
+            {/* Registration-locked warning — only shown for non-admin when registration is open */}
+            {!isAdmin && !registrationLocked && (
               <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
                 <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
                 <div>
@@ -400,7 +421,9 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
                       className={`rounded-2xl border transition-all ${
-                        isDone ? 'border-emerald-500/15 bg-emerald-500/5' : 'border-[#1e1e32] bg-[#0a0a12]'
+                        f.status === 'live' ? 'border-yellow-500/30 bg-yellow-500/5'
+                        : isDone ? 'border-emerald-500/15 bg-emerald-500/5'
+                        : 'border-[#1e1e32] bg-[#0a0a12]'
                       }`}
                     >
                       <div className="p-5 flex items-center gap-4">
@@ -476,7 +499,7 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
 
                         {/* Admin Actions */}
                         {isAdmin && (
-                          <div className="ml-4 flex gap-1.5">
+                          <div className="ml-2 flex gap-1.5 flex-shrink-0">
                             {isEditing ? (
                               <>
                                 <button
@@ -500,15 +523,29 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
                                     fixtureId: f.id,
                                     home: f.homeScore?.toString() ?? '',
                                     away: f.awayScore?.toString() ?? '',
+                                    date: f.date ?? '',
+                                    time: f.time ?? '',
+                                    venue: f.venue ?? '',
                                   })}
                                   className="w-8 h-8 rounded-lg bg-[#0f0f1a] border border-[#1e1e32] text-slate-400 flex items-center justify-center hover:border-indigo-500/50 hover:text-white transition-all"
+                                  title="Edit score & details"
                                 >
                                   <Edit3 className="w-3.5 h-3.5" />
                                 </button>
-                                {isDone && (
+                                {!isDone && f.status !== 'live' && (
+                                  <button
+                                    onClick={() => handleSetLive(f.id)}
+                                    className="w-8 h-8 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 flex items-center justify-center hover:bg-yellow-500/20 transition-all"
+                                    title="Set as Live"
+                                  >
+                                    <Zap className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                {(isDone || f.status === 'live') && (
                                   <button
                                     onClick={() => handleResetScore(f.id)}
                                     className="w-8 h-8 rounded-lg bg-[#0f0f1a] border border-[#1e1e32] text-slate-500 flex items-center justify-center hover:border-red-500/50 hover:text-red-400 transition-all"
+                                    title="Reset to Upcoming"
                                   >
                                     <X className="w-3.5 h-3.5" />
                                   </button>
@@ -518,7 +555,67 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
                           </div>
                         )}
                       </div>
+
+                      {/* ── Date / Time / Venue editing (admin, while editing) ── */}
+                      {isAdmin && isEditing && (
+                        <div className="px-5 pb-4 pt-0 border-t border-[#1e1e32] space-y-2">
+                          <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest pt-3">Schedule Details</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[8px] font-black text-slate-600 uppercase tracking-widest block mb-1">Date</label>
+                              <input
+                                type="date"
+                                value={editingScore?.date ?? ''}
+                                onChange={e => setEditingScore(prev => prev ? { ...prev, date: e.target.value } : prev)}
+                                className="w-full bg-[#050508] border border-[#1e1e32] rounded-lg px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-indigo-500/50 text-slate-300"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[8px] font-black text-slate-600 uppercase tracking-widest block mb-1">Time</label>
+                              <input
+                                type="time"
+                                value={editingScore?.time ?? ''}
+                                onChange={e => setEditingScore(prev => prev ? { ...prev, time: e.target.value } : prev)}
+                                className="w-full bg-[#050508] border border-[#1e1e32] rounded-lg px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-indigo-500/50 text-slate-300"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-black text-slate-600 uppercase tracking-widest block mb-1">Venue</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Main Pitch"
+                              value={editingScore?.venue ?? ''}
+                              onChange={e => setEditingScore(prev => prev ? { ...prev, venue: e.target.value } : prev)}
+                              className="w-full bg-[#050508] border border-[#1e1e32] rounded-lg px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-indigo-500/50 placeholder:text-slate-700"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── Date / Time / Venue display (when set, not editing) ── */}
+                      {!isEditing && (f.date || f.time || f.venue) && (
+                        <div className="px-5 pb-3 pt-0 flex items-center gap-3 flex-wrap">
+                          {f.date && (
+                            <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">
+                              📅 {f.date}
+                            </span>
+                          )}
+                          {f.time && (
+                            <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">
+                              🕐 {f.time}
+                            </span>
+                          )}
+                          {f.venue && (
+                            <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">
+                              📍 {f.venue}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </motion.div>
+
+
                   );
                 })
               )}

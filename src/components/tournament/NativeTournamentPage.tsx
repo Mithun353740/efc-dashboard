@@ -39,6 +39,11 @@ export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPa
   const [activeTab, setActiveTab] = useState<'live' | 'rankings' | 'history'>('live');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Admin-visible tabs: no rankings/standings (managed in tournament dashboard)
+  const visibleTabs = (isAdmin
+    ? ['live', 'history']
+    : ['live', 'rankings', 'history']) as ('live' | 'rankings' | 'history')[];
+
   // Registration modal state
   const [regModal, setRegModal] = useState<{ tournament: Tournament } | null>(null);
   const [regLoading, setRegLoading] = useState(false);
@@ -123,7 +128,7 @@ export function NativeTournamentPage({ forcePublic = false }: NativeTournamentPa
       {view === 'list' && (
         <div className="sticky top-0 z-[40] bg-[#050508]/90 backdrop-blur-md border-b border-white/5">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar px-4 py-3 sm:justify-center">
-            {(['live', 'rankings', 'history'] as const).map(tab => (
+            {visibleTabs.map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
