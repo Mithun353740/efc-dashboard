@@ -3588,9 +3588,15 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                   <input type="number" value={config.currentMatchday} onChange={e => setConfig({...config, currentMatchday: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none" />
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Total Matchdays</label>
-                <input type="number" value={config.totalMatchdays} onChange={e => setConfig({...config, totalMatchdays: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">Total Matchdays</label>
+                  <input type="number" value={config.totalMatchdays} onChange={e => setConfig({...config, totalMatchdays: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black tracking-widest text-amber-500 uppercase">MD Deadline</label>
+                  <input type="datetime-local" value={config.currentMatchdayDeadline ? new Date(config.currentMatchdayDeadline - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''} onChange={e => setConfig({...config, currentMatchdayDeadline: e.target.value ? new Date(e.target.value).getTime() : undefined})} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold text-amber-400 focus:border-amber-500 outline-none" />
+                </div>
               </div>
             </div>
             <div className="space-y-4">

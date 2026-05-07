@@ -339,6 +339,7 @@ export interface ClubSystemConfig {
   deadlineDayActive?: boolean;      // true if "Deadline Day" mode is on
   auctionActive?: boolean;         // true if live auction mode is on
   currentMatchday: number;
+  currentMatchdayDeadline?: number; // Deadline for the global current matchday
   totalMatchdays: number;
   matchdaySchedule: MatchdaySlot[];
   linkedTournamentId?: string;      // optional link to a tournament
