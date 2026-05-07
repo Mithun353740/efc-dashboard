@@ -80,7 +80,8 @@ export default function Login() {
         localStorage.setItem('playerLoggedIn', 'true');
         localStorage.setItem('playerId', playerDoc.id);
         localStorage.setItem('playerName', playerData.name);
-        localStorage.setItem('userType', 'player');
+        localStorage.setItem('playerRole', playerData.role || 'player');
+        localStorage.setItem('userType', playerData.role === 'admin' ? 'admin' : 'player');
 
         // Always ensure a Firebase Auth session for security rules
         try {
@@ -107,9 +108,10 @@ export default function Login() {
 
         // Notify Navbar that auth state changed (same-tab storage events don't fire automatically)
         window.dispatchEvent(new StorageEvent('storage', { key: 'playerLoggedIn', newValue: 'true' }));
-        window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: 'player' }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: playerData.role === 'admin' ? 'admin' : 'player' }));
 
-        navigate('/');
+        // Player-admins go directly to Control Center
+        navigate(playerData.role === 'admin' ? '/admin' : '/');
       } else {
         setError('Invalid player email or password');
       }

@@ -31,6 +31,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Returns true for BOTH admin authentication paths:
+ *  1. Password/Google admin login  → localStorage.adminLoggedIn === 'true'
+ *  2. Player with role='admin'     → localStorage.playerRole === 'admin'
+ * Use this everywhere instead of checking adminLoggedIn directly.
+ */
+export function isAdminUser(): boolean {
+  return (
+    localStorage.getItem('adminLoggedIn') === 'true' ||
+    localStorage.getItem('playerRole') === 'admin'
+  );
+}
+
+
 export function getSeasonInfo(date: Date) {
   let start = new Date(2026, 3, 17, 0, 0, 0, 0); // April 17, 2026 (Anchor)
   if (date >= start) {
