@@ -25,9 +25,7 @@ export function invalidateClubCache() { _clubCache = null; }
 
 // â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ');
-}
+
 
 function fmtBudget(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -592,6 +590,7 @@ export default function ClubManager() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [config, setConfig] = useState<ClubSystemConfig | null>(null);
   const [listings, setListings] = useState<MarketListing[]>([]);
+  const [fixtures, setFixtures] = useState<ClubFixture[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'squad' | 'market' | 'rankings' | 'tournaments' | 'auction' | 'inbox'>('overview');
   const [msg, setMsg] = useState({ text: '', type: '' });
@@ -637,6 +636,12 @@ export default function ClubManager() {
       if (cfg) setConfig(cfg);
       setListings(ls);
       setClubs(cs || []);
+      
+      // Fetch fixtures if we have a season
+      if (cfg?.season) {
+        const fs = await fetchClubFixtures(cfg.season);
+        setFixtures(fs.sort((a, b) => b.createdAt - a.createdAt));
+      }
       
       if (_clubCache) {
         _clubCache.config = cfg;
