@@ -28,14 +28,18 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
   const [prevBid, setPrevBid] = useState(0);
   const [isBidding, setIsBidding] = useState(false);
   const [error, setError] = useState('');
+  const [customBid, setCustomBid] = useState('');
 
   // Role detection
   const isDedicatedAuctionAdmin = config?.auctionAdminId && loggedInPlayerId === config.auctionAdminId;
-  const isOwner = !!myClub;
+  const isOwner = !!myClub && myClub.ownerId === loggedInPlayerId;
   
-  // CRITICAL: Any admin (global admin or assigned player admin) can see controls.
-  // The dedicated auction admin (assigned in config) can also see controls.
-  const canOperateControls = isDedicatedAuctionAdmin || isAdmin;
+  // CRITICAL: Strict Auction Admin controls
+  // If an auction admin is assigned, ONLY they can operate controls.
+  // If none is assigned, fallback to master admins who do not own a club.
+  const canOperateControls = config?.auctionAdminId 
+    ? isDedicatedAuctionAdmin 
+    : (isAdmin && !isOwner);
 
   // Admin setup
   const [revealPlayerId, setRevealPlayerId] = useState('');
@@ -220,6 +224,17 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
                 <SkipForward size={13} /> NEXT CLUB
               </button>
             )}
+            {/* End Session button */}
+            <button
+              onClick={async () => {
+                if (window.confirm("Are you sure you want to end this auction session?")) {
+                  await adminEndAuction();
+                }
+              }}
+              className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1"
+            >
+              <X size={13} /> END SESSION
+            </button>
           </div>
         </div>
       )}
@@ -419,22 +434,32 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
             </div>
 
             {/* My bid/fold buttons */}
-            {myClub && auctionState.status === 'active' && !iAmFolded && (
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  disabled={!isMyTurn || isBidding || (myClub.budget < auctionState.minNextBid)}
-                  onClick={async () => {
-                    if (!isMyTurn || !myClub) return;
-                    setIsBidding(true); setError('');
-                    try { await placeBid(myClub.id, myClub.name, auctionState.minNextBid, auctionState); }
-                    catch (e: any) { setError(e.message); }
-                    finally { setIsBidding(false); }
-                  }}
-                  className="py-5 bg-gradient-to-r from-amber-500 to-orange-500 text-black font-black text-sm uppercase rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 disabled:scale-100"
-                >
-                  <TrendingUp size={18} className="inline mr-2" />
-                  {isBidding ? 'Bidding...' : `Bid ${fmtCoins(auctionState.minNextBid)}`}
-                </button>
+            {isOwner && myClub && auctionState.status === 'active' && !iAmFolded && (
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder={`Min: ${auctionState.minNextBid}`}
+                    value={customBid}
+                    onChange={e => setCustomBid(e.target.value)}
+                    className="flex-1 w-full min-w-[80px] bg-white/5 border border-white/10 p-3 sm:p-4 rounded-2xl text-sm font-black text-white focus:border-amber-500 outline-none placeholder:text-slate-500"
+                  />
+                  <button
+                    disabled={!isMyTurn || isBidding || (myClub.budget < Math.max(auctionState.minNextBid, Number(customBid) || 0))}
+                    onClick={async () => {
+                      if (!isMyTurn || !myClub) return;
+                      const bidAmt = Math.max(auctionState.minNextBid, Number(customBid) || auctionState.minNextBid);
+                      setIsBidding(true); setError('');
+                      try { await placeBid(myClub.id, myClub.name, bidAmt, auctionState); setCustomBid(''); }
+                      catch (e: any) { setError(e.message); }
+                      finally { setIsBidding(false); }
+                    }}
+                    className="flex-[2] py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-black font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 disabled:scale-100"
+                  >
+                    <TrendingUp size={16} className="inline mr-1 sm:mr-2" />
+                    {isBidding ? '...' : `Bid ${customBid ? fmtCoins(Math.max(auctionState.minNextBid, Number(customBid))) : fmtCoins(auctionState.minNextBid)}`}
+                  </button>
+                </div>
                 <button
                   disabled={!isMyTurn || isBidding}
                   onClick={async () => {
@@ -443,9 +468,9 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
                     try { await foldBid(myClub.id, auctionState); }
                     finally { setIsBidding(false); }
                   }}
-                  className="py-5 bg-white/5 hover:bg-white/10 text-slate-400 font-black text-sm uppercase rounded-2xl transition-all disabled:opacity-30"
+                  className="py-3 sm:py-4 bg-white/5 hover:bg-white/10 text-slate-400 font-black text-xs sm:text-sm uppercase rounded-2xl transition-all disabled:opacity-30"
                 >
-                  <X size={18} className="inline mr-2" />Fold
+                  <X size={16} className="inline mr-1 sm:mr-2" />Fold
                 </button>
               </div>
             )}

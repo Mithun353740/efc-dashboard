@@ -211,10 +211,11 @@ function StatCircle({ label, value, color, icon }: { label: string; value: numbe
 
 // â”€â”€â”€ Overview Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, setActiveTab }: { 
+function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, setActiveTab, isOwner }: { 
   myClub: Club; squad: Player[]; allClubs: Club[]; config: ClubSystemConfig | null; matches: MatchRecord[];
   inboxUnread: number;
   setActiveTab: (t: 'overview' | 'squad' | 'market' | 'auction' | 'rankings' | 'tournaments' | 'inbox' | 'player_inbox') => void;
+  isOwner: boolean;
 }) {
     const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
   
@@ -447,31 +448,33 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, inboxUnread, se
         </motion.div>
 
         {/* Budget / Transfers */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
-          onClick={() => setActiveTab('market')}
-          className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-4 sm:p-6 cursor-pointer group transition-all"
-          style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}22, ${myClub.secondaryColor}15)`, border: `1px solid ${myClub.primaryColor}30` }}
-        >
-          <div className="absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 rounded-full blur-[60px] opacity-20"
-            style={{ background: myClub.primaryColor }} />
-          <div className="relative z-10 flex flex-col h-full">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: myClub.primaryColor + '30', color: myClub.primaryColor }}>
-                <DollarSign size={16} />
+        {isOwner && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
+            onClick={() => setActiveTab('market')}
+            className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-4 sm:p-6 cursor-pointer group transition-all"
+            style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}22, ${myClub.secondaryColor}15)`, border: `1px solid ${myClub.primaryColor}30` }}
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 rounded-full blur-[60px] opacity-20"
+              style={{ background: myClub.primaryColor }} />
+            <div className="relative z-10 flex flex-col h-full">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: myClub.primaryColor + '30', color: myClub.primaryColor }}>
+                  <DollarSign size={16} />
+                </div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">TRANSFER HUB</p>
               </div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">TRANSFER HUB</p>
+              <div className="flex-1">
+                <p className="text-[9px] font-black uppercase tracking-widest mb-1" style={{ color: myClub.primaryColor }}>BUDGET</p>
+                <p className="text-2xl sm:text-3xl font-black text-white italic leading-none">{fmtBudget(myClub.budget || 0)}</p>
+                <p className="text-[8px] text-slate-500 font-bold mt-0.5 uppercase">VCC Available</p>
+              </div>
+              <div className="mt-4 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest" style={{ color: myClub.primaryColor }}>
+                Open Market <ArrowLeft size={10} className="rotate-180" />
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="text-[9px] font-black uppercase tracking-widest mb-1" style={{ color: myClub.primaryColor }}>BUDGET</p>
-              <p className="text-2xl sm:text-3xl font-black text-white italic leading-none">{fmtBudget(myClub.budget || 0)}</p>
-              <p className="text-[8px] text-slate-500 font-bold mt-0.5 uppercase">VCC Available</p>
-            </div>
-            <div className="mt-4 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest" style={{ color: myClub.primaryColor }}>
-              Open Market <ArrowLeft size={10} className="rotate-180" />
-            </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
       </div>
 
       {/* â”€â”€ ROW 3: Club Standings â”€â”€ */}
@@ -664,10 +667,12 @@ export default function ClubManager() {
               {myPlayer?.ovr || 'â€”'}
             </div>
             {/* Budget pill */}
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
-              <DollarSign size={10} className="text-amber-500" />
-              <span className="text-[10px] font-black text-amber-400">{fmtBudget(myClub?.budget || 0)}</span>
-            </div>
+            {(isOwner || isAdmin) && (
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
+                <DollarSign size={10} className="text-amber-500" />
+                <span className="text-[10px] font-black text-amber-400">{fmtBudget(myClub?.budget || 0)}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -746,6 +751,7 @@ export default function ClubManager() {
                     matches={matches} 
                     inboxUnread={inboxUnread}
                     setActiveTab={setActiveTab}
+                    isOwner={isOwner}
                   />
                 ) : (
                   <NoClubScreen />
@@ -1171,12 +1177,16 @@ function SquadTab({ myClub, squad, allClubs, allPlayers, isOwner, isAdmin, match
                     <span className="text-[10px] font-bold text-slate-500">{total}MP</span>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => onRenewContract(p)} className="flex-1 py-2.5 bg-brand-purple text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-brand-purple/10 hover:bg-brand-purple/80 transition-all">
-                      RENEW
-                    </button>
-                    <button onClick={() => onSetReleaseClause(p)} className={cn("px-3 py-2.5 rounded-xl transition-all border", p.releaseClause?.active ? 'bg-amber-500/10 border-amber-500/30 text-amber-500' : 'bg-white/5 border-white/10 text-slate-500 hover:text-white')}>
-                      <Zap size={14} />
-                    </button>
+                    {isOwner && (
+                      <>
+                        <button onClick={() => onRenewContract(p)} className="flex-1 py-2.5 bg-brand-purple text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-brand-purple/10 hover:bg-brand-purple/80 transition-all">
+                          RENEW
+                        </button>
+                        <button onClick={() => onSetReleaseClause(p)} className={cn("px-3 py-2.5 rounded-xl transition-all border", p.releaseClause?.active ? 'bg-amber-500/10 border-amber-500/30 text-amber-500' : 'bg-white/5 border-white/10 text-slate-500 hover:text-white')}>
+                          <Zap size={14} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1291,7 +1301,7 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
             <p className="text-[10px] font-bold text-slate-400">{windowOpen ? (config?.transferWindowCloseDate ? `Closes ${new Date(config.transferWindowCloseDate).toLocaleDateString()}` : 'Window active') : 'No transfers allowed.'}</p>
           </div>
         </div>
-        {myClub && <div className="md:ml-auto text-left md:text-right border-t md:border-t-0 border-white/5 pt-3 md:pt-0"><p className="text-[9px] font-black text-slate-500 uppercase">My Budget</p><p className="text-xl md:text-2xl font-black text-amber-400">VCC {fmtBudget(myClub.budget)}</p></div>}
+        {isOwner && myClub && <div className="md:ml-auto text-left md:text-right border-t md:border-t-0 border-white/5 pt-3 md:pt-0"><p className="text-[9px] font-black text-slate-500 uppercase">My Budget</p><p className="text-xl md:text-2xl font-black text-amber-400">VCC {fmtBudget(myClub.budget)}</p></div>}
       </div>
 
       {isOwner && windowOpen && mySquad.length > 0 && (
@@ -1357,13 +1367,13 @@ function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefres
                     </div>
                     <p className="text-amber-400 font-black text-sm mt-1">VCC {fmtBudget(l.price)}</p>
                   </div>
-                  {isMine ? (
+                  {isOwner && (isMine ? (
                     <button onClick={() => handleDelist(l)} disabled={busy} className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-[10px] font-black tracking-widest transition-all disabled:opacity-50">DELIST</button>
                   ) : (
                     <button onClick={() => handleBuy(l)} disabled={busy || !windowOpen || !myClub || !canAfford} className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-[10px] font-black tracking-widest transition-all disabled:opacity-50">
                       {!windowOpen ? 'CLOSED' : !myClub ? 'NO CLUB' : !canAfford ? 'NO FUNDS' : 'BUY'}
                     </button>
-                  )}
+                  ))}
                 </motion.div>
               );
             })}

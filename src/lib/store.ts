@@ -2239,9 +2239,9 @@ export async function sendPlayerInboxMessage(message: Omit<PlayerInboxMessage, '
 }
 
 export function subscribeToPlayerInbox(recipientId: string, callback: (messages: PlayerInboxMessage[]) => void) {
-  const q = query(collection(db, 'playerInbox'), where('recipientId', '==', recipientId), orderBy('createdAt', 'desc'), limit(50));
+  const q = query(collection(db, 'playerInbox'), where('recipientId', '==', recipientId), limit(50));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as PlayerInboxMessage)));
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as PlayerInboxMessage)).sort((a, b) => b.createdAt - a.createdAt));
   }, (err) => handleFirestoreError(err, OperationType.LIST, `playerInbox/${recipientId}`));
 }
 
@@ -2252,9 +2252,9 @@ export function subscribeToPlayerInbox(recipientId: string, callback: (messages:
  */
 export async function fetchPlayerInboxMessages(recipientId: string, limitCount = 50): Promise<PlayerInboxMessage[]> {
   try {
-    const q = query(collection(db, 'playerInbox'), where('recipientId', '==', recipientId), orderBy('createdAt', 'desc'), limit(limitCount));
+    const q = query(collection(db, 'playerInbox'), where('recipientId', '==', recipientId), limit(limitCount));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as PlayerInboxMessage));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as PlayerInboxMessage)).sort((a, b) => b.createdAt - a.createdAt);
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, `playerInbox/${recipientId}`);
     return [];
