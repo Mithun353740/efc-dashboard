@@ -2315,19 +2315,61 @@ export async function respondToContractRenewal(msg: PlayerInboxMessage, accepted
   // 1. Update message status
   batch.update(doc(db, 'playerInbox', msg.id), { status: accepted ? 'accepted' : 'rejected' });
 
+  let responseMessageBody = '';
+
+  if (accepted && msg.data?.playerId) {
+    // Player accepted: update contract
+    batch.update(doc(db, 'players', msg.data.playerId), {
+      clubContract: {
+        type: 'matches',
+        amount: msg.data.duration || 10
+      }
+    });
+    responseMessageBody = `✅ ${msg.data.playerName || 'Player'} accepted the contract renewal for ${msg.data.clubName || 'the club'}!`;
+  } else if (!accepted && msg.data?.playerId) {
+    // Player rejected: automatically list them on the Transfer Market
+    const pSnap = await getDoc(doc(db, 'players', msg.data.playerId));
+    if (pSnap.exists()) {
+      const p = pSnap.data() as import('../types').Player;
+      // Calculate a base price using their OVR and a neutral Form 'C'
+      const suggestedPrice = calculateBasePrize(p.ovr, 'C');
+      
+      const listingId = crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
+      batch.set(doc(db, 'clubListings', listingId), {
+        id: listingId,
+        playerId: p.id,
+        playerName: p.name,
+        playerImage: p.image || null,
+        playerOvr: p.ovr,
+        fromClubId: msg.data.clubId || p.clubId,
+        fromClubName: msg.data.clubName || p.clubName,
+        fromClubColor: p.primaryColor || '#8b5cf6',
+        price: suggestedPrice,
+        listedAt: now
+      });
+
+      // Update the player's status
+      batch.update(doc(db, 'players', p.id), {
+        isListed: true,
+        listingPrice: suggestedPrice
+      });
+
+      responseMessageBody = `❌ ${msg.data.playerName || p.name} rejected the contract renewal proposal. They have been automatically placed on the Transfer Market for ${suggestedPrice.toLocaleString()} VCC.`;
+    } else {
+      responseMessageBody = `❌ ${msg.data.playerName || 'Player'} rejected the contract renewal proposal.`;
+    }
+  }
+
   // 2. Send response back to owner
-  if (msg.data?.clubId) {
+  if (msg.data?.clubId && responseMessageBody) {
     const responseMsg: ClubInboxMessage = {
       id: `msg_${now}`,
       type: 'system',
       from: null,
-      message: accepted 
-        ? `G�� ${msg.data.playerName} accepted the contract renewal for ${msg.data.clubName}!`
-        : `G�� ${msg.data.playerName} rejected the contract renewal proposal.`,
+      message: responseMessageBody,
       read: false,
       createdAt: now
     };
-    // We need the ownerId of the club to push to their inbox
     const clubDoc = await getDoc(doc(db, 'clubs', msg.data.clubId));
     if (clubDoc.exists() && clubDoc.data().ownerId) {
       const ownerId = clubDoc.data().ownerId;
@@ -2336,18 +2378,7 @@ export async function respondToContractRenewal(msg: PlayerInboxMessage, accepted
     }
   }
 
-  // 3. If accepted, actually update the player's contract in their profile
-  if (accepted && msg.data?.playerId) {
-    batch.update(doc(db, 'players', msg.data.playerId), {
-      clubContract: {
-        type: 'matches',
-        amount: msg.data.duration || 10
-      }
-    });
-  }
-
   await batch.commit();
-  
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

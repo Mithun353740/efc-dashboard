@@ -976,7 +976,7 @@ export default function ClubManager() {
                               type: 'contract_renewal',
                               title: 'Contract Renewal Offer',
                               body: myClub.ownerName + ' has offered you a renewal: ' + offerDuration + ' matches · ' + Number(offerAmount).toLocaleString() + ' VCC bonus.',
-                              data: { clubId: myClub.id, clubName: myClub.name, salary: Number(offerAmount), duration: Number(offerDuration) }
+                              data: { clubId: myClub.id, clubName: myClub.name, salary: Number(offerAmount), duration: Number(offerDuration), playerId: shortlistPlayer.id, playerName: shortlistPlayer.name }
                             });
                             setMsg({ text: '✅ Renewal offer sent to player!', type: 'success' });
                             setProposalStep(null); setShortlistPlayer(null);
