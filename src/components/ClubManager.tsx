@@ -122,42 +122,78 @@ function OverviewTab({ myClub, squad, allClubs, config, matches, fixtures, inbox
   );
 }
 
-function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefresh, setMsg, matches }: any) {
+function MarketTab({ listings, clubs, myClub, players, isOwner, config, onRefresh, setMsg, onViewSquad }: any) {
+  const [marketSubTab, setMarketSubTab] = useState<'players' | 'clubs'>('players');
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {listings.map((l: any) => {
-        const player = players.find((p:any) => p.id === l.playerId);
-        const seller = clubs.find((c:any) => c.id === l.clubId);
-        if (!player) return null;
-        return (
-          <div key={l.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 hover:border-amber-500/40 transition-all">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-slate-800 overflow-hidden">{player.image && <img src={player.image} className="w-full h-full object-cover" alt="" />}</div>
-              <div className="flex-1">
-                <h4 className="text-sm font-black text-white uppercase">{player.name}</h4>
-                <p className="text-[9px] font-bold text-slate-500 uppercase">{player.ovr} OVR · {seller?.name || 'Free Agent'}</p>
+    <div className="space-y-6">
+      {/* Market Sub-nav */}
+      <div className="flex gap-2 p-1 bg-white/5 border border-white/10 rounded-2xl w-fit">
+        <button onClick={() => setMarketSubTab('players')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", marketSubTab === 'players' ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white')}>Listed Players</button>
+        <button onClick={() => setMarketSubTab('clubs')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", marketSubTab === 'clubs' ? 'bg-brand-purple text-white' : 'text-slate-500 hover:text-white')}>Browse Clubs</button>
+      </div>
+
+      {marketSubTab === 'players' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {(listings || []).length === 0 ? (
+            <div className="col-span-full py-20 text-center bg-white/3 border border-white/5 rounded-3xl">
+              <Search size={48} className="mx-auto text-slate-800 mb-4" />
+              <p className="text-xs font-black text-slate-500 uppercase tracking-widest">No players currently listed</p>
+            </div>
+          ) : (
+            listings.map((l: any) => {
+              const player = players.find((p:any) => p.id === l.playerId);
+              const seller = clubs.find((c:any) => c.id === l.clubId);
+              if (!player) return null;
+              return (
+                <div key={l.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 hover:border-amber-500/40 transition-all group relative overflow-hidden">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-800 overflow-hidden border border-white/10">
+                      {player.image ? <img src={player.image} className="w-full h-full object-cover" alt="" /> : <User size={24} className="m-auto mt-4 text-slate-700" />}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-black text-white uppercase italic tracking-tighter">{player.name}</h4>
+                      <p className="text-[9px] font-bold text-slate-500 uppercase">{player.ovr} OVR · {seller?.name || 'Free Agent'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between py-3 border-t border-white/5 mb-4">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Price</span>
+                    <span className="text-xl font-black text-amber-500">{fmtBudget(l.price)}</span>
+                  </div>
+                  <button 
+                    disabled={!isOwner || myClub?.id === l.clubId}
+                    onClick={async () => {
+                       try {
+                         await purchasePlayer(l, myClub, seller);
+                         setMsg({ text: 'Transfer Successful!', type: 'success' });
+                         onRefresh();
+                       } catch(e:any) { setMsg({ text: e.message, type: 'error' }); }
+                    }}
+                    className="w-full py-4 bg-amber-500 disabled:opacity-20 text-black rounded-xl text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(245,158,11,0.2)]"
+                  >
+                    Buy Player
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {clubs.map((c: any) => (
+            <div key={c.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between group hover:border-brand-purple/40 transition-all">
+              <div className="flex items-center gap-3">
+                <ClubLogo club={c} size="xs" />
+                <div>
+                  <p className="text-[10px] font-black text-white uppercase truncate">{c.name}</p>
+                  <p className="text-[8px] text-slate-500 font-bold uppercase">{c.squadIds?.length || 0} Players</p>
+                </div>
               </div>
+              <button onClick={() => onViewSquad(c)} className="px-4 py-2 bg-white/5 group-hover:bg-brand-purple rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">View Squad</button>
             </div>
-            <div className="flex items-center justify-between py-3 border-t border-white/5 mb-4">
-              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Market Price</span>
-              <span className="text-lg font-black text-amber-500">{fmtBudget(l.price)}</span>
-            </div>
-            <button 
-              disabled={!isOwner || myClub?.id === l.clubId}
-              onClick={async () => {
-                 try {
-                   await purchasePlayer(l, myClub, seller);
-                   setMsg({ text: 'Signed!', type: 'success' });
-                   onRefresh();
-                 } catch(e:any) { setMsg({ text: e.message, type: 'error' }); }
-              }}
-              className="w-full py-3 bg-amber-500 disabled:opacity-20 text-black rounded-xl text-[10px] font-black uppercase tracking-widest"
-            >
-              Sign Player
-            </button>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -350,7 +386,7 @@ export default function ClubManager() {
 
   return (
     <div className="bg-[#020617] text-white selection:bg-amber-500/30 pb-20 relative">
-      <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.3.4</div>
+      <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.3.5</div>
       
       <div className="relative md:sticky md:top-[80px] z-[50]" style={{ background: 'linear-gradient(180deg, #0a0e1a 0%, #060a14 100%)', borderBottom: `2px solid ${myClub?.primaryColor || '#8b5cf6'}40` }}>
         <div className="flex items-center gap-4 px-4 sm:px-6 py-3 border-b border-white/5">
@@ -383,7 +419,7 @@ export default function ClubManager() {
         ) : (
           <div className="transition-all duration-300">
             {activeTab === 'overview' && (myClub ? <OverviewTab myClub={myClub} squad={squad} allClubs={clubs} config={config} matches={matches} fixtures={fixtures} inboxUnread={inboxUnread} playerUnread={playerUnread} setActiveTab={setActiveTab} /> : <NoClubScreen />)}
-            {activeTab === 'market' && <MarketTab listings={listings} clubs={clubs} myClub={myClub} players={players} isOwner={isOwner} config={config} onRefresh={() => load(true)} setMsg={setMsg} matches={matches} />}
+            {activeTab === 'market' && <MarketTab listings={listings} clubs={clubs} myClub={myClub} players={players} isOwner={isOwner} config={config} onRefresh={() => load(true)} setMsg={setMsg} onViewSquad={setViewingClub} />}
             {activeTab === 'rankings' && <RankingsTab clubs={clubs} players={players} myClub={myClub} config={config} onViewSquad={setViewingClub} />}
             {activeTab === 'auction' && <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} loggedInPlayerId={playerId} config={config} />}
             {activeTab === 'inbox' && (
