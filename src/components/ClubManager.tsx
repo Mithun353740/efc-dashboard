@@ -12,7 +12,7 @@ import {
   sendPlayerInboxMessage
 } from '../lib/store';
 import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubTournament, ClubFixture, AuctionState, ClubInboxMessage, PlayerInboxMessage } from '../types';
-import { getPlayerGrade, GRADE_COLORS } from '../lib/utils';
+import { getPlayerGrade, GRADE_COLORS, isAdminUser, cn } from '../lib/utils';
 import { Layers, ShoppingCart, Trophy, Calendar, Lock, Star, TrendingUp, Zap, ArrowLeft, Download, Users, DollarSign, Shield, Hammer, AlertCircle, Check, Bell, ArrowLeftRight, X, PenTool, LayoutDashboard, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClubAuction from './club/ClubAuction';
@@ -601,7 +601,7 @@ export default function ClubManager() {
   }, [isPlayer]);
 
   // Locked (Bypass for admins)
-  const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+  const isAdmin = isAdminUser();
   if (systemLocks?.clubManager && !isAdmin) return <LockedScreen />;
 
   // Not logged in
