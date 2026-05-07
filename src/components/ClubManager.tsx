@@ -209,17 +209,28 @@ function StatCircle({ label, value, color, icon }: { label: string; value: numbe
 
 // â”€â”€â”€ Overview Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function OverviewTab({ myClub, squad, allClubs, clubs, config, matches, fixtures, inboxUnread, setActiveTab, isOwner }: { 
+function OverviewTab({ myClub, squad, allClubs, clubs, config, matches, fixtures, inboxUnread, playerUnread, setActiveTab, isOwner }: { 
   myClub: Club; squad: Player[]; allClubs: Club[]; clubs: Club[]; config: ClubSystemConfig | null; matches: MatchRecord[];
   fixtures: ClubFixture[];
   inboxUnread: number;
-  setActiveTab: (t: 'overview' | 'squad' | 'market' | 'auction' | 'rankings' | 'tournaments' | 'inbox' | 'player_inbox') => void;
+  playerUnread: number;
+  setActiveTab: (t: any) => void;
   isOwner: boolean;
 }) {
+  try {
     const avgOvr = squad.length ? Math.round(squad.reduce((a, p) => a + p.ovr, 0) / squad.length) : 0;
   
+  // Helper to get ms from potential Timestamp
+  const getMs = (val: any) => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    if (val.toMillis) return val.toMillis();
+    if (val.seconds) return val.seconds * 1000;
+    return 0;
+  };
+
   // Filter for Club Zone matches (matches played in current season)
-  const clubMatches = matches.filter(m => m.seasonId === config?.season).sort((a,b) => a.timestamp - b.timestamp);
+  const clubMatches = (matches || []).filter(m => m.seasonId === config?.season).sort((a,b) => getMs(a.timestamp) - getMs(b.timestamp));
   const myClubMatches = clubMatches.filter(m => m.p1Id === myClub.ownerId || m.p2Id === myClub.ownerId);
   const recentMatches = myClubMatches.slice(-5).reverse();
   
@@ -256,137 +267,136 @@ function OverviewTab({ myClub, squad, allClubs, clubs, config, matches, fixtures
   const sharpness = calculatedSharpness;
   const morale = formRecord[0] === 'W' ? 95 : formRecord[0] === 'L' ? 45 : (squad.length >= 5 ? 82 : 55);
 
-  const topScorers = [...squad].sort((a, b) => (b.goalsScored || 0) - (a.goalsScored || 0)).slice(0, 3);
+  const topScorers = [...(squad || [])].sort((a, b) => (b.goalsScored || 0) - (a.goalsScored || 0)).slice(0, 3);
 
   const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  return (
-    <div className="space-y-3 sm:space-y-4">
+    return (
+      <div className="space-y-3 sm:space-y-4">
+        {/* ROW 1: Training Day Hero + Notifications */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4">
+          {/* Next Matchday Hero Panel */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            className="lg:col-span-3 relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 min-h-[200px]"
+            style={{ background: 'linear-gradient(135deg, #080c18 0%, #0a0e1a 50%, #060810 100%)' }}
+          >
+            {/* Color accent strip */}
+            <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${myClub.primaryColor || '#8b5cf6'}, ${myClub.secondaryColor || '#f59e0b'})` }} />
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                  {config?.currentMatchday ? `MATCHDAY ${config.currentMatchday}` : 'NEXT MATCHDAY'}
+                </p>
+              </div>
+              {(() => {
+                const now = Date.now();
+                // Find the next UNCOMPLETED fixture for my club
+                const next = (fixtures || [])
+                  .filter(f => (f.homeClubId === myClub.id || f.awayClubId === myClub.id) && f.status !== 'completed')
+                  .sort((a, b) => (a.matchday || 0) - (b.matchday || 0))[0];
 
-      {/* â”€â”€ ROW 1: Training Day Hero + Notifications â”€â”€ */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4">
-
-        {/* Next Matchday Hero Panel */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-          className="lg:col-span-3 relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 min-h-[200px]"
-          style={{ background: 'linear-gradient(135deg, #080c18 0%, #0a0e1a 50%, #060810 100%)' }}
-        >
-          {/* Color accent strip */}
-          <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${myClub.primaryColor}, ${myClub.secondaryColor})` }} />
-          <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                {config?.currentMatchday ? `MATCHDAY ${config.currentMatchday}` : 'NEXT MATCHDAY'}
-              </p>
-            </div>
-            {(() => {
-              const now = Date.now();
-              // Find the next UNCOMPLETED fixture for my club
-              const next = fixtures
-                .filter(f => (f.homeClubId === myClub.id || f.awayClubId === myClub.id) && f.status !== 'completed')
-                .sort((a, b) => (a.matchday || 0) - (b.matchday || 0))[0];
-
-              if (!next) {
-                return (
-                  <div className="flex flex-col items-center justify-center py-8 gap-3">
-                    <div className="w-14 h-14 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center">
-                      <Calendar size={24} className="text-slate-500" />
+                if (!next) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-8 gap-3">
+                      <div className="w-14 h-14 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center">
+                        <Calendar size={24} className="text-slate-500" />
+                      </div>
+                      <p className="text-sm font-black text-slate-500 uppercase tracking-widest">No Fixture Scheduled</p>
+                      <button onClick={() => setActiveTab('tournaments')} className="text-[9px] font-black text-amber-500 uppercase tracking-widest hover:text-amber-400 transition-colors">
+                        View Tournaments →
+                      </button>
                     </div>
-                    <p className="text-sm font-black text-slate-500 uppercase tracking-widest">No Fixture Scheduled</p>
-                    <button onClick={() => setActiveTab('tournaments')} className="text-[9px] font-black text-amber-500 uppercase tracking-widest hover:text-amber-400 transition-colors">
-                      View Tournaments →
-                    </button>
+                  );
+                }
+
+                const isHome = next.homeClubId === myClub.id;
+                const oppId = isHome ? next.awayClubId : next.homeClubId;
+                const opp = (clubs || []).find(c => c.id === oppId);
+                
+                // Determine squad status
+                const myLineup = isHome ? next.homeLineupIds : next.awayLineupIds;
+                const isSquadSubmitted = (myLineup || []).length === next.lineupSize;
+                
+                // Deadline logic
+                const deadlineMs = getMs(config?.currentMatchdayDeadline || next.deadline);
+                const isPastDeadline = deadlineMs ? now > deadlineMs : false;
+                
+                const formatTimeLeft = (ms: number) => {
+                  if (ms <= 0 || isNaN(ms)) return '00:00:00';
+                  const totalSeconds = Math.floor(ms / 1000);
+                  const h = Math.floor(totalSeconds / 3600);
+                  const m = Math.floor((totalSeconds % 3600) / 60);
+                  const s = totalSeconds % 60;
+                  return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+                };
+
+                return (
+                  <div className="flex flex-col gap-6">
+                    <div className="flex items-center justify-between gap-3 sm:gap-6">
+                      {/* My Club */}
+                      <div className="flex flex-col items-center gap-2 flex-1">
+                        <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl border-2 flex items-center justify-center text-white font-black text-lg"
+                          style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}80, ${myClub.secondaryColor}60)`, borderColor: myClub.primaryColor + '80' }}>
+                          {myClub.shortName || (myClub.name || "CLUB").slice(0,3).toUpperCase()}
+                        </div>
+                        <p className="text-[9px] font-black text-white uppercase tracking-widest truncate max-w-[80px] text-center">{myClub.name}</p>
+                      </div>
+                      
+                      {/* VS badge & Countdown */}
+                      <div className="flex flex-col items-center gap-2 shrink-0">
+                        <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                          <span className="text-amber-400 font-black text-xs sm:text-sm">VS</span>
+                        </div>
+                        {deadlineMs > 0 && (
+                          <div className="flex flex-col items-center bg-black/40 border border-white/10 rounded-lg px-3 py-1.5">
+                            <span className="text-[7px] text-slate-500 font-black uppercase tracking-widest mb-0.5">DEADLINE</span>
+                            <span className={`text-[10px] font-black tabular-nums tracking-widest ${isPastDeadline ? 'text-red-500' : 'text-amber-500'}`}>
+                              {isPastDeadline ? 'EXPIRED' : formatTimeLeft(deadlineMs - now)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Opponent Club */}
+                      <div className="flex flex-col items-center gap-2 flex-1">
+                        {opp ? (
+                          <>
+                            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl border-2 flex items-center justify-center text-white font-black text-lg"
+                              style={{ background: `linear-gradient(135deg, ${opp.primaryColor}80, ${opp.secondaryColor}60)`, borderColor: opp.primaryColor + '80' }}>
+                              {opp.shortName || (opp.name || "CLUB").slice(0,3).toUpperCase()}
+                            </div>
+                            <p className="text-[9px] font-black text-white uppercase tracking-widest truncate max-w-[80px] text-center">{opp.name}</p>
+                          </>
+                        ) : (
+                          <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center">
+                            <Users size={24} className="text-white/20" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Action Bar */}
+                    {isOwner && (
+                      <div className="flex justify-center mt-2 border-t border-white/5 pt-4">
+                        {!isSquadSubmitted ? (
+                          <button onClick={() => setActiveTab('tournaments')} className="flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all animate-pulse">
+                            <AlertCircle size={14} /> SUBMIT SQUAD ({next.lineupSize}v{next.lineupSize})
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2 px-6 py-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-widest">
+                            <Check size={14} /> SQUAD SUBMITTED
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
-              }
-
-              const isHome = next.homeClubId === myClub.id;
-              const oppId = isHome ? next.awayClubId : next.homeClubId;
-              const opp = clubs.find(c => c.id === oppId);
-              
-              // Determine squad status
-              const myLineup = isHome ? next.homeLineupIds : next.awayLineupIds;
-              const isSquadSubmitted = myLineup.length === next.lineupSize;
-              
-              // Deadline logic
-              const deadlineMs = config?.currentMatchdayDeadline || next.deadline;
-              const isPastDeadline = deadlineMs ? now > deadlineMs : false;
-              
-              const formatTimeLeft = (ms) => {
-                if (ms <= 0) return '00:00:00';
-                const totalSeconds = Math.floor(ms / 1000);
-                const h = Math.floor(totalSeconds / 3600);
-                const m = Math.floor((totalSeconds % 3600) / 60);
-                const s = totalSeconds % 60;
-                return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
-              };
-
-              return (
-                <div className="flex flex-col gap-6">
-                  <div className="flex items-center justify-between gap-3 sm:gap-6">
-                    {/* My Club */}
-                    <div className="flex flex-col items-center gap-2 flex-1">
-                      <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl border-2 flex items-center justify-center text-white font-black text-lg"
-                        style={{ background: `linear-gradient(135deg, ${myClub.primaryColor}80, ${myClub.secondaryColor}60)`, borderColor: myClub.primaryColor + '80' }}>
-                        {myClub.shortName || myClub.name.slice(0,3).toUpperCase()}
-                      </div>
-                      <p className="text-[9px] font-black text-white uppercase tracking-widest truncate max-w-[80px] text-center">{myClub.name}</p>
-                    </div>
-                    
-                    {/* VS badge & Countdown */}
-                    <div className="flex flex-col items-center gap-2 shrink-0">
-                      <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                        <span className="text-amber-400 font-black text-xs sm:text-sm">VS</span>
-                      </div>
-                      {deadlineMs && (
-                        <div className="flex flex-col items-center bg-black/40 border border-white/10 rounded-lg px-3 py-1.5">
-                          <span className="text-[7px] text-slate-500 font-black uppercase tracking-widest mb-0.5">DEADLINE</span>
-                          <span className={`text-[10px] font-black tabular-nums tracking-widest ${isPastDeadline ? 'text-red-500' : 'text-amber-500'}`}>
-                            {isPastDeadline ? 'EXPIRED' : formatTimeLeft(deadlineMs - now)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Opponent Club */}
-                    <div className="flex flex-col items-center gap-2 flex-1">
-                      {opp ? (
-                        <>
-                          <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl border-2 flex items-center justify-center text-white font-black text-lg"
-                            style={{ background: `linear-gradient(135deg, ${opp.primaryColor}80, ${opp.secondaryColor}60)`, borderColor: opp.primaryColor + '80' }}>
-                            {opp.shortName || opp.name.slice(0,3).toUpperCase()}
-                          </div>
-                          <p className="text-[9px] font-black text-white uppercase tracking-widest truncate max-w-[80px] text-center">{opp.name}</p>
-                        </>
-                      ) : (
-                        <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center">
-                          <Users size={24} className="text-white/20" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Action Bar */}
-                  {isOwner && (
-                    <div className="flex justify-center mt-2 border-t border-white/5 pt-4">
-                      {!isSquadSubmitted ? (
-                        <button onClick={() => setActiveTab('tournaments')} className="flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all animate-pulse">
-                          <AlertCircle size={14} /> SUBMIT SQUAD ({next.lineupSize}v{next.lineupSize})
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2 px-6 py-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-widest">
-                          <Check size={14} /> SQUAD SUBMITTED
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        </motion.div>
+              })()}
+            </div>
+          </motion.div>
+    
 
         {/* Right column: Notifications + Development stacked */}
         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4">
@@ -579,6 +589,16 @@ function OverviewTab({ myClub, squad, allClubs, clubs, config, matches, fixtures
 
     </div>
   );
+  } catch (err) {
+    console.error("OverviewTab Critical Error:", err);
+    return (
+      <div className="p-10 text-center border border-red-500/20 bg-red-500/5 rounded-[2rem]">
+        <AlertCircle className="mx-auto text-red-500 mb-4" size={32} />
+        <p className="text-sm font-black text-white uppercase italic">Dashboard Error</p>
+        <p className="text-[10px] text-slate-500 mt-2">There was a problem loading your club summary. Please refresh.</p>
+      </div>
+    );
+  }
 }
 
 
@@ -640,8 +660,16 @@ export default function ClubManager() {
       
       // Fetch fixtures if we have a season
       if (cfg?.season) {
-        const fs = await fetchClubFixtures(cfg.season);
-        setFixtures(fs.sort((a, b) => b.createdAt - a.createdAt));
+        try {
+          const fs = await fetchClubFixtures(cfg.season);
+          if (Array.isArray(fs)) {
+            setFixtures(fs.sort((a, b) => {
+              const tA = (a.createdAt as any)?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || a.createdAt || 0;
+              const tB = (b.createdAt as any)?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || b.createdAt || 0;
+              return tB - tA;
+            }));
+          }
+        } catch (e) { console.error("Fixture load error:", e); }
       }
       
       if (_clubCache) {
@@ -863,6 +891,7 @@ export default function ClubManager() {
                     matches={matches} 
                     fixtures={fixtures}
                     inboxUnread={inboxUnread}
+                    playerUnread={playerUnread}
                     setActiveTab={setActiveTab}
                     isOwner={isOwner}
                   />
