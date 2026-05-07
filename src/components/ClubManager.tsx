@@ -747,10 +747,11 @@ export default function ClubManager() {
   ] as const, [isOwner, auctionLive, inboxUnread, playerUnread]);
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white selection:bg-amber-500/30 pb-10">
+    <div className="bg-[#020617] text-white selection:bg-amber-500/30 pb-20 relative">
+      <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.2</div>
 
       {/* â”€â”€ FIFA MANAGER STYLE HEADER â”€â”€ */}
-      <div className="sticky top-[60px] md:top-[80px] z-[50]"
+      <div className="relative md:sticky md:top-[80px] z-[50]"
         style={{ background: 'linear-gradient(180deg, #0a0e1a 0%, #060a14 100%)', borderBottom: `2px solid ${myClub?.primaryColor || '#8b5cf6'}40` }}>
 
         {/* Top strip: club logo + manager info + rating */}
@@ -878,9 +879,9 @@ export default function ClubManager() {
             <div className="text-amber-500 font-black text-xs md:text-sm animate-pulse tracking-[0.3em] uppercase">Initializing Club Systems...</div>
           </div>
         ) : (
-          <AnimatePresence mode="wait">
+          <div className="transition-all duration-300">
             {activeTab === 'overview' && (
-              <motion.div key="overview" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+              <div key="overview">
                 {myClub ? (
                   <OverviewTab 
                     myClub={myClub} 
@@ -898,25 +899,25 @@ export default function ClubManager() {
                 ) : (
                   <NoClubScreen />
                 )}
-              </motion.div>
+              </div>
             )}
             {activeTab === 'market' && (
-              <motion.div key="market" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+              <div key="market">
                 <MarketTab listings={listings} clubs={clubs} myClub={myClub} players={players} isOwner={isOwner} config={config} onRefresh={() => load(true)} setMsg={setMsg} matches={matches} />
-              </motion.div>
+              </div>
             )}
             {activeTab === 'rankings' && (
-              <motion.div key="rankings" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+              <div key="rankings">
                 <RankingsTab clubs={clubs} players={players} myClub={myClub} config={config} />
-              </motion.div>
+              </div>
             )}
             {activeTab === 'auction' && (
-              <motion.div key="auction" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+              <div key="auction">
                 <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} loggedInPlayerId={playerId} config={config} />
-              </motion.div>
+              </div>
             )}
             {activeTab === 'inbox' && (
-              <motion.div key="inbox" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+              <div key="inbox">
                 <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden relative" style={{ minHeight: 600 }}>
                   <div className="flex flex-col h-full bg-[#0a0a14]">
                     {/* Owner's Club Inbox */}
@@ -960,10 +961,10 @@ export default function ClubManager() {
                     )}
                   </div>
                 </div>
-              </motion.div>
+              </div>
             )}
             {activeTab === 'squad' && myClub && (
-              <motion.div key="squad" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+              <div key="squad">
                 <SquadTab
                   myClub={myClub}
                   squad={squad}
@@ -977,14 +978,14 @@ export default function ClubManager() {
                   setMsg={setMsg}
                   matches={matches}
                 />
-              </motion.div>
+              </div>
             )}
             {activeTab === 'tournaments' && (
-              <motion.div key="tournaments" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+              <div key="tournaments">
                 <TournamentsTab config={config} clubs={clubs} myClub={myClub} squad={squad} players={players} setMsg={setMsg} />
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
+          </div>
         )}
         {msg.text && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
