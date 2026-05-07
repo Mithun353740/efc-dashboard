@@ -50,7 +50,8 @@ function ovrColor(ovr: number) {
 
 // â”€â”€â”€ Club Logo component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function ClubLogo({ club, size = 'md' }: { club: Club; size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
+function ClubLogo({ club, size = 'md' }: { club: Club | null; size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
+  if (!club) return <div className="w-8 h-8 rounded bg-slate-800" />;
   const dim = { 'xs': 'w-6 h-6', 'sm': 'w-10 h-10', 'md': 'w-16 h-16', 'lg': 'w-24 h-24', 'xl': 'w-32 h-32' }[size];
   const text = { 'xs': 'text-[8px]', 'sm': 'text-[10px]', 'md': 'text-sm', 'lg': 'text-xl', 'xl': 'text-3xl' }[size];
   const rounded = size === 'xs' ? 'rounded' : size === 'sm' ? 'rounded-lg' : 'rounded-2xl';
@@ -209,11 +210,11 @@ function StatCircle({ label, value, color, icon }: { label: string; value: numbe
 
 // â”€â”€â”€ Overview Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function OverviewTab({ myClub, squad, allClubs, clubs, config, matches, fixtures, inboxUnread, playerUnread, setActiveTab, isOwner }: { 
-  myClub: Club; squad: Player[]; allClubs: Club[]; clubs: Club[]; config: ClubSystemConfig | null; matches: MatchRecord[];
-  fixtures: ClubFixture[];
-  inboxUnread: number;
-  playerUnread: number;
+function OverviewTab({ myClub, squad = [], allClubs = [], clubs = [], config = null, matches = [], fixtures = [], inboxUnread = 0, playerUnread = 0, setActiveTab, isOwner }: { 
+  myClub: Club; squad?: Player[]; allClubs?: Club[]; clubs?: Club[]; config?: ClubSystemConfig | null; matches?: MatchRecord[];
+  fixtures?: ClubFixture[];
+  inboxUnread?: number;
+  playerUnread?: number;
   setActiveTab: (t: any) => void;
   isOwner: boolean;
 }) {
@@ -652,7 +653,10 @@ export default function ClubManager() {
         fetchClubConfig(force),
         fetchMarketListings(force),
         fetchClubs(force)
-      ]);
+      ]).catch(e => {
+        console.error("Promise.all failed:", e);
+        return [null, [], []];
+      }) as [any, any, any];
       
       if (cfg) setConfig(cfg);
       setListings(ls);
@@ -746,9 +750,15 @@ export default function ClubManager() {
     { id: 'inbox', label: isOwner ? 'CLUB OFFICE' : 'MY INBOX', icon: <Bell size={14} />, badge: (isOwner ? inboxUnread : playerUnread) || null },
   ] as const, [isOwner, auctionLive, inboxUnread, playerUnread]);
 
-  return (
-    <div className="bg-[#020617] text-white selection:bg-amber-500/30 pb-20 relative">
-      <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.2</div>
+  useEffect(() => {
+    console.log("[ClubManager] Component Mounted v1.3");
+    document.body.setAttribute('data-club-zone-active', 'true');
+  }, []);
+
+  try {
+    return (
+      <div className="bg-[#020617] text-white selection:bg-amber-500/30 pb-20 relative">
+        <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.3</div>
 
       {/* â”€â”€ FIFA MANAGER STYLE HEADER â”€â”€ */}
       <div className="relative md:sticky md:top-[80px] z-[50]"
@@ -2274,5 +2284,19 @@ function TournamentsTab({ config, clubs, myClub, squad, players, setMsg }: { con
       )}
 
     </>
-  );
+      </div>
+    );
+  } catch (err) {
+    console.error("ClubManager Global Crash:", err);
+    return (
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 text-center">
+        <div className="space-y-4">
+          <AlertCircle size={48} className="text-red-500 mx-auto" />
+          <h2 className="text-xl font-black text-white uppercase tracking-widest">Zone Error</h2>
+          <p className="text-xs text-slate-500 font-bold italic">Something went wrong while initializing the Club Zone. Please try a hard refresh.</p>
+          <div className="text-[8px] text-slate-700 font-mono mt-4">v1.3 Error Detected</div>
+        </div>
+      </div>
+    );
+  }
 }
