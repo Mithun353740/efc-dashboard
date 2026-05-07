@@ -1675,8 +1675,11 @@ export async function adminConfirmSold(currentState: AuctionState, winningClub: 
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   if (!currentState.currentPlayer || !currentState.leadingClubId) return;
   const batch = writeBatch(db);
-  // Deduct budget from winning club
-  batch.update(doc(db, 'clubs', winningClub.id), { budget: winningClub.budget - currentState.currentBid });
+  // Deduct budget and add player to squad
+  batch.update(doc(db, 'clubs', winningClub.id), { 
+    budget: winningClub.budget - currentState.currentBid,
+    squadIds: arrayUnion(currentState.currentPlayer.id)
+  });
   // Transfer player to new club
   batch.update(doc(db, 'players', currentState.currentPlayer.id), {
     clubId: winningClub.id,
