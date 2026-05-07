@@ -184,7 +184,7 @@ function SquadTab({ myClub, squad, onShortlistPlayer, onRenewContract, onSetRele
   );
 }
 
-function RankingsTab({ clubs }: any) {
+function RankingsTab({ clubs, onViewSquad }: any) {
   const sorted = [...clubs].sort((a,b) => (b.managerRating || 0) - (a.managerRating || 0));
   return (
     <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
@@ -193,7 +193,8 @@ function RankingsTab({ clubs }: any) {
           <tr>
             <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Pos</th>
             <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Club</th>
-            <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Rating</th>
+            <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest hidden md:table-cell">Rating</th>
+            <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Action</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
@@ -206,7 +207,10 @@ function RankingsTab({ clubs }: any) {
                   <span className="text-xs font-black text-white uppercase">{c.name}</span>
                 </div>
               </td>
-              <td className="px-6 py-4 text-xs font-black text-amber-500">{c.managerRating || 0}</td>
+              <td className="px-6 py-4 text-xs font-black text-amber-500 hidden md:table-cell">{c.managerRating || 0}</td>
+              <td className="px-6 py-4 text-right">
+                <button onClick={() => onViewSquad(c)} className="px-4 py-2 bg-white/5 hover:bg-brand-purple text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">View Squad</button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -264,6 +268,7 @@ export default function ClubManager() {
   const [offerDuration, setOfferDuration] = useState('5');
   const [releaseTarget, setReleaseTarget] = useState<Player | null>(null);
   const [releaseAmount, setReleaseAmount] = useState('');
+  const [viewingClub, setViewingClub] = useState<Club | null>(null);
 
   const playerId = localStorage.getItem('playerId') || '';
   const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
@@ -345,7 +350,7 @@ export default function ClubManager() {
 
   return (
     <div className="bg-[#020617] text-white selection:bg-amber-500/30 pb-20 relative">
-      <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.3.3</div>
+      <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.3.4</div>
       
       <div className="relative md:sticky md:top-[80px] z-[50]" style={{ background: 'linear-gradient(180deg, #0a0e1a 0%, #060a14 100%)', borderBottom: `2px solid ${myClub?.primaryColor || '#8b5cf6'}40` }}>
         <div className="flex items-center gap-4 px-4 sm:px-6 py-3 border-b border-white/5">
@@ -379,7 +384,7 @@ export default function ClubManager() {
           <div className="transition-all duration-300">
             {activeTab === 'overview' && (myClub ? <OverviewTab myClub={myClub} squad={squad} allClubs={clubs} config={config} matches={matches} fixtures={fixtures} inboxUnread={inboxUnread} playerUnread={playerUnread} setActiveTab={setActiveTab} /> : <NoClubScreen />)}
             {activeTab === 'market' && <MarketTab listings={listings} clubs={clubs} myClub={myClub} players={players} isOwner={isOwner} config={config} onRefresh={() => load(true)} setMsg={setMsg} matches={matches} />}
-            {activeTab === 'rankings' && <RankingsTab clubs={clubs} players={players} myClub={myClub} config={config} />}
+            {activeTab === 'rankings' && <RankingsTab clubs={clubs} players={players} myClub={myClub} config={config} onViewSquad={setViewingClub} />}
             {activeTab === 'auction' && <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} loggedInPlayerId={playerId} config={config} />}
             {activeTab === 'inbox' && (
               <div className="bg-[#0a0a14] border border-white/10 rounded-3xl overflow-hidden min-h-[600px]">
@@ -464,6 +469,41 @@ export default function ClubManager() {
                    await setReleaseClause(releaseTarget.id, { amount: Number(releaseAmount), active: true, setByClubId: myClub?.id || '', setAt: Date.now() });
                    setMsg({ text: 'Set!', type: 'success' }); setReleaseTarget(null); load(true);
                 }} className="py-4 bg-amber-500 text-black rounded-2xl text-[10px] font-black uppercase">Save</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      <AnimatePresence>
+        {viewingClub && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-[#0a0a14] border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
+                <div className="flex items-center gap-4">
+                  <ClubLogo club={viewingClub} size="sm" />
+                  <div>
+                    <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">{viewingClub.name}</h3>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Manager: {viewingClub.ownerName}</p>
+                  </div>
+                </div>
+                <button onClick={() => setViewingClub(null)} className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors"><X size={20} /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {players.filter(p => viewingClub.squadIds?.includes(p.id)).map(p => (
+                    <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4">
+                       <div className="w-12 h-12 rounded-xl bg-slate-800 shrink-0 overflow-hidden">
+                         {p.image && <img src={p.image} className="w-full h-full object-cover" alt="" />}
+                       </div>
+                       <div className="flex-1 min-w-0">
+                         <p className="text-xs font-black text-white uppercase truncate">{p.name}</p>
+                         <p className="text-[9px] text-slate-500 font-bold uppercase">{p.position} · {p.ovr} OVR</p>
+                       </div>
+                       {isOwner && viewingClub.id !== myClub?.id && (
+                         <button onClick={() => { setViewingClub(null); setShortlistPlayer(p); setProposalStep('shortlist'); }} className="px-4 py-2 bg-brand-purple text-white rounded-lg text-[9px] font-black uppercase tracking-widest">Buy</button>
+                       )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </motion.div>
           </div>
