@@ -597,6 +597,7 @@ export default function ClubManager() {
   // Inbox state
   const [inboxMessages, setInboxMessages] = useState<ClubInboxMessage[]>([]);
   const [inboxUnread, setInboxUnread] = useState(0);
+  const [playerUnread, setPlayerUnread] = useState(0);
   // Auction live watcher â€” minimal: only subscribes when on auction tab
   const [auctionLive, setAuctionLive] = useState(false);
   // Shortlist modal state
@@ -666,11 +667,20 @@ export default function ClubManager() {
   // Subscribe to inbox when owner is identified
   useEffect(() => {
     if (!playerId || !isPlayer) return;
-    const unsub = subscribeToInbox(playerId, (msgs, count) => {
+    
+    // Club Inbox (for owners)
+    const unsubClub = subscribeToInbox(playerId, (msgs, count) => {
       setInboxMessages(msgs);
       setInboxUnread(count);
     });
-    return unsub;
+    
+    // Player Inbox (for all players)
+    const unsubPlayer = subscribeToPlayerInbox(playerId, (msgs) => {
+      const count = msgs.filter(m => m.status === 'unread').length;
+      setPlayerUnread(count);
+    });
+
+    return () => { unsubClub(); unsubPlayer(); };
   }, [playerId, isPlayer]);
 
   // Check if auction is live (cheap single snapshot watcher)
@@ -705,8 +715,8 @@ export default function ClubManager() {
     { id: 'auction', label: auctionLive ? 'ðŸ”´ LIVE AUCTION' : 'AUCTION', icon: <Hammer size={14} /> },
     { id: 'rankings', label: 'STANDINGS', icon: <Trophy size={14} /> },
     { id: 'tournaments', label: 'MATCH DAY', icon: <Calendar size={14} /> },
-    { id: 'inbox', label: isOwner ? 'CLUB OFFICE' : 'MY INBOX', icon: <Bell size={14} />, badge: inboxUnread > 0 ? inboxUnread : null },
-  ] as const, [isOwner, auctionLive, inboxUnread]);
+    { id: 'inbox', label: isOwner ? 'CLUB OFFICE' : 'MY INBOX', icon: <Bell size={14} />, badge: (isOwner ? inboxUnread : playerUnread) || null },
+  ] as const, [isOwner, auctionLive, inboxUnread, playerUnread]);
 
   return (
     <div className="min-h-screen bg-[#020617] text-white selection:bg-amber-500/30 pb-10">
@@ -1043,7 +1053,7 @@ export default function ClubManager() {
           })()}
         </AnimatePresence>
         <AnimatePresence>
-          {proposalStep && shortlistPlayer && myClub && (() => {
+          {proposalStep === 'shortlist' && shortlistPlayer && myClub && (() => {
             const sellerClub = clubs.find(c => c.squadIds?.includes(shortlistPlayer.id));
             return (
               <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
