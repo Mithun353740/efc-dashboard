@@ -31,15 +31,14 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
   const [customBid, setCustomBid] = useState('');
 
   // Role detection
-  const isDedicatedAuctionAdmin = config?.auctionAdminId && loggedInPlayerId === config.auctionAdminId;
+  const isDedicatedAuctionAdmin = !!(config?.auctionAdminId && String(loggedInPlayerId).trim() === String(config.auctionAdminId).trim());
   const isOwner = !!myClub && myClub.ownerId === loggedInPlayerId;
   
   // CRITICAL: Strict Auction Admin controls
-  // If an auction admin is assigned, ONLY they can operate controls.
-  // If none is assigned, any admin can operate (even if they own a club).
-  const canOperateControls = config?.auctionAdminId 
-    ? isDedicatedAuctionAdmin 
-    : isAdmin;
+  // If an auction admin is assigned in Control Center, ONLY they can operate controls.
+  // If none is assigned, fallback to master admins who DO NOT own a club.
+  // An admin who owns a club is NEVER allowed to control unless explicitly assigned as Auction Admin.
+  const canOperateControls = isDedicatedAuctionAdmin || (isAdmin && !isOwner && !config?.auctionAdminId);
 
   // Admin setup
   const [revealPlayerId, setRevealPlayerId] = useState('');

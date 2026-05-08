@@ -386,7 +386,7 @@ export default function ClubManager() {
 
   return (
     <div className="bg-[#020617] text-white selection:bg-amber-500/30 pb-20 relative">
-      <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.3.7</div>
+      <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.3.8</div>
       
       <div className="relative md:sticky md:top-[80px] z-[50]" style={{ background: 'linear-gradient(180deg, #0a0e1a 0%, #060a14 100%)', borderBottom: `2px solid ${myClub?.primaryColor || '#8b5cf6'}40` }}>
         <div className="flex items-center gap-4 px-4 sm:px-6 py-3 border-b border-white/5">
