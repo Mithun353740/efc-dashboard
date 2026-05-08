@@ -3495,7 +3495,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                       </button>
                     </div>
                   </div>
-                  </div>
+                  
                   
                   {auctionState.currentPlayer ? (
                     <div className="flex items-center gap-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
@@ -3524,7 +3524,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                     onClick={async () => {
                       const winningClub = clubs.find(c => c.id === auctionState.leadingClubId);
                       if (winningClub) {
-                        await adminConfirmSold(auctionState, winningClub);
+                        await adminConfirmSold(auctionState, winningClub, config);
                         setMsg({ text: 'Player SOLD successfully!', type: 'success' });
                       }
                     }}
