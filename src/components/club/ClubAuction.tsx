@@ -20,10 +20,11 @@ interface ClubAuctionProps {
   allPlayers: Player[];
   isAdmin: boolean;
   loggedInPlayerId?: string;
+  playerName?: string;
   config: ClubSystemConfig | null;
 }
 
-export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, loggedInPlayerId, config }: ClubAuctionProps) {
+export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, loggedInPlayerId, playerName, config }: ClubAuctionProps) {
   const [auctionState, setAuctionState] = useState<AuctionState | null>(null);
   const [prevBid, setPrevBid] = useState(0);
   const [isBidding, setIsBidding] = useState(false);
@@ -31,7 +32,13 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
   const [customBid, setCustomBid] = useState('');
 
   // Role detection
-  const isDedicatedAuctionAdmin = !!(config?.auctionAdminId && String(loggedInPlayerId).trim() === String(config.auctionAdminId).trim());
+  const isDedicatedAuctionAdmin = !!(
+    config?.auctionAdminId && 
+    (
+      String(loggedInPlayerId).trim() === String(config.auctionAdminId).trim() ||
+      String(playerName).trim().toLowerCase() === String(config.auctionAdminId).trim().toLowerCase()
+    )
+  );
   const isOwner = !!myClub && myClub.ownerId === loggedInPlayerId;
   
   // CRITICAL: Strict Auction Admin controls
@@ -273,6 +280,16 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
                         <div className="space-y-2">
                           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">SESSION IDLE</p>
                           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed px-8">The auction admin has not revealed the first player card yet.</p>
+                          {config?.auctionAdminId && !canOperateControls && (isAdmin || playerName === config.auctionAdminId) && (
+                            <div className="mt-4 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-xl">
+                              <p className="text-[8px] font-black text-red-500 uppercase leading-tight">Verification Error: Assigned ID in Control Center does not match your current login.</p>
+                            </div>
+                          )}
+                          {canOperateControls && (
+                            <div className="mt-4 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                              <p className="text-[8px] font-black text-emerald-500 uppercase">Admin Mode Active</p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

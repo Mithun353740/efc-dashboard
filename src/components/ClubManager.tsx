@@ -386,7 +386,7 @@ export default function ClubManager() {
 
   return (
     <div className="bg-[#020617] text-white selection:bg-amber-500/30 pb-20 relative">
-      <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.3.8</div>
+      <div className="absolute top-0 right-0 p-1 opacity-20 text-[8px] font-black z-50">v1.3.9</div>
       
       <div className="relative md:sticky md:top-[80px] z-[50]" style={{ background: 'linear-gradient(180deg, #0a0e1a 0%, #060a14 100%)', borderBottom: `2px solid ${myClub?.primaryColor || '#8b5cf6'}40` }}>
         <div className="flex items-center gap-4 px-4 sm:px-6 py-3 border-b border-white/5">
@@ -421,7 +421,7 @@ export default function ClubManager() {
             {activeTab === 'overview' && (myClub ? <OverviewTab myClub={myClub} squad={squad} allClubs={clubs} config={config} matches={matches} fixtures={fixtures} inboxUnread={inboxUnread} playerUnread={playerUnread} setActiveTab={setActiveTab} /> : <NoClubScreen />)}
             {activeTab === 'market' && <MarketTab listings={listings} clubs={clubs} myClub={myClub} players={players} isOwner={isOwner} config={config} onRefresh={() => load(true)} setMsg={setMsg} onViewSquad={setViewingClub} />}
             {activeTab === 'rankings' && <RankingsTab clubs={clubs} players={players} myClub={myClub} config={config} onViewSquad={setViewingClub} />}
-            {activeTab === 'auction' && <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} loggedInPlayerId={playerId} config={config} />}
+            {activeTab === 'auction' && <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} loggedInPlayerId={playerId} playerName={players.find(p => p.id === playerId)?.name} config={config} />}
             {activeTab === 'inbox' && (
               <div className="bg-[#0a0a14] border border-white/10 rounded-3xl overflow-hidden min-h-[600px]">
                 {isOwner && myClub ? <ClubInbox ownerId={playerId} myClub={myClub} allClubs={clubs} allPlayers={players} initialMessages={[]} initialUnread={inboxUnread} /> : (myPlayer ? <PlayerInbox player={myPlayer} allClubs={clubs} /> : <div className="p-20 text-center text-slate-500 uppercase text-[10px] font-black">No Profile</div>)}
