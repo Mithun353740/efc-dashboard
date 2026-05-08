@@ -368,11 +368,22 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
 
                         {/* Form indicators */}
                         {recentForm.length > 0 && (
-                          <div className="px-4 pb-4 flex items-center gap-1.5">
+                          <div className="px-4 pb-2 flex items-center gap-1.5">
                             <span className="text-[9px] font-black text-slate-600 uppercase mr-1">Form:</span>
                             {recentForm.map((r, i) => (
                               <div key={i} className={`w-5 h-5 rounded-md flex items-center justify-center text-[8px] font-black ${r === 'W' ? 'bg-green-500/20 text-green-400' : r === 'L' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>{r}</div>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Contract status if active */}
+                        {config?.contractsActive && (
+                          <div className="px-4 pb-4">
+                            <div className="flex items-center gap-2 p-2 bg-white/5 border border-white/5 rounded-xl">
+                              <CheckCircle size={12} className="text-emerald-500" />
+                              <span className="text-[10px] font-black text-white uppercase">Automatic Contract:</span>
+                              <span className="text-[10px] font-black text-emerald-500 uppercase">{config.defaultContractAmount} {config.defaultContractType || 'matches'}</span>
+                            </div>
                           </div>
                         )}
 
@@ -464,7 +475,11 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
                     disabled={!isMyTurn || isBidding || (myClub.budget < Math.max(auctionState.minNextBid, Number(customBid) || 0))}
                     onClick={async () => {
                       if (!isMyTurn || !myClub) return;
-                      const bidAmt = Math.max(auctionState.minNextBid, Number(customBid) || auctionState.minNextBid);
+                      const parsed = Number(customBid);
+                      const bidAmt = (!customBid || isNaN(parsed) || parsed <= 0) 
+                        ? auctionState.minNextBid 
+                        : Math.max(auctionState.minNextBid, parsed);
+                        
                       setIsBidding(true); setError('');
                       try { await placeBid(myClub.id, myClub.name, bidAmt, auctionState); setCustomBid(''); }
                       catch (e: any) { setError(e.message); }
@@ -473,7 +488,13 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
                     className="flex-[2] py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-black font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 disabled:scale-100"
                   >
                     <TrendingUp size={16} className="inline mr-1 sm:mr-2" />
-                    {isBidding ? '...' : `Bid ${customBid ? fmtCoins(Math.max(auctionState.minNextBid, Number(customBid))) : fmtCoins(auctionState.minNextBid)}`}
+                    {isBidding ? '...' : (
+                      <span>
+                        Bid {customBid && Number(customBid) > auctionState.minNextBid 
+                          ? fmtCoins(Number(customBid)) 
+                          : fmtCoins(auctionState.minNextBid)}
+                      </span>
+                    )}
                   </button>
                 </div>
                 <button
@@ -481,7 +502,7 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
                   onClick={async () => {
                     if (!isMyTurn || !myClub) return;
                     setIsBidding(true);
-                    try { await foldBid(myClub.id, auctionState); }
+                    try { await foldBid(myClub.id, auctionState, config); }
                     finally { setIsBidding(false); }
                   }}
                   className="py-3 sm:py-4 bg-white/5 hover:bg-white/10 text-slate-400 font-black text-xs sm:text-sm uppercase rounded-2xl transition-all disabled:opacity-30"

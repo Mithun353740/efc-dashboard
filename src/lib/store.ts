@@ -1520,7 +1520,7 @@ export async function updateFixtureSubMatch(
   }
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG
 // Ranking logic (can be used on the client-side array)
 export function sortRankedPlayers(players: Player[]): Player[] {
   return [...players].sort((a, b) => {
@@ -1560,16 +1560,15 @@ export function sortRankedPlayers(players: Player[]): Player[] {
     // 8. Matches Played (FEWER matches played ranks higher if tied - "Games in Hand")
     if (totalMatchesA !== totalMatchesB) return totalMatchesA - totalMatchesB;
     
-    // 7. Alphabetical order fallback
     return a.name.localeCompare(b.name);
   });
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
-// CLUB ZONE V2 G�� AUCTION SYSTEM
-// Single shared document "auctions/live" G�� all 60+ viewers share ONE listener.
+// GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG
+// CLUB ZONE V2 G AUCTION SYSTEM
+// Single shared document "auctions/live" G all 60+ viewers share ONE listener.
 // Cost: 1 read per user to connect + 1 write per bid/fold/reveal. Extremely cheap.
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG
 
 const AUCTION_DOC = doc(db, 'auctions', 'live');
 
@@ -1688,12 +1687,12 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
     foldedClubs: newFolded,
     status: 'active',
     soldAt: null,
-    currentTurnIndex: (currentState.currentTurnIndex + 1) % Math.max(activeBidders.length, 1),
+    currentTurnIndex: (currentState.currentTurnIndex) % Math.max(activeBidders.length, 1),
     bidDeadlineAt: Date.now() + 90_000, // Reset timer on fold too
   }, { merge: true });
 }
 
-/** Admin: Confirm the sale G�� deduct budget from winning club, assign player. */
+/** Admin: Confirm the sale G deduct budget from winning club, assign player. */
 export async function adminConfirmSold(currentState: AuctionState, winningClub: import('../types').Club): Promise<void> {
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   if (!currentState.currentPlayer || !currentState.leadingClubId) return;

@@ -118,7 +118,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setHasPendingWrites(pending);
         setIsLoading(false);
         if (_globalCache) { _globalCache.players = data; _globalCache.fetchedAt = Date.now(); }
-      }, 100));
+      }, 1000));
 
       unsubscribers.push(subscribeToLeaders((data) => {
         if (!mounted) return;
@@ -155,7 +155,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       } else {
         // Fetch once, cache for 15 minutes
         const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
-        const playerLimit = isPlayer ? 100 : 15; // guests get fewer
+        const playerLimit = isPlayer ? 1000 : 50; // guests get fewer
 
         const loadOnce = async () => {
           try {

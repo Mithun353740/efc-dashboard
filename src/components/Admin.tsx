@@ -1653,6 +1653,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const [setupBasePrice, setSetupBasePrice] = React.useState('500000');
   const [setupIncrement, setSetupIncrement] = React.useState('100000');
   const [revealPlayerId, setRevealPlayerId] = React.useState('');
+  const [auctionSearch, setAuctionSearch] = React.useState('');
 
   React.useEffect(() => {
     if (subTab !== 'auction') return;
@@ -3458,28 +3459,42 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
               <div className="space-y-6">
                 <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
                   <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] mb-4">REVEAL PLAYER CARD</h4>
-                  <div className="flex gap-2 mb-4">
-                    <select 
-                      value={revealPlayerId} 
-                      onChange={e => setRevealPlayerId(e.target.value)}
-                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-amber-500/50"
-                    >
-                      <option value="">Select a Free Agent...</option>
-                      {players.filter(p => !p.clubId || p.clubId === '').map(p => (
-                        <option key={p.id} value={p.id}>{p.name} ({p.ovr} OVR)</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={async () => {
-                        if (!revealPlayerId) return;
-                        const p = players.find(pl => pl.id === revealPlayerId)!;
-                        await adminRevealCard({ id: p.id, name: p.name, image: p.image, ovr: p.ovr, currentClubId: p.clubId || null, currentClubName: p.clubName || null }, Number(setupBasePrice), Number(setupIncrement));
-                        setRevealPlayerId('');
-                      }}
-                      className="px-6 bg-amber-500 text-black rounded-xl text-xs font-black uppercase hover:bg-amber-600 transition-all"
-                    >
-                      REVEAL
-                    </button>
+                  <div className="space-y-2 mb-4">
+                    <input 
+                      type="text"
+                      placeholder="Search player to reveal..."
+                      value={auctionSearch}
+                      onChange={e => setAuctionSearch(e.target.value)}
+                      className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-2 text-[10px] font-bold text-white outline-none focus:border-amber-500/30"
+                    />
+                    <div className="flex gap-2">
+                      <select 
+                        value={revealPlayerId} 
+                        onChange={e => setRevealPlayerId(e.target.value)}
+                        className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-amber-500/50"
+                      >
+                        <option value="">Select a Free Agent...</option>
+                        {players
+                          .filter(p => !p.clubId || p.clubId === '')
+                          .filter(p => !auctionSearch || p.name.toLowerCase().includes(auctionSearch.toLowerCase()))
+                          .map(p => (
+                            <option key={p.id} value={p.id}>{p.name} ({p.ovr} OVR)</option>
+                          ))
+                        }
+                      </select>
+                      <button
+                        onClick={async () => {
+                          if (!revealPlayerId) return;
+                          const p = players.find(pl => pl.id === revealPlayerId)!;
+                          await adminRevealCard({ id: p.id, name: p.name, image: p.image, ovr: p.ovr, currentClubId: p.clubId || null, currentClubName: p.clubName || null }, Number(setupBasePrice), Number(setupIncrement));
+                          setRevealPlayerId('');
+                        }}
+                        className="px-6 bg-amber-500 text-black rounded-xl text-xs font-black uppercase hover:bg-amber-600 transition-all"
+                      >
+                        REVEAL
+                      </button>
+                    </div>
+                  </div>
                   </div>
                   
                   {auctionState.currentPlayer ? (
