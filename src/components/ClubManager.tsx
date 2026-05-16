@@ -5,7 +5,8 @@ import {
   fetchClubs, fetchClubConfig, fetchMarketListings,
   subscribeToInbox, subscribeToAuction, subscribeToPlayerInbox,
   sendTransferProposal, setReleaseClause, removeReleaseClause,
-  getFormGrade, sendPlayerInboxMessage, applyDirectContract, fetchClubFixtures
+  getFormGrade, sendPlayerInboxMessage, applyDirectContract, fetchClubFixtures,
+  fetchPlayerInboxMessages,
 } from '../lib/store';
 import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubFixture, ClubInboxMessage } from '../types';
 import { isAdminUser, cn, getPlayerGrade, GRADE_COLORS } from '../lib/utils';
@@ -346,20 +347,76 @@ export default function ClubManager() {
 
   useEffect(() => { load(); }, []);
 
+  // ── Inbox: lazy-mount only when Inbox tab is active ──────────────────────
+  // Replaces always-on subscription that ran from mount even when user never opened inbox.
+  // Saves 2 persistent Firestore WebSocket connections per player.
   useEffect(() => {
-    if (!playerId || !isPlayer) return;
+    if (!playerId || !isPlayer || activeTab !== 'inbox') return;
     const u1 = subscribeToInbox(playerId, (_, count) => { setInboxUnread(count); });
-    const u2 = subscribeToPlayerInbox(playerId, (msgs) => { setPlayerUnread(msgs.filter(m => m.status === 'unread').length); });
+    const u2 = subscribeToPlayerInbox(playerId, (msgs) => {
+      setPlayerUnread(msgs.filter(m => m.status === 'unread').length);
+    });
     return () => { u1(); u2(); };
-  }, [playerId, isPlayer]);
+  }, [playerId, isPlayer, activeTab]);
 
+  // ── Inbox unread badge: lightweight poll when NOT on inbox tab ─────────────
+  // Fetches inbox once on mount + every 2 minutes to show the badge dot.
+  // Cost: 1 read per 2 min vs. a permanent always-on WebSocket listener.
+  useEffect(() => {
+    if (!playerId || !isPlayer || activeTab === 'inbox') return;
+    const checkUnread = async () => {
+      try {
+        const msgs = await fetchPlayerInboxMessages(playerId, 20);
+        setPlayerUnread(msgs.filter(m => m.status === 'unread').length);
+        // Also check club inbox unread count if owner (stored on inbox doc itself — 1 read)
+        if (isOwner) {
+          try {
+            const { db } = await import('../firebase');
+            const { getDoc, doc: fsDoc } = await import('firebase/firestore');
+            const snap = await getDoc(fsDoc(db, 'clubInbox', playerId));
+            if (snap.exists()) setInboxUnread(snap.data().unreadCount || 0);
+          } catch {}
+        }
+      } catch {}
+    };
+    checkUnread();
+    const interval = setInterval(checkUnread, 2 * 60 * 1000); // Poll every 2 min for badge
+    return () => clearInterval(interval);
+  }, [playerId, isPlayer, activeTab, isOwner]);
+
+  // ── Auction: real-time only when Auction tab active; poll otherwise ────────
+  // Full real-time listener when tab is open (needed for live bidding).
+  // Lightweight poll when tab is closed (just enough to show the 🔴 LIVE badge).
   useEffect(() => {
     if (!isPlayer) return;
-    return subscribeToAuction((s) => setAuctionLive(!!s && s.status !== 'ended' && s.status !== 'idle'));
-  }, [isPlayer]);
+    if (activeTab === 'auction') {
+      // Full real-time listener while auction tab is open
+      return subscribeToAuction((s) => {
+        setAuctionLive(!!s && s.status !== 'ended' && s.status !== 'idle');
+      });
+    } else {
+      // Lightweight 30-second poll for badge — no persistent WebSocket
+      const checkAuction = async () => {
+        try {
+          const { db } = await import('../firebase');
+          const { getDoc, doc } = await import('firebase/firestore');
+          const snap = await getDoc(doc(db, 'auctions', 'live'));
+          if (snap.exists()) {
+            const s = snap.data();
+            setAuctionLive(!!s && s.status !== 'ended' && s.status !== 'idle');
+          } else {
+            setAuctionLive(false);
+          }
+        } catch {}
+      };
+      checkAuction();
+      const interval = setInterval(checkAuction, 30_000);
+      return () => clearInterval(interval);
+    }
+  }, [isPlayer, activeTab]);
 
   useEffect(() => {
-    console.log("[ClubManager] v1.3.3 Mounted");
+    console.log("[ClubManager] v1.4.0 Mounted — optimized subscriptions");
     document.body.setAttribute('data-club-zone-active', 'true');
   }, []);
 

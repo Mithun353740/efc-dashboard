@@ -5,6 +5,7 @@ import {
 } from '../types';
 import { db, auth } from '../firebase';
 import { resolveCanonicalTournamentName, getSeasonInfo } from './utils';
+import { trackRead, invalidateStorage } from './cache';
 import { 
   collection, 
   doc, 
@@ -316,7 +317,7 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes default
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes — matches FirebaseContext session TTL
 const _cache = new Map<string, CacheEntry<any>>();
 const _pendingRequests = new Map<string, Promise<any>>();
 
@@ -341,6 +342,9 @@ async function fetchWithCache<T>(key: string, queryFn: () => Promise<T>, ttl = C
   try {
     const data = await promise;
     _cache.set(key, { data, timestamp: now });
+    // Track reads for quota monitoring
+    if (Array.isArray(data)) trackRead(data.length || 1);
+    else trackRead(1);
     return data;
   } catch (error) {
     throw error;
@@ -358,14 +362,13 @@ export function invalidateCache(key?: string) {
   }
 }
 
-export async function fetchPlayers(limitCount?: number, force = false): Promise<Player[]> {
-  const cacheKey = `players_${limitCount || 'all'}`;
+// IMPORTANT: Default limit=100 prevents unbounded collection scans.
+export async function fetchPlayers(limitCount = 100, force = false): Promise<Player[]> {
+  const cacheKey = `players_${limitCount}`;
   if (force) invalidateCache(cacheKey);
 
   return fetchWithCache(cacheKey, async () => {
-    const q = limitCount 
-      ? query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount))
-      : query(collection(db, 'players'));
+    const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
   });
@@ -500,10 +503,12 @@ async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]
   return results.sort((a, b) => a.timestamp - b.timestamp);
 }
 
-export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 100, errorCallback?: (err: Error) => void) {
+// Admin-only real-time listener. Limit=200 is sufficient for any club.
+export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 200, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
     const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+    trackRead(players.length || 1);
     callback(players, snapshot.metadata.hasPendingWrites);
   }, (error) => {
     if (errorCallback) errorCallback(error);
@@ -641,7 +646,8 @@ export async function recalculateAllStats(playersArg?: Player[]) {
   let playersToSync = playersArg || [];
   if (playersToSync.length === 0) {
     console.log('[Resync] No players provided, fetching all players from Firestore...');
-    const allPlayersSnap = await getDocs(collection(db, 'players'));
+    const allPlayersSnap = await getDocs(query(collection(db, 'players'), limit(500)));
+    trackRead(allPlayersSnap.docs.length);
     playersToSync = allPlayersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Player));
   }
 
@@ -650,7 +656,9 @@ export async function recalculateAllStats(playersArg?: Player[]) {
     return;
   }
 
-  const fullMatchesSnap = await getDocs(query(collection(db, 'matches'), orderBy('timestamp', 'asc')));
+  // Limit to recent 500 matches - sufficient for accurate ELO, prevents full-collection scan.
+  const fullMatchesSnap = await getDocs(query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(500)));
+  trackRead(fullMatchesSnap.docs.length);
   const allMatches = fullMatchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
   const elos = computeGlobalElo(playersToSync, allMatches);
   playersToSync.forEach(p => {
@@ -1038,7 +1046,9 @@ export async function saveTournament(tournament: Tournament) {
   const path = `tournaments/${tournament.id}`;
   try {
     await setDoc(doc(db, 'tournaments', tournament.id), tournament);
-    
+    // Bust caches so self-registration + admin changes are immediately visible.
+    invalidateCache('tournaments_active');
+    invalidateStorage('tournaments');
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
     throw error;
@@ -2003,7 +2013,7 @@ export async function fetchClubSeasons(globalSeason: string): Promise<ClubSeason
 /** Fetches ALL active or upcoming seasons across all global years for the landing dashboard. */
 export async function fetchAllActiveClubSeasons(): Promise<ClubSeason[]> {
   try {
-    const q = query(collection(db, 'clubSeasons'), where('status', 'in', ['active', 'upcoming']), limit(50));
+    const q = query(collection(db, 'clubSeasons'), where('status', 'in', ['active', 'upcoming']), limit(20));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason));
   } catch (err) {

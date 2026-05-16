@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Player, Leader, MatchRecord, Tournament } from './types';
 import {
   subscribeToAppVersion,
@@ -15,15 +15,25 @@ import {
   fetchLeadersOnce,
   fetchMatchesOnce,
   fetchTournamentsOnce,
+  fetchSystemLocks,
   ensureAdminSession,
 } from './lib/store';
 import { VERSION } from './constants';
+import {
+  persistToStorage,
+  hydrateFromStorage,
+  invalidateStorage,
+  trackRead,
+} from './lib/cache';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SESSION CACHE — 15-minute TTL
-// One fetch per session for non-admin users. Zero re-reads on navigation.
+// SESSION CACHE — 15-minute in-memory TTL (zero re-reads on tab navigation)
+// STORAGE CACHE — 10-minute localStorage TTL (zero re-reads on page refresh)
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes in-memory
+/** How often non-admin users re-check systemLocks (tiny single doc). */
+const LOCKS_POLL_INTERVAL_MS = 60 * 1000; // 60 seconds
+
 let _globalCache: {
   players: Player[];
   leaders: Leader[];
@@ -48,34 +58,111 @@ interface FirebaseContextType {
   dbError: string | null;
   hasPendingWrites: boolean;
   appVersion: string;
+  /** Force non-admin users to re-fetch all data (e.g. after self-registration). */
+  refreshData: () => Promise<void>;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
 
 export function FirebaseProvider({ children }: { children: React.ReactNode }) {
-  const [players, setPlayers] = useState<Player[]>(_globalCache?.players || []);
-  const [leaders, setLeaders] = useState<Leader[]>(_globalCache?.leaders || []);
-  const [matches, setMatches] = useState<MatchRecord[]>(_globalCache?.matches || []);
-  const [tournaments, setTournaments] = useState<Tournament[]>(_globalCache?.tournaments || []);
-  const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>(_globalCache?.systemLocks || {});
-  const [isLoading, setIsLoading] = useState(!_globalCache || _globalCache.players.length === 0);
+  // Hydrate immediately from localStorage so the UI shows data before first Firestore call
+  const storedPlayers = hydrateFromStorage<Player[]>('players') ?? _globalCache?.players ?? [];
+  const storedLeaders = hydrateFromStorage<Leader[]>('leaders') ?? _globalCache?.leaders ?? [];
+  const storedMatches = hydrateFromStorage<MatchRecord[]>('matches') ?? _globalCache?.matches ?? [];
+  const storedTournaments = hydrateFromStorage<Tournament[]>('tournaments') ?? _globalCache?.tournaments ?? [];
+
+  const [players, setPlayers] = useState<Player[]>(storedPlayers);
+  const [leaders, setLeaders] = useState<Leader[]>(storedLeaders);
+  const [matches, setMatches] = useState<MatchRecord[]>(storedMatches);
+  const [tournaments, setTournaments] = useState<Tournament[]>(storedTournaments);
+  const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>(
+    _globalCache?.systemLocks || {}
+  );
+  const [isLoading, setIsLoading] = useState(
+    storedPlayers.length === 0 && (!_globalCache || _globalCache.players.length === 0)
+  );
   const [dbError, setDbError] = useState<string | null>(null);
   const [hasPendingWrites, setHasPendingWrites] = useState(false);
   const [appVersion, setAppVersion] = useState<string>(VERSION);
 
+  // Ref to avoid stale-closure issues in the poll callback
+  const mountedRef = useRef(true);
+  // Track whether we've done the initial one-time fetch so refreshData can force re-fetch
+  const lastFetchedAt = useRef<number>(storedPlayers.length > 0 ? Date.now() : 0);
+
+  // ─── Non-admin one-time fetch (shared by mount + refreshData) ──────────────
+  const loadOnce = useCallback(async (force = false) => {
+    if (!mountedRef.current) return;
+
+    // Only re-fetch if forced or cache is expired
+    const cacheAge = Date.now() - lastFetchedAt.current;
+    if (!force && cacheAge < CACHE_TTL_MS && storedPlayers.length > 0) return;
+
+    const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
+    const playerLimit = isPlayer ? 200 : 50;
+
+    try {
+      const [p, l, m, t] = await Promise.all([
+        fetchPlayersOnce(playerLimit),
+        fetchLeadersOnce(),
+        isPlayer ? fetchMatchesOnce(50) : Promise.resolve([] as MatchRecord[]),
+        fetchTournamentsOnce(20),
+      ]);
+
+      // Track reads
+      trackRead(p.length + l.length + m.length + t.length);
+
+      if (!mountedRef.current) return;
+
+      setPlayers(p);
+      setLeaders(l);
+      setMatches(m);
+      setTournaments(t);
+      lastFetchedAt.current = Date.now();
+
+      // Persist to localStorage for next page load
+      persistToStorage('players', p);
+      persistToStorage('leaders', l);
+      persistToStorage('matches', m);
+      persistToStorage('tournaments', t);
+
+      // Update in-memory global cache
+      _globalCache = {
+        players: p,
+        leaders: l,
+        matches: m,
+        tournaments: t,
+        systemLocks: _globalCache?.systemLocks || {},
+        fetchedAt: Date.now(),
+      };
+    } catch (err) {
+      console.warn('[FirebaseContext] One-time fetch failed:', err);
+    } finally {
+      if (mountedRef.current) setIsLoading(false);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Exposed to components — forces a fresh fetch and updates all state (e.g. after self-registration). */
+  const refreshData = useCallback(async () => {
+    invalidateStorage(); // clear localStorage cache
+    if (_globalCache) _globalCache.fetchedAt = 0;
+    lastFetchedAt.current = 0;
+    await loadOnce(true);
+  }, [loadOnce]);
+
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
     const unsubscribers: (() => void)[] = [];
 
     // Minimum branding delay
     const minTimer = setTimeout(() => {
-      if (mounted) setIsLoading(false);
+      if (mountedRef.current) setIsLoading(false);
     }, 1200);
 
     // Global error handler
     const errorHandler = (e: Event) => {
       const customEvent = e as CustomEvent;
-      if (!mounted || !customEvent.detail?.error) return;
+      if (!mountedRef.current || !customEvent.detail?.error) return;
       const errStr = String(customEvent.detail.error).toLowerCase();
       setIsLoading(false);
       if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
@@ -95,117 +182,136 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
 
-    // ── ALWAYS: System locks (tiny single doc) ────────────────────────────────
-    unsubscribers.push(subscribeToSystemLocks((locks) => {
-      if (!mounted) return;
-      setSystemLocks(locks);
-      if (_globalCache) _globalCache.systemLocks = locks;
-    }));
-
-    // ── ALWAYS: App version (tiny single doc) ─────────────────────────────────
-    unsubscribers.push(subscribeToAppVersion((version) => {
-      if (mounted && version) setAppVersion(version);
-    }));
-
     if (isAdmin) {
-      // ── ADMIN: Real-time subscriptions (1 admin only, cost acceptable) ──────
+      // ── ADMIN: Real-time subscriptions ────────────────────────────────────
+      // These are acceptable costs for a single admin user.
       ensureAdminSession();
       testFirestoreConnection();
 
+      // systemLocks — real-time for admin (they need instant updates to manage locks)
+      unsubscribers.push(subscribeToSystemLocks((locks) => {
+        if (!mountedRef.current) return;
+        setSystemLocks(locks);
+        if (_globalCache) _globalCache.systemLocks = locks;
+      }));
+
+      // appVersion — real-time for admin
+      unsubscribers.push(subscribeToAppVersion((version) => {
+        if (mountedRef.current && version) setAppVersion(version);
+      }));
+
       unsubscribers.push(subscribeToPlayers((data, pending) => {
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         setPlayers(data);
         setHasPendingWrites(pending);
         setIsLoading(false);
         if (_globalCache) { _globalCache.players = data; _globalCache.fetchedAt = Date.now(); }
-      }, 1000));
+      }, 200)); // Reduced from 1000 to 200 — more than enough for any club
 
       unsubscribers.push(subscribeToLeaders((data) => {
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         setLeaders(data);
         if (_globalCache) _globalCache.leaders = data;
       }));
 
       unsubscribers.push(subscribeToMatches((data) => {
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         setMatches(data);
         if (_globalCache) _globalCache.matches = data;
       }));
 
       unsubscribers.push(subscribeToTournaments((data) => {
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         setTournaments(data);
         if (_globalCache) _globalCache.tournaments = data;
       }));
 
     } else {
-      // ── PLAYER / GUEST: ONE-TIME FETCH — zero ongoing listener cost ──────────
-      // Check if cache is still fresh (within TTL)
-      const cacheAge = _globalCache ? Date.now() - (_globalCache.fetchedAt || 0) : Infinity;
-      const cacheIsFresh = cacheAge < CACHE_TTL_MS && _globalCache && _globalCache.players.length > 0;
+      // ── PLAYER / GUEST: ONE-TIME FETCH + controlled polling ───────────────
+      // NO persistent WebSocket connections for regular users.
 
-      if (cacheIsFresh) {
-        // Serve instantly from memory — 0 Firestore reads
+      // Check if in-memory cache is still fresh
+      const cacheAge = _globalCache ? Date.now() - (_globalCache.fetchedAt || 0) : Infinity;
+      const inMemoryCacheFresh = cacheAge < CACHE_TTL_MS && _globalCache && _globalCache.players.length > 0;
+      // Check localStorage — storedPlayers already hydrated above at useState init
+      const localStorageCacheFresh = storedPlayers.length > 0;
+
+      if (inMemoryCacheFresh) {
+        // Serve from memory — 0 Firestore reads
         setPlayers(_globalCache!.players);
         setLeaders(_globalCache!.leaders);
         setMatches(_globalCache!.matches);
         setTournaments(_globalCache!.tournaments);
         setSystemLocks(_globalCache!.systemLocks);
         setIsLoading(false);
-      } else {
-        // Fetch once, cache for 15 minutes
-        const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
-        const playerLimit = isPlayer ? 1000 : 50; // guests get fewer
-
-        const loadOnce = async () => {
-          try {
-            const [p, l, m, t] = await Promise.all([
-              fetchPlayersOnce(playerLimit),
-              fetchLeadersOnce(),
-              isPlayer ? fetchMatchesOnce(50) : Promise.resolve([] as MatchRecord[]),
-              fetchTournamentsOnce(20),
-            ]);
-
-            if (!mounted) return;
-
-            setPlayers(p);
-            setLeaders(l);
-            setMatches(m);
-            setTournaments(t);
-
-            // Populate cache so next navigation costs 0 reads
-            _globalCache = {
-              players: p,
-              leaders: l,
-              matches: m,
-              tournaments: t,
-              systemLocks: _globalCache?.systemLocks || {},
-              fetchedAt: Date.now(),
-            };
-          } catch (err) {
-            console.warn('[FirebaseContext] One-time fetch failed:', err);
-          } finally {
-            if (mounted) setIsLoading(false);
-          }
+      } else if (localStorageCacheFresh) {
+        // localStorage data already loaded into state via useState initializer.
+        // Just mark loading done and fetch systemLocks once in background.
+        setIsLoading(false);
+        lastFetchedAt.current = Date.now();
+        // Populate in-memory cache from localStorage so navigations are instant
+        _globalCache = {
+          players: storedPlayers,
+          leaders: storedLeaders,
+          matches: storedMatches,
+          tournaments: storedTournaments,
+          systemLocks: {},
+          fetchedAt: Date.now(),
         };
-
-        loadOnce();
+      } else {
+        // Cold start — fetch from Firestore once
+        loadOnce(true);
       }
+
+      // ── systemLocks: one-time fetch + 60s poll ───────────────────────────
+      // Replaces the permanent onSnapshot that all 50+ users previously held.
+      // Cost: 1 read on load + 1 read per minute per user (vs. permanent WebSocket).
+      const pollLocks = async () => {
+        if (!mountedRef.current) return;
+        try {
+          const locks = await fetchSystemLocks();
+          trackRead(1);
+          if (!mountedRef.current) return;
+          setSystemLocks(locks);
+          if (_globalCache) _globalCache.systemLocks = locks;
+        } catch {
+          // Non-critical — fail silently
+        }
+      };
+      pollLocks(); // immediate fetch on mount
+      const locksInterval = setInterval(pollLocks, LOCKS_POLL_INTERVAL_MS);
+      unsubscribers.push(() => clearInterval(locksInterval));
+
+      // ── appVersion: fetch once on load ───────────────────────────────────
+      // Version changes are infrequent; no need for a permanent WebSocket.
+      // The AutoUpdater component handles forced reloads via a separate mechanism.
+      import('./firebase').then(({ db }) => {
+        import('firebase/firestore').then(({ getDoc, doc }) => {
+          getDoc(doc(db, 'settings', 'version'))
+            .then(snap => {
+              if (snap.exists() && mountedRef.current) {
+                setAppVersion(snap.data().currentVersion || VERSION);
+              }
+              trackRead(1);
+            })
+            .catch(() => {}); // Non-critical
+        });
+      });
     }
 
     // Safety timeout — never block UI more than 8s
     const timeout = setTimeout(() => {
-      if (mounted) setIsLoading(false);
+      if (mountedRef.current) setIsLoading(false);
     }, 8000);
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
       window.removeEventListener('firestore-error', errorHandler);
       unsubscribers.forEach(u => u());
       clearTimeout(timeout);
       clearTimeout(minTimer);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const elos = React.useMemo(() => {
     const result: Record<string, number> = {};
@@ -234,8 +340,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     dbError,
     hasPendingWrites,
-    appVersion
-  }), [players, rankedPlayers, enrichedLeaders, matches, tournaments, systemLocks, elos, isLoading, dbError, hasPendingWrites, appVersion]);
+    appVersion,
+    refreshData,
+  }), [players, rankedPlayers, enrichedLeaders, matches, tournaments, systemLocks, elos, isLoading, dbError, hasPendingWrites, appVersion, refreshData]);
 
   return (
     <FirebaseContext.Provider value={value}>
@@ -252,7 +359,11 @@ export function useFirebase() {
   return context;
 }
 
-/** Call this after any admin write to force non-admin users to re-fetch on next navigation. */
+/**
+ * Call this after any admin write to force non-admin users to re-fetch on next navigation.
+ * Also evicts the localStorage cache so a page refresh gives fresh data.
+ */
 export function invalidateGlobalCache() {
   if (_globalCache) _globalCache.fetchedAt = 0;
+  invalidateStorage(); // bust localStorage too
 }
