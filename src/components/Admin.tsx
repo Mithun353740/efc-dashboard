@@ -1575,14 +1575,13 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     }
   }, [hSeasons, viewState, selectedSeason]);
 
-  // Refresh seasons list when returning to landing view (now uses subscription for landing)
+  // Refresh seasons list when returning to landing view (one-time fetch, no persistent listener)
   React.useEffect(() => {
     if (viewState === 'landing') {
-      const unsub = subscribeToActiveClubSeasons((ss) => {
-        setHSeasons(ss);
-        setHLoading(false);
-      });
-      return unsub;
+      setHLoading(true);
+      fetchAllActiveClubSeasons()
+        .then((ss) => { setHSeasons(ss); setHLoading(false); })
+        .catch(() => setHLoading(false));
     } else {
       loadAllSeasons();
     }

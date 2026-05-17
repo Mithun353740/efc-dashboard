@@ -3,10 +3,6 @@ import { Player, Leader, MatchRecord, Tournament } from './types';
 import {
   subscribeToAppVersion,
   subscribeToSystemLocks,
-  subscribeToPlayers,
-  subscribeToLeaders,
-  subscribeToMatches,
-  subscribeToTournaments,
   sortRankedPlayers,
   testFirestoreConnection,
   computeGlobalElo,
@@ -33,6 +29,8 @@ import {
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes in-memory
 /** How often non-admin users re-check systemLocks (tiny single doc). */
 const LOCKS_POLL_INTERVAL_MS = 60 * 1000; // 60 seconds
+/** How often admin auto-refreshes collection data (replaces persistent listeners). */
+const ADMIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 let _globalCache: {
   players: Player[];
@@ -42,6 +40,9 @@ let _globalCache: {
   systemLocks: Record<string, boolean>;
   fetchedAt: number;
 } | null = null;
+
+// Admin fetch function ref — set during useEffect, called by refreshData
+let _adminFetchRef: (() => Promise<void>) | null = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Context type
@@ -142,12 +143,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Exposed to components — forces a fresh fetch and updates all state (e.g. after self-registration). */
+  /** Exposed to components — forces a fresh fetch and updates all state (e.g. after self-registration or admin writes). */
   const refreshData = useCallback(async () => {
     invalidateStorage(); // clear localStorage cache
     if (_globalCache) _globalCache.fetchedAt = 0;
     lastFetchedAt.current = 0;
-    await loadOnce(true);
+    const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+    if (isAdmin && _adminFetchRef) {
+      await _adminFetchRef();
+    } else {
+      await loadOnce(true);
+    }
   }, [loadOnce]);
 
   useEffect(() => {
@@ -183,48 +189,69 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
 
     if (isAdmin) {
-      // ── ADMIN: Real-time subscriptions ────────────────────────────────────
-      // These are acceptable costs for a single admin user.
+      // ── ADMIN: ONE-TIME FETCH + 5-min auto-refresh ────────────────────────
+      // Previously used 4 persistent onSnapshot listeners that re-fired on
+      // every write — causing ~350 reads per match entry. Now uses one-time
+      // fetches with a timed refresh, cutting admin reads by ~90%.
       ensureAdminSession();
       testFirestoreConnection();
 
-      // systemLocks — real-time for admin (they need instant updates to manage locks)
+      // systemLocks — real-time for admin (tiny single doc, needed for instant lock control)
       unsubscribers.push(subscribeToSystemLocks((locks) => {
         if (!mountedRef.current) return;
         setSystemLocks(locks);
         if (_globalCache) _globalCache.systemLocks = locks;
       }));
 
-      // appVersion — real-time for admin
+      // appVersion — real-time for admin (tiny single doc)
       unsubscribers.push(subscribeToAppVersion((version) => {
         if (mountedRef.current && version) setAppVersion(version);
       }));
 
-      unsubscribers.push(subscribeToPlayers((data, pending) => {
+      // ONE-TIME fetch for the 4 large collections
+      const adminFetch = async () => {
         if (!mountedRef.current) return;
-        setPlayers(data);
-        setHasPendingWrites(pending);
-        setIsLoading(false);
-        if (_globalCache) { _globalCache.players = data; _globalCache.fetchedAt = Date.now(); }
-      }, 200)); // Reduced from 1000 to 200 — more than enough for any club
+        try {
+          const [p, l, m, t] = await Promise.all([
+            fetchPlayersOnce(200),
+            fetchLeadersOnce(),
+            fetchMatchesOnce(100),
+            fetchTournamentsOnce(50),
+          ]);
+          if (!mountedRef.current) return;
+          setPlayers(p);
+          setLeaders(l);
+          setMatches(m);
+          setTournaments(t);
+          setIsLoading(false);
+          if (_globalCache) {
+            _globalCache.players = p;
+            _globalCache.leaders = l;
+            _globalCache.matches = m;
+            _globalCache.tournaments = t;
+            _globalCache.fetchedAt = Date.now();
+          } else {
+            _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: {}, fetchedAt: Date.now() };
+          }
+          // Persist for fast reloads
+          import('./lib/cache').then(({ persistToStorage }) => {
+            persistToStorage('players', p);
+            persistToStorage('leaders', l);
+            persistToStorage('matches', m);
+            persistToStorage('tournaments', t);
+          });
+        } catch (err) {
+          console.warn('[FirebaseContext] Admin fetch failed:', err);
+          if (mountedRef.current) setIsLoading(false);
+        }
+      };
 
-      unsubscribers.push(subscribeToLeaders((data) => {
-        if (!mountedRef.current) return;
-        setLeaders(data);
-        if (_globalCache) _globalCache.leaders = data;
-      }));
-
-      unsubscribers.push(subscribeToMatches((data) => {
-        if (!mountedRef.current) return;
-        setMatches(data);
-        if (_globalCache) _globalCache.matches = data;
-      }));
-
-      unsubscribers.push(subscribeToTournaments((data) => {
-        if (!mountedRef.current) return;
-        setTournaments(data);
-        if (_globalCache) _globalCache.tournaments = data;
-      }));
+      // Expose to module-level ref so refreshData() can trigger a manual re-fetch
+      _adminFetchRef = adminFetch;
+      adminFetch();
+      // Auto-refresh every 5 minutes so admin sees fresh data without reads on every write
+      const adminRefreshInterval = setInterval(() => { if (mountedRef.current) adminFetch(); }, ADMIN_REFRESH_INTERVAL_MS);
+      unsubscribers.push(() => { clearInterval(adminRefreshInterval); _adminFetchRef = null; });
 
     } else {
       // ── PLAYER / GUEST: ONE-TIME FETCH + controlled polling ───────────────
