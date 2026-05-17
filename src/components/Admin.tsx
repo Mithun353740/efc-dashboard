@@ -233,7 +233,6 @@ export default function Admin() {
       setEditingPlayerId(null);
       setPlayerNameSearch('');
       setPlayerNumberSearch('');
-      await refreshData();
     } catch (err) {
       console.error('Error saving player:', err);
       setPlayerMsg({ text: `❌ Failed to save player: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
@@ -264,7 +263,6 @@ export default function Admin() {
       setLeaderMsg({ text: '✅ Leader added successfully', type: 'success' });
       setNewLeader({ name: '', role: '', quote: '', initials: '', playerId: '', image: '' });
       setLeaderPlayerSearch('');
-      await refreshData();
     } catch (err) {
       console.error('Error adding leader:', err);
       setLeaderMsg({ text: `❌ Failed to save leader: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
@@ -282,7 +280,6 @@ export default function Admin() {
       await deleteLeader(id);
       setLeaderMsg({ text: '✅ Leader deleted successfully', type: 'success' });
       setLeaderToDelete(null);
-      await refreshData();
     } catch (err) {
       console.error('Error deleting leader:', err);
       setLeaderMsg({ text: `❌ Failed to delete leader: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
@@ -302,7 +299,6 @@ export default function Admin() {
       setDelSearch('');
       setPlayerMsg({ text: '✅ Player deleted successfully', type: 'success' });
       setPlayerToDelete(null);
-      await refreshData();
     } catch (err) {
       console.error('Error deleting player:', err);
       setPlayerMsg({ text: `❌ Failed to delete player: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
@@ -343,7 +339,6 @@ export default function Admin() {
       setMatch({ p1Id: '', p1Score: '', p2Score: '', p2Id: '', isExternal: false, tournament: 'QVFC Elite League Cup Division 1' });
       setP1Search('');
       setP2Search('');
-      await refreshData();
     } catch (err) {
       setMatchMsg({ text: `❌ Failed: ${err instanceof Error ? err.message : 'Error'}`, type: 'error' });
     } finally {
@@ -362,7 +357,6 @@ export default function Admin() {
       setEditMatchScore1('');
       setEditMatchScore2('');
       setEditMatchTournament('');
-      await refreshData();
     } catch (err) {
       console.error('Error editing match:', err);
       alert("Failed to save match: " + (err instanceof Error ? err.message : String(err)));
@@ -372,7 +366,6 @@ export default function Admin() {
   const handleDeleteMatch = async (m: MatchRecord) => {
     try {
       await deleteMatchFromHistory(m, players, matches);
-      await refreshData();
     } catch (err) {
       console.error('Error deleting match:', err);
     }
@@ -1731,7 +1724,6 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
       setHEditingMatch(null);
       await loadSeasonMatches();
-      await refreshData();
 
     } catch (e: any) { setMsg({ text: e.message, type: 'error' }); }
     finally { setHLoading(false); }
@@ -1744,7 +1736,6 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       await deleteMatchFromHistory(m, players, []);
       setMsg({ text: 'Match deleted and stats reverted!', type: 'success' });
       await loadSeasonMatches();
-      await refreshData();
     } catch (e: any) { setMsg({ text: e.message, type: 'error' }); }
     finally { setHLoading(false); }
   };
@@ -2014,7 +2005,6 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       flashMatch('✅ Match added', true);
       resetMForm();
       await loadMatches();
-      await refreshData();
     } catch (e: any) { flashMatch('❌ ' + e.message, false); }
     finally { setMatchBusy(false); }
   };
@@ -2027,7 +2017,6 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       setEditMatchId(null);
       flashMatch('✅ Match updated', true);
       await loadMatches();
-      await refreshData();
     } catch (e: any) { flashMatch('❌ ' + e.message, false); }
     finally { setMatchBusy(false); }
   };
@@ -2039,7 +2028,6 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       await deleteMatchFromHistory(m, players, []);
       setClubMatches(prev => prev.filter(x => x.id !== m.id));
       flashMatch('✅ Match deleted', true);
-      await refreshData();
     } catch (e: any) { flashMatch('❌ ' + e.message, false); }
     finally { setMatchBusy(false); }
   };
@@ -2234,10 +2222,6 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       if (p1) {
         const sId = selectedSeason?.id || config.activeInternalSeasonId || config.season;
         await addMatch(p1, s1, s2, p2, [], f.tournamentName || config.season, p2?.name || 'Unknown', sId, config.currentMatchday);
-        
-        // Also call global refreshData() since a real match was added
-        await refreshData();
-
       }
 
       const nf = { ...f };
