@@ -35,22 +35,33 @@ export const STATS_VERSION = 2;
 export const MIN_MATCHES = 10;
 
 /**
- * Calculates adjusted ranking stats for a player.
- * Balancing performance (OVR), activity (Points), and sample size (Confidence).
+ * Calculates adjusted ranking stats for a player (v3 - balanced for activity + performance).
+ *
+ * finalScore = (adjustedWinRate x 40) + (OVR x 0.4) + volumeBonus
+ *
+ * - adjustedWinRate = winRate x confidence  (penalises tiny sample sizes)
+ * - confidence      = n / (n + 10)   reaches 67% at 20 matches, 91% at 100
+ * - volumeBonus     = log2(MP + 1) x 2  rewards activity without letting it dominate
+ * - OVR weight (0.4) factors in ELO-derived skill
+ *
+ * The best CONSISTENT player over many matches ranks highest.
+ * A new 10-0 player stays provisional and below a 50-10 veteran.
  */
 export function calculateRankingStats(player: Player) {
   const matchesPlayed = (player.win || 0) + (player.loss || 0) + (player.draw || 0);
   const points = (player.win || 0) * 3 + (player.draw || 0);
   const winRate = matchesPlayed > 0 ? (player.win || 0) / matchesPlayed : 0;
-  
-  // Confidence factor: reaches ~50% at 20 matches, ~33% at 10 matches.
-  // Reduces the weight of high win-rates for low-match players.
-  const confidence = matchesPlayed / (matchesPlayed + 20);
+
+  // Confidence: reaches 67% at 20 matches, 83% at 50, 91% at 100
+  const confidence = matchesPlayed / (matchesPlayed + 10);
   const adjustedWinRate = winRate * confidence;
-  
-  // Formula: points (50%) + win rate (20%) + skill/elo (30%)
-  const finalScore = (points * 0.5) + (adjustedWinRate * 100 * 0.2) + (player.ovr * 0.3);
-  
+
+  // Volume bonus: logarithmic so farming easy games has diminishing returns
+  const volumeBonus = Math.log2(matchesPlayed + 1) * 2;
+
+  // Final score: 40% win-rate performance + 40% OVR skill + activity bonus
+  const finalScore = (adjustedWinRate * 40) + ((player.ovr || 60) * 0.4) + volumeBonus;
+
   return {
     finalScore: Math.round(finalScore * 100) / 100,
     isProvisional: matchesPlayed < MIN_MATCHES,
@@ -294,7 +305,8 @@ export function calculateOvrHybrid(player: Player, elo: number): number {
   // Factor experience softly
   const gamesFactor = Math.min(totalMatches, 20) / 20;
   const goalDiff = player.goalsScored - player.goalsConceded;
-  const gdFactor = Math.max(-10, Math.min(goalDiff, 20));
+  // Symmetric cap: ±15 so goal farming and heavy conceding don't over-swing OVR
+  const gdFactor = Math.max(-15, Math.min(goalDiff, 15));
   
   // Base stat value (gives up to +18 OVR)
   const statsBonus = (winPct * 15) + (gamesFactor * 5) + (gdFactor * 0.4);
@@ -1567,8 +1579,8 @@ export function sortRankedPlayers(players: Player[]): Player[] {
     // 7. Total Wins
     if (b.win !== a.win) return b.win - a.win;
     
-    // 8. Matches Played (FEWER matches played ranks higher if tied - "Games in Hand")
-    if (totalMatchesA !== totalMatchesB) return totalMatchesA - totalMatchesB;
+    // 8. More matches played ranks HIGHER (rewards activity, not "games in hand")
+    if (totalMatchesA !== totalMatchesB) return totalMatchesB - totalMatchesA;
     
     return a.name.localeCompare(b.name);
   });
