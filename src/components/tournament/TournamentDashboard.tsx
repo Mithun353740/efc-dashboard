@@ -54,22 +54,32 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
   const handleSaveDateSettings = async () => {
     setIsSaving(true);
     setDateSaveMsg('');
-    const updated: Tournament = {
-      ...tournament,
-      name: editName,
-      logo: editLogo || undefined,
-      startingDate: editStartDate || undefined,
-      maxTeams: editMaxTeams && !isNaN(Number(editMaxTeams)) && Number(editMaxTeams) > 1
-        ? Number(editMaxTeams)
-        : undefined,
-      matchDayStart: editMatchDayStart || undefined,
-      matchDayEnd: editMatchDayEnd || undefined,
-    };
-    await saveTournament(updated);
-    setTournament(updated);
-    setIsSaving(false);
-    setDateSaveMsg('✅ Saved');
-    setTimeout(() => setDateSaveMsg(''), 2500);
+    const updated: any = { ...tournament, name: editName };
+    if (editLogo) updated.logo = editLogo; else delete updated.logo;
+    if (editStartDate) updated.startingDate = editStartDate; else delete updated.startingDate;
+    
+    if (editMaxTeams && !isNaN(Number(editMaxTeams)) && Number(editMaxTeams) > 1) {
+      updated.maxTeams = Number(editMaxTeams);
+    } else {
+      delete updated.maxTeams;
+    }
+    
+    if (editMatchDayStart) updated.matchDayStart = editMatchDayStart; else delete updated.matchDayStart;
+    if (editMatchDayEnd) updated.matchDayEnd = editMatchDayEnd; else delete updated.matchDayEnd;
+
+    
+    try {
+      await saveTournament(updated);
+      setTournament(updated);
+      setDateSaveMsg('✅ Saved');
+      setTimeout(() => setDateSaveMsg(''), 2500);
+    } catch (e: any) {
+      console.error('Error saving tournament:', e);
+      setDateSaveMsg('❌ ' + (e.message || 'Save failed'));
+      setTimeout(() => setDateSaveMsg(''), 5000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const isKnockout = tournament.type === 'knockout' || tournament.type === 'groups';
