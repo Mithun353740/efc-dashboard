@@ -802,12 +802,12 @@ export async function addMatch(
 
   try {
     // 5. Dynamic Manager Rating updates - OPTIMIZED: only fetch relevant clubs
-    const p1ClubQuery = query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1.id));
+    const p1ClubQuery = query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1.id), limit(1));
     const p1ClubSnap = await getDocs(p1ClubQuery);
     
     let p2ClubSnap: any = { docs: [] };
     if (p2 && p2.id !== p1.id) {
-      const p2ClubQuery = query(collection(db, 'clubs'), where('squadIds', 'array-contains', p2.id));
+      const p2ClubQuery = query(collection(db, 'clubs'), where('squadIds', 'array-contains', p2.id), limit(1));
       p2ClubSnap = await getDocs(p2ClubQuery);
     }
 
@@ -905,8 +905,8 @@ export async function editMatch(
   // Dynamic Manager Rating updates (Edit logic) — use targeted queries not full collection fetch
   try {
     const [p1ClubSnap, p2ClubSnap] = await Promise.all([
-      getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1?.id || ''))),
-      p2 ? getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p2.id))) : Promise.resolve({ docs: [] } as any),
+      getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1?.id || ''), limit(1))),
+      p2 ? getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p2.id), limit(1))) : Promise.resolve({ docs: [] } as any),
     ]);
     const p1Club = p1ClubSnap.docs.length > 0 ? { id: p1ClubSnap.docs[0].id, ...p1ClubSnap.docs[0].data() } as Club : undefined;
     const p2Club = p2ClubSnap.docs.length > 0 ? { id: p2ClubSnap.docs[0].id, ...p2ClubSnap.docs[0].data() } as Club : undefined;
@@ -985,8 +985,8 @@ export async function deleteMatchFromHistory(
   // Dynamic Manager Rating updates (Delete logic) — use targeted queries not full collection fetch
   try {
     const [p1ClubSnap, p2ClubSnap] = await Promise.all([
-      getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1?.id || ''))),
-      p2 ? getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p2.id))) : Promise.resolve({ docs: [] } as any),
+      getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1?.id || ''), limit(1))),
+      p2 ? getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p2.id), limit(1))) : Promise.resolve({ docs: [] } as any),
     ]);
     const p1Club = p1ClubSnap.docs.length > 0 ? { id: p1ClubSnap.docs[0].id, ...p1ClubSnap.docs[0].data() } as Club : undefined;
     const p2Club = p2ClubSnap.docs.length > 0 ? { id: p2ClubSnap.docs[0].id, ...p2ClubSnap.docs[0].data() } as Club : undefined;
@@ -1174,7 +1174,7 @@ export async function saveClub(club: Club, previousOwnerId?: string): Promise<vo
   
   // Check for duplicate names (case insensitive) if this is a new club
   if (!club.id) {
-    const q = query(collection(db, 'clubs'), where('name', '==', club.name));
+    const q = query(collection(db, 'clubs'), where('name', '==', club.name), limit(1));
     const snap = await getDocs(q);
     if (!snap.empty) throw new Error('A club with this name already exists.');
   }
@@ -2246,7 +2246,8 @@ export async function startGlobalSeason(name: string): Promise<GlobalSeason> {
     const oldInternalSnap = await getDocs(query(
       collection(db, 'clubSeasons'), 
       where('globalSeason', 'in', oldActiveNames),
-      where('status', '!=', 'completed')
+      where('status', '!=', 'completed'),
+      limit(50)
     ));
     oldInternalSnap.docs.forEach(d => {
       batch.update(d.ref, { status: 'completed', endedAt: Date.now() });
