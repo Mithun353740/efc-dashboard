@@ -6,7 +6,7 @@ import {
   subscribeToInbox, subscribeToAuction, subscribeToPlayerInbox,
   sendTransferProposal, setReleaseClause, removeReleaseClause,
   getFormGrade, sendPlayerInboxMessage, applyDirectContract, fetchClubFixtures,
-  fetchPlayerInboxMessages,
+  fetchPlayerInboxMessages, purchasePlayer,
 } from '../lib/store';
 import { Club, ClubSystemConfig, MarketListing, MatchRecord, Player, ClubFixture, ClubInboxMessage } from '../types';
 import { isAdminUser, cn, getPlayerGrade, GRADE_COLORS } from '../lib/utils';
@@ -15,9 +15,6 @@ import { Link } from 'react-router-dom';
 import ClubAuction from './club/ClubAuction';
 import ClubInbox from './club/ClubInbox';
 import PlayerInbox from './club/PlayerInbox';
-
-// Module-level cache
-let _clubCache: any = null;
 
 function fmtBudget(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -410,7 +407,7 @@ export default function ClubManager() {
         } catch {}
       };
       checkAuction();
-      const interval = setInterval(checkAuction, 30_000);
+      const interval = setInterval(checkAuction, 120_000); // 2-min poll for badge (was 30s)
       return () => clearInterval(interval);
     }
   }, [isPlayer, activeTab]);

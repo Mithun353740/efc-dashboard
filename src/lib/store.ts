@@ -374,6 +374,14 @@ export function invalidateCache(key?: string) {
   }
 }
 
+/** Clears all cache entries starting with prefix. Used by delete ops where the
+ * exact season/key is not available at the call site. */
+export function invalidateCacheByPrefix(prefix: string) {
+  for (const key of Array.from(_cache.keys())) {
+    if (key.startsWith(prefix)) _cache.delete(key);
+  }
+}
+
 // IMPORTANT: Default limit=100 prevents unbounded collection scans.
 export async function fetchPlayers(limitCount = 100, force = false): Promise<Player[]> {
   const cacheKey = `players_${limitCount}`;
@@ -1300,12 +1308,16 @@ export async function fetchMarketListings(force = false): Promise<MarketListing[
  * Uses a targeted `where` query G�� costs 1 read per match doc, never loads
  * unrelated matches. Called only when the Club Rankings tab is opened.
  */
-export async function fetchClubSeasonMatches(seasonName: string): Promise<import('../types').MatchRecord[]> {
+export async function fetchClubSeasonMatches(seasonName: string, force = false): Promise<import('../types').MatchRecord[]> {
+  const cacheKey = `clubSeasonMatches_${seasonName}`;
+  if (force) invalidateCache(cacheKey);
   try {
-    const snap = await getDocs(
-      query(collection(db, 'matches'), where('tournament', '==', seasonName), limit(200))
-    );
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').MatchRecord));
+    return await fetchWithCache(cacheKey, async () => {
+      const snap = await getDocs(
+        query(collection(db, 'matches'), where('tournament', '==', seasonName), limit(200))
+      );
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').MatchRecord));
+    }, 5 * 60 * 1000);
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'matches-club-season');
     return [];
@@ -1392,10 +1404,14 @@ export async function purchasePlayer(
 
 // G��G��G�� CLUB TOURNAMENTS & FIXTURES G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
-export async function fetchClubTournaments(seasonName: string): Promise<import('../types').ClubTournament[]> {
+export async function fetchClubTournaments(seasonName: string, force = false): Promise<import('../types').ClubTournament[]> {
+  const cacheKey = `clubTournaments_${seasonName}`;
+  if (force) invalidateCache(cacheKey);
   try {
-    const snap = await getDocs(query(collection(db, 'clubTournaments'), where('season', '==', seasonName), limit(50)));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubTournament));
+    return await fetchWithCache(cacheKey, async () => {
+      const snap = await getDocs(query(collection(db, 'clubTournaments'), where('season', '==', seasonName), limit(50)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubTournament));
+    }, 10 * 60 * 1000);
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'clubTournaments');
     return [];
@@ -1407,6 +1423,7 @@ export async function saveClubTournament(tourney: import('../types').ClubTournam
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
   try {
     await setDoc(doc(db, 'clubTournaments', tourney.id), tourney);
+    invalidateCache(`clubTournaments_${tourney.season}`);
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `clubTournaments/${tourney.id}`);
     throw err;
@@ -1414,23 +1431,26 @@ export async function saveClubTournament(tourney: import('../types').ClubTournam
 }
 
 export async function deleteClubTournament(id: string): Promise<void> {
-  
   await ensureAdminSession();
   if (isQuotaExceeded) return;
   try {
     await deleteDoc(doc(db, 'clubTournaments', id));
+    invalidateCacheByPrefix('clubTournaments_');
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `clubTournaments/${id}`);
     throw err;
   }
 }
 
-export async function fetchClubFixtures(seasonName: string): Promise<import('../types').ClubFixture[]> {
-  // FIX: Removed double-read fallback — it was costing 200 extra reads on any query failure.
-  // All fixtures MUST have a 'season' field. Old docs without it are treated as not found.
+export async function fetchClubFixtures(seasonName: string, force = false): Promise<import('../types').ClubFixture[]> {
+  // Cached per-season (5-min TTL) to avoid re-reads on every tab switch or mount.
+  const cacheKey = `clubFixtures_${seasonName}`;
+  if (force) invalidateCache(cacheKey);
   try {
-    const snap = await getDocs(query(collection(db, 'clubFixtures'), where('season', '==', seasonName), limit(200)));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubFixture));
+    return await fetchWithCache(cacheKey, async () => {
+      const snap = await getDocs(query(collection(db, 'clubFixtures'), where('season', '==', seasonName), limit(200)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubFixture));
+    }, 5 * 60 * 1000);
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'clubFixtures');
     return [];
@@ -1442,6 +1462,10 @@ export async function saveClubFixture(fixture: import('../types').ClubFixture): 
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
   try {
     await setDoc(doc(db, 'clubFixtures', fixture.id), fixture);
+    // Bust cache so next fetch reflects the change immediately
+    const season = (fixture as any).season;
+    if (season) invalidateCache(`clubFixtures_${season}`);
+    else invalidateCacheByPrefix('clubFixtures_');
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `clubFixtures/${fixture.id}`);
     throw err;
@@ -1449,11 +1473,11 @@ export async function saveClubFixture(fixture: import('../types').ClubFixture): 
 }
 
 export async function deleteClubFixture(id: string): Promise<void> {
-  
   await ensureAdminSession();
   if (isQuotaExceeded) return;
   try {
     await deleteDoc(doc(db, 'clubFixtures', id));
+    invalidateCacheByPrefix('clubFixtures_');
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `clubFixtures/${id}`);
     throw err;
@@ -2012,10 +2036,14 @@ export async function removeFromShortlist(clubId: string, playerId: string): Pro
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
 /** Fetch all internal seasons for a global season (e.g., "2026/2027"). */
-export async function fetchClubSeasons(globalSeason: string): Promise<ClubSeason[]> {
+export async function fetchClubSeasons(globalSeason: string, force = false): Promise<ClubSeason[]> {
+  const cacheKey = `clubSeasons_${globalSeason}`;
+  if (force) invalidateCache(cacheKey);
   try {
-    const snap = await getDocs(query(collection(db, 'clubSeasons'), where('globalSeason', '==', globalSeason), orderBy('seasonNumber', 'asc'), limit(20)));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason));
+    return await fetchWithCache(cacheKey, async () => {
+      const snap = await getDocs(query(collection(db, 'clubSeasons'), where('globalSeason', '==', globalSeason), orderBy('seasonNumber', 'asc'), limit(20)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason));
+    }, 15 * 60 * 1000);
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'clubSeasons');
     return [];
@@ -2023,11 +2051,15 @@ export async function fetchClubSeasons(globalSeason: string): Promise<ClubSeason
 }
 
 /** Fetches ALL active or upcoming seasons across all global years for the landing dashboard. */
-export async function fetchAllActiveClubSeasons(): Promise<ClubSeason[]> {
+export async function fetchAllActiveClubSeasons(force = false): Promise<ClubSeason[]> {
+  const cacheKey = 'clubSeasons_active';
+  if (force) invalidateCache(cacheKey);
   try {
-    const q = query(collection(db, 'clubSeasons'), where('status', 'in', ['active', 'upcoming']), limit(20));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason));
+    return await fetchWithCache(cacheKey, async () => {
+      const q = query(collection(db, 'clubSeasons'), where('status', 'in', ['active', 'upcoming']), limit(20));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason));
+    }, 15 * 60 * 1000);
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'clubSeasons-active');
     return [];
@@ -2061,8 +2093,11 @@ export async function startClubSeason(globalSeason: string, seasonNumber: number
   };
   await setDoc(doc(db, 'clubSeasons', id), season);
   // Update the active season reference in clubConfig
-    await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: id, activeInternalSeasonLabel: season.label }, { merge: true });
+  await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: id, activeInternalSeasonLabel: season.label }, { merge: true });
+  // Bust caches so new season is visible immediately
   invalidateCache('club_config');
+  invalidateCache('clubSeasons_active');
+  invalidateCache(`clubSeasons_${globalSeason}`);
 
   return season;
 }
@@ -2073,9 +2108,11 @@ export async function endClubSeason(seasonId: string, standingsSnapshot: ClubSea
   await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   await setDoc(doc(db, 'clubSeasons', seasonId), { status: 'completed', endedAt: Date.now(), standingsSnapshot }, { merge: true });
-    await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: null, activeInternalSeasonLabel: null }, { merge: true });
+  await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: null, activeInternalSeasonLabel: null }, { merge: true });
+  // Bust all season caches — statuses changed across the board
   invalidateCache('club_config');
-
+  invalidateCache('clubSeasons_active');
+  invalidateCacheByPrefix('clubSeasons_');
 }
 
 /** Admin: Broadcast a system notification to all club owners' inboxes. */
@@ -2090,21 +2127,25 @@ export async function broadcastToAllOwners(ownerIds: string[], message: Omit<Clu
 /**
  * Calculates a player's form (A-E) based on their last 5 matches.
  */
-export async function fetchPlayerMatches(playerId: string, limitCount = 50): Promise<MatchRecord[]> {
+export async function fetchPlayerMatches(playerId: string, limitCount = 50, force = false): Promise<MatchRecord[]> {
+  const cacheKey = `playerMatches_${playerId}_${limitCount}`;
+  if (force) invalidateCache(cacheKey);
   try {
-    const [snap1, snap2] = await Promise.all([
-      getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId), orderBy('timestamp', 'desc'), limit(limitCount))),
-      getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId), orderBy('timestamp', 'desc'), limit(limitCount)))
-    ]);
-    const seen = new Set<string>();
-    const results: MatchRecord[] = [];
-    [...snap1.docs, ...snap2.docs].forEach(d => {
-      if (!seen.has(d.id)) {
-        seen.add(d.id);
-        results.push({ id: d.id, ...d.data() } as MatchRecord);
-      }
-    });
-    return results.sort((a, b) => b.timestamp - a.timestamp);
+    return await fetchWithCache(cacheKey, async () => {
+      const [snap1, snap2] = await Promise.all([
+        getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId), orderBy('timestamp', 'desc'), limit(limitCount))),
+        getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId), orderBy('timestamp', 'desc'), limit(limitCount)))
+      ]);
+      const seen = new Set<string>();
+      const results: MatchRecord[] = [];
+      [...snap1.docs, ...snap2.docs].forEach(d => {
+        if (!seen.has(d.id)) {
+          seen.add(d.id);
+          results.push({ id: d.id, ...d.data() } as MatchRecord);
+        }
+      });
+      return results.sort((a, b) => b.timestamp - a.timestamp);
+    }, 5 * 60 * 1000);
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, `matches/player/${playerId}`);
     return [];
@@ -2192,7 +2233,7 @@ export async function startGlobalSeason(name: string): Promise<GlobalSeason> {
   const batch = writeBatch(db);
   
   // 1. Mark all existing global seasons as 'completed'
-  const oldGsSnap = await getDocs(query(collection(db, 'globalSeasons'), where('status', '==', 'active')));
+  const oldGsSnap = await getDocs(query(collection(db, 'globalSeasons'), where('status', '==', 'active'), limit(10))); // Bounded: at most 1 active season
   const oldActiveNames: string[] = [];
   oldGsSnap.docs.forEach(d => {
     batch.update(d.ref, { status: 'completed', endedAt: Date.now() });
@@ -2221,10 +2262,13 @@ export async function startGlobalSeason(name: string): Promise<GlobalSeason> {
   return gs;
 }
 
-export async function fetchGlobalSeasons(): Promise<GlobalSeason[]> {
-  // FIX: Added limit(20) — previously an UNBOUNDED collection scan on every admin load.
-  const snap = await getDocs(query(collection(db, 'globalSeasons'), orderBy('createdAt', 'desc'), limit(20)));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as GlobalSeason));
+export async function fetchGlobalSeasons(force = false): Promise<GlobalSeason[]> {
+  const cacheKey = 'globalSeasons_all';
+  if (force) invalidateCache(cacheKey);
+  return fetchWithCache(cacheKey, async () => {
+    const snap = await getDocs(query(collection(db, 'globalSeasons'), orderBy('createdAt', 'desc'), limit(20)));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as GlobalSeason));
+  }, 15 * 60 * 1000);
 }
 
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
