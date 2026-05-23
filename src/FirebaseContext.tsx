@@ -23,14 +23,14 @@ import {
 } from './lib/cache';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SESSION CACHE — 15-minute in-memory TTL (zero re-reads on tab navigation)
-// STORAGE CACHE — 10-minute localStorage TTL (zero re-reads on page refresh)
+// SESSION CACHE — 30-minute in-memory TTL (zero re-reads on tab navigation)
+// STORAGE CACHE — 30-minute localStorage TTL (zero re-reads on page refresh)
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes in-memory
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes in-memory
 /** How often non-admin users re-check systemLocks (tiny single doc). */
-const LOCKS_POLL_INTERVAL_MS = 60 * 1000; // 60 seconds
+const LOCKS_POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 /** How often admin auto-refreshes collection data (replaces persistent listeners). */
-const ADMIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const ADMIN_REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 let _globalCache: {
   players: Player[];
