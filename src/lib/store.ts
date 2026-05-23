@@ -390,7 +390,10 @@ export async function fetchPlayers(limitCount = 100, force = false): Promise<Pla
   return fetchWithCache(cacheKey, async () => {
     const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Player;
+    });
   });
 }
 
@@ -401,7 +404,10 @@ export async function fetchLeaders(force = false): Promise<Leader[]> {
   return fetchWithCache(cacheKey, async () => {
     const q = query(collection(db, 'leaders'), limit(50));
     const snap = await getDocs(q);
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Leader;
+    });
   });
 }
 
@@ -1153,7 +1159,10 @@ export async function fetchClubs(force = false): Promise<Club[]> {
   return fetchWithCache(cacheKey, async () => {
     try {
       const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(100)));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
+      return snap.docs.map(doc => {
+        const d = doc.data();
+        return { id: doc.id, ...d, logo: d.logo || '/default-logo.jpg' } as Club;
+      });
     } catch (err) {
       handleFirestoreError(err, OperationType.LIST, 'clubs');
       throw err;
@@ -1164,7 +1173,10 @@ export async function fetchClubs(force = false): Promise<Club[]> {
 export function subscribeToClubs(callback: (clubs: Club[]) => void, limitCount = 50) {
     const q = query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(limitCount));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Club)));
+    callback(snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, logo: d.logo || '/default-logo.jpg' } as Club;
+    }));
   }, (err) => handleFirestoreError(err, OperationType.GET, 'clubs'));
 }
 
@@ -1626,7 +1638,12 @@ const AUCTION_DOC = doc(db, 'auctions', 'live');
 /** Real-time listener on the single auction document. */
 export function subscribeToAuction(callback: (state: AuctionState | null) => void) {
   return onSnapshot(AUCTION_DOC, (snap) => {
-    callback(snap.exists() ? (snap.data() as AuctionState) : null);
+    if (!snap.exists()) return callback(null);
+    const state = snap.data() as AuctionState;
+    if (state.currentPlayer && !state.currentPlayer.image) {
+      state.currentPlayer.image = '/default-logo.jpg';
+    }
+    callback(state);
   }, (err) => handleFirestoreError(err, OperationType.GET, 'auctions/live'));
 }
 
@@ -2504,7 +2521,10 @@ export async function fetchPlayersOnce(limitCount = 15): Promise<Player[]> {
   try {
     const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Player));
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Player;
+    });
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, 'players');
     return [];
@@ -2516,7 +2536,10 @@ export async function fetchLeadersOnce(): Promise<Leader[]> {
   try {
     const q = query(collection(db, 'leaders'), limit(20));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Leader));
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Leader;
+    });
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, 'leaders');
     return [];
