@@ -329,7 +329,7 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const CACHE_TTL = 15 * 60 * 1000; // 15 minutes — matches FirebaseContext session TTL
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes — matches FirebaseContext/localStorage session TTL
 const _cache = new Map<string, CacheEntry<any>>();
 const _pendingRequests = new Map<string, Promise<any>>();
 
@@ -508,19 +508,24 @@ export async function updatePlayerProfile(
  * recomputing stats during admin writes.
  */
 async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]> {
-  const [snap1, snap2] = await Promise.all([
-    getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId), orderBy('timestamp', 'desc'), limit(100))),
-    getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId), orderBy('timestamp', 'desc'), limit(100))),
-  ]);
-  const seen = new Set<string>();
-  const results: MatchRecord[] = [];
-  [...snap1.docs, ...snap2.docs].forEach(d => {
-    if (!seen.has(d.id)) {
-      seen.add(d.id);
-      results.push({ id: d.id, ...d.data() } as MatchRecord);
-    }
-  });
-  return results.sort((a, b) => a.timestamp - b.timestamp);
+  // Short 2-minute cache — prevents duplicate reads when addMatch/editMatch
+  // call this for both p1 and p2 within the same operation.
+  const cacheKey = `playerMatches_${playerId}`;
+  return fetchWithCache(cacheKey, async () => {
+    const [snap1, snap2] = await Promise.all([
+      getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId), orderBy('timestamp', 'desc'), limit(100))),
+      getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId), orderBy('timestamp', 'desc'), limit(100))),
+    ]);
+    const seen = new Set<string>();
+    const results: MatchRecord[] = [];
+    [...snap1.docs, ...snap2.docs].forEach(d => {
+      if (!seen.has(d.id)) {
+        seen.add(d.id);
+        results.push({ id: d.id, ...d.data() } as MatchRecord);
+      }
+    });
+    return results.sort((a, b) => a.timestamp - b.timestamp);
+  }, 2 * 60 * 1000); // 2-min TTL — short enough to stay accurate, long enough to deduplicate
 }
 
 // Admin-only real-time listener. Limit=200 is sufficient for any club.

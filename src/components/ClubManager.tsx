@@ -377,22 +377,19 @@ export default function ClubManager() {
       } catch {}
     };
     checkUnread();
-    const interval = setInterval(checkUnread, 2 * 60 * 1000); // Poll every 2 min for badge
+    const interval = setInterval(checkUnread, 5 * 60 * 1000); // Poll every 5 min for badge
     return () => clearInterval(interval);
   }, [playerId, isPlayer, activeTab, isOwner]);
 
   // ── Auction: real-time only when Auction tab active; poll otherwise ────────
-  // Full real-time listener when tab is open (needed for live bidding).
-  // Lightweight poll when tab is closed (just enough to show the 🔴 LIVE badge).
   useEffect(() => {
     if (!isPlayer) return;
     if (activeTab === 'auction') {
-      // Full real-time listener while auction tab is open
-      return subscribeToAuction((s) => {
-        setAuctionLive(!!s && s.status !== 'ended' && s.status !== 'idle');
-      });
+      // ClubAuction component handles the real-time subscription when active.
+      // We don't need a duplicate listener here.
+      return;
     } else {
-      // Lightweight 30-second poll for badge — no persistent WebSocket
+      // Lightweight 5-minute poll for badge — no persistent WebSocket
       const checkAuction = async () => {
         try {
           const { db } = await import('../firebase');
@@ -407,7 +404,7 @@ export default function ClubManager() {
         } catch {}
       };
       checkAuction();
-      const interval = setInterval(checkAuction, 120_000); // 2-min poll for badge (was 30s)
+      const interval = setInterval(checkAuction, 300_000); // 5-min poll for badge (was 2m)
       return () => clearInterval(interval);
     }
   }, [isPlayer, activeTab]);
