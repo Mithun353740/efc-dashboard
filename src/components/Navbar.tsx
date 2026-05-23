@@ -14,6 +14,7 @@ export default function Navbar() {
   const [isPlayer, setIsPlayer] = useState(false);
   const [playerName, setPlayerName] = useState('');
   const [loggedInPlayerId, setLoggedInPlayerId] = useState('');
+  const [playerRole, setPlayerRole] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -28,9 +29,9 @@ export default function Navbar() {
     return { 
       playerImage: p?.image || '', 
       isClubOwner: p?.isClubOwner === true,
-      isSystemAdmin: isAdminLoggedIn || p?.role === 'admin'
+      isSystemAdmin: isAdminLoggedIn || playerRole === 'admin'
     };
-  }, [players, loggedInPlayerId, isPlayer]);
+  }, [players, loggedInPlayerId, isPlayer, playerRole]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -49,6 +50,7 @@ export default function Navbar() {
       if (playerLoggedIn) {
         setPlayerName(localStorage.getItem('playerName') || 'Player');
         setLoggedInPlayerId(localStorage.getItem('playerId') || '');
+        setPlayerRole(localStorage.getItem('playerRole') || 'player');
       }
     };
     
