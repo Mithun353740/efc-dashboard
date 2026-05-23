@@ -297,7 +297,7 @@ export default function PlayerStats() {
               </div>
 
               {/* Detailed Stats Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-4">
                 {/* 1. Activity & Outcomes */}
                 <StatCard icon={<Activity className="text-brand-purple" />} label="TOTAL MATCHES" value={computedPlayer.rankingStats.matchesPlayed} />
                 <StatCard icon={<Zap className="text-green-500" />} label="TOTAL WINS" value={computedPlayer.win} />
@@ -322,16 +322,16 @@ export default function PlayerStats() {
               {/* Form & Recent */}
               <div className="bg-white dark:bg-white/5 rounded-3xl p-6 lg:p-8 border border-slate-100 dark:border-white/10 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors">
                 <h3 className="text-lg font-black text-brand-dark dark:text-white mb-6 tracking-tight">RECENT FORM</h3>
-                <div className="grid grid-cols-5 gap-2 lg:gap-4">
-                  {(computedPlayer.win > 0 || computedPlayer.loss > 0 || computedPlayer.draw > 0) && computedPlayer.form?.length ? computedPlayer.form.slice(0, 5).map((res, i) => (
+                <div className="flex flex-wrap gap-2 lg:gap-3">
+                  {(computedPlayer.win > 0 || computedPlayer.loss > 0 || computedPlayer.draw > 0) && computedPlayer.form?.length ? computedPlayer.form.slice(0, 10).map((res, i) => (
                     <div key={i} className={cn(
-                      "py-3 lg:py-4 rounded-xl lg:rounded-2xl flex flex-col items-center justify-center border transition-all",
+                      "w-10 h-12 lg:w-14 lg:h-14 rounded-xl lg:rounded-2xl flex flex-col items-center justify-center border transition-all flex-shrink-0",
                       res === 'W' ? "bg-brand-purple/10 border-brand-purple/20 text-brand-purple" :
                       res === 'L' ? "bg-red-500/10 border-red-500/20 text-red-500" :
                       "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400"
                     )}>
-                      <span className="text-lg lg:text-xl font-black">{res}</span>
-                      <span className="text-[7px] lg:text-[8px] font-black uppercase tracking-widest mt-1 opacity-60">MATCH {i + 1}</span>
+                      <span className="text-sm lg:text-xl font-black">{res}</span>
+                      <span className="text-[6px] lg:text-[8px] font-black uppercase tracking-widest mt-0.5 opacity-60">M{i + 1}</span>
                     </div>
                   )) : (
                     <div className="col-span-5 py-12 text-center border-2 border-dashed border-slate-100 dark:border-white/10 rounded-2xl">
@@ -435,13 +435,13 @@ export default function PlayerStats() {
 
 function StatCard({ icon, label, value, tooltip }: { icon: React.ReactNode; label: string; value: string | number; tooltip?: string }) {
   return (
-    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 p-5 rounded-3xl shadow-sm flex items-center gap-4 transition-all hover:scale-[1.01] relative group">
-      <div className="w-10 h-10 lg:w-12 lg:h-12 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center shrink-0">
-        <div className="scale-75 lg:scale-100">{icon}</div>
+    <div className="bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 p-3 lg:p-5 rounded-2xl lg:rounded-3xl shadow-sm flex items-center gap-2 lg:gap-4 transition-all hover:scale-[1.01] relative group">
+      <div className="w-8 h-8 lg:w-12 lg:h-12 bg-slate-50 dark:bg-white/5 rounded-xl lg:rounded-2xl flex items-center justify-center shrink-0">
+        <div className="scale-75">{icon}</div>
       </div>
       <div className="min-w-0">
-        <p className="text-[9px] font-black text-slate-400 tracking-widest uppercase truncate">{label}</p>
-        <p className="text-xl lg:text-2xl font-black text-brand-dark dark:text-white leading-none truncate">{value}</p>
+        <p className="text-[8px] lg:text-[9px] font-black text-slate-400 tracking-widest uppercase leading-tight">{label}</p>
+        <p className="text-lg lg:text-2xl font-black text-brand-dark dark:text-white leading-none">{value}</p>
       </div>
       {tooltip && (
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 hidden group-hover:block bg-brand-dark text-white p-2 rounded-lg text-[8px] font-bold text-center border border-white/10 shadow-2xl z-20">

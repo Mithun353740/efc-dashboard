@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -21,12 +21,34 @@ import { FirebaseProvider, useFirebase } from './FirebaseContext';
 import { INITIAL_PLAYERS } from './lib/store';
 import ClubManager from './components/ClubManager';
 import firebaseConfig from '../firebase-applet-config.json';
+import { CLUB_LOGO, CLUB_NAME } from './constants';
 
 function Home() {
   const { rankedPlayers, dbError, isLoading } = useFirebase();
+  // Grace period: don't show NO DATA DETECTED for 4s after isLoading flips false
+  // (the 1200ms branding timer can fire before the Firestore fetch completes)
+  const [grace, setGrace] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setGrace(false), 4000);
+    return () => clearTimeout(t);
+  }, []);
 
-  // Safety: If we are not loading but have no players, something is wrong or empty
-  if (!isLoading && rankedPlayers.length === 0) {
+  if (!isLoading && rankedPlayers.length === 0 && grace) {
+    // Still within grace window — show a subtle spinner instead of NO DATA
+    return (
+      <div className="py-32 flex flex-col items-center justify-center gap-4">
+        <div className="flex items-center gap-1.5">
+          {[0,1,2,3,4].map(i => (
+            <div key={i} className="w-1 bg-brand-purple/40 rounded-full animate-bounce"
+              style={{ height: 20 + (i % 3) * 8 + 'px', animationDelay: i * 0.1 + 's' }} />
+          ))}
+        </div>
+        <p className="text-[10px] font-black text-slate-500 tracking-[0.3em] uppercase">Loading data...</p>
+      </div>
+    );
+  }
+
+  if (!isLoading && rankedPlayers.length === 0 && !grace) {
     return (
       <div className="py-20 text-center">
         <h2 className="text-2xl font-black text-slate-500 uppercase tracking-widest">NO DATA DETECTED</h2>
@@ -62,8 +84,35 @@ function AppContent() {
   const { isLoading, dbError, rankedPlayers, matches, leaders } = useFirebase();
 
   if (isLoading) return (
-    <div className="min-h-screen bg-brand-dark flex items-center justify-center">
-      <div className="text-brand-purple font-black animate-pulse tracking-widest">INITIALIZING VORTEX ENGINE...</div>
+    <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center gap-8">
+      {/* Club logo with pulsing ring */}
+      <div className="relative">
+        <div className="w-20 h-20 rounded-[1.5rem] overflow-hidden border border-brand-purple/40 shadow-2xl shadow-brand-purple/30">
+          <img src={CLUB_LOGO} alt={CLUB_NAME} className="w-full h-full object-cover" />
+        </div>
+        <div className="absolute -inset-2 rounded-[2rem] border border-brand-purple/30 animate-ping" style={{ animationDuration: '1.5s' }} />
+      </div>
+
+      {/* Animated frequency bars */}
+      <div className="flex items-end gap-1.5">
+        {[14, 22, 18, 28, 20, 16, 26, 12, 24, 18].map((h, i) => (
+          <div
+            key={i}
+            className="w-1.5 bg-brand-purple rounded-full animate-bounce"
+            style={{ height: h + 'px', animationDelay: i * 0.08 + 's', animationDuration: '0.8s' }}
+          />
+        ))}
+      </div>
+
+      {/* Text */}
+      <div className="text-center space-y-2">
+        <p className="text-brand-purple font-black tracking-[0.35em] text-xs uppercase">
+          INITIALIZING VORTEX ENGINE
+        </p>
+        <p className="text-slate-600 font-bold text-[10px] tracking-widest uppercase">
+          Loading match data &amp; player rankings...
+        </p>
+      </div>
     </div>
   );
 

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tournament, Fixture, Team } from '../../types';
-import { saveTournament, addMatch } from '../../lib/store';
+import { saveTournament, addMatch, deleteMatchFromHistory } from '../../lib/store';
 import { useFirebase } from '../../FirebaseContext';
 import {
   ChevronLeft, ChevronRight, CheckCircle, Clock, Zap, Edit3, X, Check,
-  Shuffle, ListOrdered, Lock, Unlock, RefreshCw, AlertTriangle,
+  Shuffle, ListOrdered, Lock, Unlock, RefreshCw, AlertTriangle, Trash2,
 } from 'lucide-react';
 import { bergerRoundRobin, seededKnockout } from '../../lib/fixtureGen';
 import { cn } from '../../lib/utils';
@@ -165,9 +165,55 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
   };
 
   const handleResetScore = async (fixtureId: string) => {
+    const fixture = fixtures.find(f => f.id === fixtureId);
+    if (!fixture) return;
+
+    if (fixture.status === 'completed') {
+      const confirmed = window.confirm(
+        '⚠️ WARNING: This will reset the score AND remove this match result from the global stats history.\n\nPlayer rankings and form will be recalculated. This cannot be undone.\n\nAre you sure?'
+      );
+      if (!confirmed) return;
+
+      // Find and delete the corresponding match record from global history
+      const linkedMatch = matches.find(m =>
+        m.tournament === tournament.name &&
+        ((m.p1Id === fixture.homeId && m.p2Id === fixture.awayId) ||
+         (m.p1Id === fixture.awayId && m.p2Id === fixture.homeId)) &&
+        m.p1Score === fixture.homeScore &&
+        m.p2Score === fixture.awayScore
+      );
+      if (linkedMatch) {
+        try {
+          await deleteMatchFromHistory(linkedMatch, players, []);
+        } catch (err) {
+          console.error('Failed to remove match from global history:', err);
+        }
+      }
+    } else {
+      const confirmed = window.confirm('Reset this fixture back to upcoming?');
+      if (!confirmed) return;
+    }
+
     const updatedFixtures = fixtures.map(f =>
       f.id === fixtureId ? { ...f, homeScore: null, awayScore: null, status: 'upcoming' as const } : f
     );
+    const updated: Tournament = { ...tournament, fixtures: updatedFixtures };
+    await saveTournament(updated);
+    onUpdate(updated);
+  };
+
+  const handleDeleteFixture = async (fixtureId: string) => {
+    const fixture = fixtures.find(f => f.id === fixtureId);
+    if (!fixture) return;
+
+    const confirmed = window.confirm(
+      fixture.status === 'completed'
+        ? '⚠️ WARNING: This fixture has a score. Deleting it will NOT automatically remove the match from player history.\n\nUse "Reset Score" first to revert stats, then delete.\n\nDelete anyway?'
+        : 'Delete this fixture? This cannot be undone.'
+    );
+    if (!confirmed) return;
+
+    const updatedFixtures = fixtures.filter(f => f.id !== fixtureId);
     const updated: Tournament = { ...tournament, fixtures: updatedFixtures };
     await saveTournament(updated);
     onUpdate(updated);
@@ -512,6 +558,7 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
                                 <button
                                   onClick={() => setEditingScore(null)}
                                   className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/20 transition-all"
+                                  title="Cancel editing"
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
@@ -544,12 +591,19 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
                                 {(isDone || f.status === 'live') && (
                                   <button
                                     onClick={() => handleResetScore(f.id)}
-                                    className="w-8 h-8 rounded-lg bg-[#0f0f1a] border border-[#1e1e32] text-slate-500 flex items-center justify-center hover:border-red-500/50 hover:text-red-400 transition-all"
-                                    title="Reset to Upcoming"
+                                    className="w-8 h-8 rounded-lg bg-[#0f0f1a] border border-[#1e1e32] text-slate-500 flex items-center justify-center hover:border-amber-500/50 hover:text-amber-400 transition-all"
+                                    title="Reset score (removes from history)"
                                   >
                                     <X className="w-3.5 h-3.5" />
                                   </button>
                                 )}
+                                <button
+                                  onClick={() => handleDeleteFixture(f.id)}
+                                  className="w-8 h-8 rounded-lg bg-[#0f0f1a] border border-[#1e1e32] text-slate-500 flex items-center justify-center hover:border-red-500/50 hover:text-red-400 transition-all"
+                                  title="Delete fixture"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </>
                             )}
                           </div>
