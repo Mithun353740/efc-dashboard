@@ -186,6 +186,29 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Real-time revocation listener for Player Admins
+    const pRole = localStorage.getItem('playerRole');
+    const pId = localStorage.getItem('playerId');
+    if (pRole === 'admin' && pId) {
+      import('./firebase').then(({ db }) => {
+        import('firebase/firestore').then(({ doc, onSnapshot }) => {
+          const unsub = onSnapshot(doc(db, 'players', pId), (snap) => {
+            if (snap.exists() && snap.data().role !== 'admin') {
+              const realRole = snap.data().role || 'player';
+              localStorage.setItem('playerRole', realRole);
+              localStorage.setItem('userType', 'player');
+              window.dispatchEvent(new StorageEvent('storage', { key: 'playerRole', newValue: realRole }));
+              window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: 'player' }));
+              if (window.location.hash.includes('/admin')) {
+                window.location.hash = '/';
+              }
+            }
+          });
+          unsubscribers.push(unsub);
+        });
+      });
+    }
+
     const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
 
     if (isAdmin) {
