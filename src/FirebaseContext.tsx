@@ -160,10 +160,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     mountedRef.current = true;
     const unsubscribers: (() => void)[] = [];
 
-    // Minimum branding delay
-    const minTimer = setTimeout(() => {
-      if (mountedRef.current) setIsLoading(false);
-    }, 1200);
+
 
     // Global error handler
     const errorHandler = (e: Event) => {
@@ -336,7 +333,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('firestore-error', errorHandler);
       unsubscribers.forEach(u => u());
       clearTimeout(timeout);
-      clearTimeout(minTimer);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
