@@ -492,7 +492,7 @@ export default function ClubManager() {
     { id: 'rankings', label: 'LEAGUE', icon: <Trophy size={14} /> },
     { id: 'tournaments', label: 'MATCHES', icon: <Calendar size={14} /> },
     { id: 'inbox', label: 'INBOX', icon: <Bell size={14} />, badge: (isOwner ? inboxUnread : playerUnread) || null },
-  ] as const;
+  ];
 
   return (
     <div className="bg-[#020617] text-white selection:bg-amber-500/30 pb-20 relative">
@@ -725,6 +725,8 @@ export default function ClubManager() {
                             sellerClubId: seller.id,
                             sellerClubName: seller.name,
                             sellerOwnerId: seller.ownerId,
+                            playerImage: shortlistPlayer.image || '',
+                            playerOvr: shortlistPlayer.ovr || 0,
                             currentOffer: {
                               type: offerType,
                               amount: offerType !== 'swap' ? Number(offerAmount) : null,
@@ -763,7 +765,7 @@ export default function ClubManager() {
                 <button onClick={() => setReleaseTarget(null)} className="py-4 bg-white/5 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Cancel</button>
                 <button onClick={async () => {
                    if (!releaseAmount) return;
-                   await setReleaseClause(releaseTarget.id, { amount: Number(releaseAmount), active: true, setByClubId: myClub?.id || '', setAt: Date.now() });
+                   await setReleaseClause(releaseTarget.id, { amount: Number(releaseAmount), active: true, setByClubId: myClub?.id || '', setByClubName: myClub?.name || '', setAt: Date.now() });
                    setMsg({ text: 'Set!', type: 'success' }); setReleaseTarget(null); load(true);
                 }} className="py-4 bg-amber-500 text-black rounded-2xl text-[10px] font-black uppercase">Save</button>
               </div>

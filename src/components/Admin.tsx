@@ -2,10 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Edit3, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad } from '../lib/store';
+import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, endClubZoneSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
+import ClubTournamentsTab from './club/ClubTournamentsTab';
 import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture, AuctionState, ClubSeason, GlobalSeason } from '../types';
 import { getSeasonInfo, cn, getPlayerGrade } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
@@ -1481,6 +1482,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const [viewState, setViewState] = React.useState<'landing' | 'season_management' | 'global_history' | 'franchise_registry'>('landing');
   const [selectedSeason, setSelectedSeason] = React.useState<ClubSeason | null>(null);
   const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'auction'|'config'|'seasons'|'history'|'franchise'>('auction');
+  const [activeAdminTournamentId, setActiveAdminTournamentId] = React.useState<string | null>(null);
 
   // Sync subTab if forced changes
   React.useEffect(() => {
@@ -1715,6 +1717,36 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   React.useEffect(() => {
     if (subTab === 'history') loadSeasonMatches();
   }, [hSelectedSeasonId, subTab]);
+
+  const handleEndClubZoneSeason = async () => {
+    if (!config.season) return;
+    const activeGlobal = gSeasons.find(g => g.status === 'active')?.name;
+    if (!activeGlobal) {
+      setMsg({ text: '❌ No active Global Season found to link history.', type: 'error' });
+      return;
+    }
+
+    const nextSeason = prompt(`Are you sure you want to end "${config.season}"?\nPlayer club stats will be reset, and standings will move to History.\n\nEnter the new season name to proceed (e.g. "Club Season 2"):`);
+    if (!nextSeason) return;
+
+    setConfigSaving(true);
+    setMsg({ text: 'Ending season...', type: 'info' });
+    try {
+      await endClubZoneSeason(config.season, activeGlobal, players, clubs);
+      
+      const newConfig = { ...config, season: nextSeason };
+      await saveClubConfig(newConfig);
+      setConfig(newConfig);
+      
+      setMsg({ text: '✅ Season ended successfully. Welcome to ' + nextSeason + '!', type: 'success' });
+      
+      await loadAllSeasons(); // Refresh history
+    } catch (e: any) {
+      setMsg({ text: '❌ ' + e.message, type: 'error' });
+    } finally {
+      setConfigSaving(false);
+    }
+  };
 
   const handleHistoryEditMatch = async () => {
     if (!hEditingMatch) return;
@@ -2785,51 +2817,63 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
       {subTab === 'tournaments' && (
         <div className="space-y-6">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl flex items-center justify-between">
-            <div>
-              <h3 className="text-2xl font-black tracking-tight mb-1">TOURNAMENTS</h3>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                Active in <span className="text-amber-400 font-black">{selectedSeason?.label || config.season}</span>
-              </p>
+          {activeAdminTournamentId ? (
+            <div className="space-y-4">
+              <button onClick={() => setActiveAdminTournamentId(null)} className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all w-fit">
+                ← BACK TO ALL TOURNAMENTS
+              </button>
+              <ClubTournamentsTab myClub={null} allClubs={clubs} allPlayers={players} config={config} isOwner={false} isAdmin={true} initialTournamentId={activeAdminTournamentId} />
             </div>
-            <button onClick={() => setShowTSetup(true)} className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl shadow-lg shadow-amber-500/20 transition-all uppercase">
-              CREATE NEW TOURNAMENT
-            </button>
-          </div>
-          
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-            <h3 className="text-xl font-black tracking-tight mb-6 uppercase">Active Tournaments ({tournaments.length})</h3>
-            {!tLoaded ? <p className="text-slate-500 text-xs font-bold animate-pulse">Loading...</p> : tournaments.length === 0 ? <p className="text-slate-500 text-xs font-bold">No club tournaments created for this season.</p> : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tournaments.map(t => (
-                  <div key={t.id} className="group bg-[#0f172a] rounded-2xl border border-white/10 p-6 flex flex-col gap-4 relative overflow-hidden">
-                    <div className="relative z-10">
-                      <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">{t.type.replace('_',' ')}</p>
-                      <h4 className="font-black text-lg text-white uppercase mb-2">{t.name}</h4>
-                      <div className="flex items-center gap-3 mb-4">
-                         <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded",
-                            t.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
-                            t.status === 'paused' ? 'bg-amber-500/20 text-amber-400' :
-                            t.status === 'postponed' ? 'bg-red-500/20 text-red-400' :
-                            'bg-slate-500/20 text-slate-400'
-                          )}>
-                            {t.status}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-bold">{t.participatingClubIds?.length || 0} CLUBS</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => {
-                          setEditingTId(t.id); 
-                          setTStatusForm({ status: t.status || 'active', reason: t.statusReason || '' });
-                        }} className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl text-[10px] font-black uppercase transition-all">EDIT STATUS</button>
-                        <button onClick={() => handleDelTournament(t.id)} className="px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all"><Trash2 size={16} /></button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+          ) : (
+            <>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-black tracking-tight mb-1">TOURNAMENTS</h3>
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Active in <span className="text-amber-400 font-black">{selectedSeason?.label || config.season}</span>
+                  </p>
+                </div>
+                <button onClick={() => setShowTSetup(true)} className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl shadow-lg shadow-amber-500/20 transition-all uppercase">
+                  CREATE NEW TOURNAMENT
+                </button>
               </div>
-            )}
-          </div>
+              
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
+                <h3 className="text-xl font-black tracking-tight mb-6 uppercase">Active Tournaments ({tournaments.length})</h3>
+                {!tLoaded ? <p className="text-slate-500 text-xs font-bold animate-pulse">Loading...</p> : tournaments.length === 0 ? <p className="text-slate-500 text-xs font-bold">No club tournaments created for this season.</p> : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {tournaments.map(t => (
+                      <div key={t.id} className="group bg-[#0f172a] rounded-2xl border border-white/10 p-6 flex flex-col gap-4 relative overflow-hidden">
+                        <div className="relative z-10">
+                          <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">{t.type.replace('_',' ')}</p>
+                          <h4 className="font-black text-lg text-white uppercase mb-2">{t.name}</h4>
+                          <div className="flex items-center gap-3 mb-4">
+                             <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded",
+                                t.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
+                                t.status === 'paused' ? 'bg-amber-500/20 text-amber-400' :
+                                t.status === 'postponed' ? 'bg-red-500/20 text-red-400' :
+                                'bg-slate-500/20 text-slate-400'
+                              )}>
+                                {t.status}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-bold">{t.participatingClubIds?.length || 0} CLUBS</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => setActiveAdminTournamentId(t.id)} className="flex-[2] py-3 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-amber-500/20">DASHBOARD</button>
+                            <button onClick={() => {
+                              setEditingTId(t.id); 
+                              setTStatusForm({ status: t.status || 'active', reason: t.statusReason || '' });
+                            }} className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl text-[10px] font-black uppercase transition-all">STATUS</button>
+                            <button onClick={() => handleDelTournament(t.id)} className="px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all"><Trash2 size={16} /></button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           <AnimatePresence>
             {showTSetup && (
@@ -3688,6 +3732,9 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
               </div>
               <button onClick={handleSaveConfig} disabled={configSaving} className="w-full py-4 glossy-btn rounded-xl disabled:opacity-50 uppercase text-xs font-black tracking-widest">
                 {configSaving ? 'SAVING...' : 'SAVE CONFIG'}
+              </button>
+              <button onClick={handleEndClubZoneSeason} disabled={configSaving} className="w-full py-4 mt-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl disabled:opacity-50 uppercase text-xs font-black tracking-widest transition-all">
+                {configSaving ? 'PROCESSING...' : 'END CLUB ZONE SEASON'}
               </button>
               {msg.text && <p className={cn('text-[10px] font-bold text-center mt-2', msg.type === 'success' ? 'text-emerald-400' : 'text-red-400')}>{msg.text}</p>}
             </div>
