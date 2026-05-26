@@ -778,7 +778,7 @@ export async function addMatch(
 
   // 1. Write the new match document first
   const matchRef = doc(collection(db, 'matches'));
-  const matchRecord: MatchRecord = {
+  const rawRecord = {
     id: matchRef.id,
     timestamp: Date.now(),
     p1Id: p1.id,
@@ -795,6 +795,11 @@ export async function addMatch(
     clubFixtureId,
     clubSubMatchId,
   };
+  
+  const matchRecord = Object.fromEntries(
+    Object.entries(rawRecord).filter(([_, v]) => v !== undefined)
+  ) as MatchRecord;
+
   batch.set(matchRef, matchRecord);
 
   // 2. Fetch full match history for each affected player from Firestore

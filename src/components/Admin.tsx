@@ -16,7 +16,7 @@ import { bergerRoundRobin } from '../lib/fixtureGen';
 
 
 export default function Admin() {
-  const { players, leaders, matches, tournaments, systemLocks, dbError, hasPendingWrites, appVersion, refreshData } = useFirebase();
+  const { players, leaders, matches, tournaments, systemLocks, dbError, hasPendingWrites, appVersion } = useFirebase();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials' | 'clubs' | 'auction'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
@@ -1047,7 +1047,6 @@ export default function Admin() {
                           try { 
                             await ensureAdminSession();
                             await toggleSystemLock('tournaments', !systemLocks?.tournaments); 
-                            await refreshData();
                           }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
@@ -1078,7 +1077,6 @@ export default function Admin() {
                           try { 
                             await ensureAdminSession();
                             await toggleSystemLock('tournamentRegistration', !isCurrentlyLocked); 
-                            await refreshData();
                           }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
@@ -1110,7 +1108,6 @@ export default function Admin() {
                           try { 
                             await ensureAdminSession();
                             await toggleSystemLock('clubManager', !systemLocks?.clubManager); 
-                            await refreshData();
                           }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
