@@ -2441,13 +2441,20 @@ export async function respondToContractRenewal(msg: PlayerInboxMessage, accepted
   let responseMessageBody = '';
 
   if (accepted && msg.data?.playerId) {
-    // Player accepted: update contract
+    // Player accepted: update contract and deduct club budget
     batch.update(doc(db, 'players', msg.data.playerId), {
       clubContract: {
         type: 'matches',
         amount: msg.data.duration || 10
       }
     });
+    
+    if (msg.data.clubId && msg.data.salary) {
+      batch.update(doc(db, 'clubs', msg.data.clubId), {
+        budget: increment(-msg.data.salary)
+      });
+    }
+
     responseMessageBody = `✅ ${msg.data.playerName || 'Player'} accepted the contract renewal for ${msg.data.clubName || 'the club'}!`;
   } else if (!accepted && msg.data?.playerId) {
     // Player rejected: automatically list them on the Transfer Market
