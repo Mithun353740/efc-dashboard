@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Calendar, Clock, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { Trophy, Calendar, Clock, CheckCircle, AlertCircle, Loader, X, Save } from 'lucide-react';
 import { Club, ClubTournament, ClubFixture, ClubSystemConfig, Player } from '../../types';
-import { fetchClubTournaments, fetchClubFixtures, computeClubStandings } from '../../lib/store';
+import { fetchClubTournaments, fetchClubFixtures, computeClubStandings, saveClubFixtureResult } from '../../lib/store';
 
 function countdownStr(deadline: number) {
   const diff = deadline - Date.now();
@@ -26,16 +26,79 @@ interface ClubTournamentsTabProps {
   config: ClubSystemConfig | null;
   isOwner: boolean;
   isAdmin?: boolean;
+  initialTournamentId?: string;
 }
 
 export default function ClubTournamentsTab({
-  myClub, allClubs, allPlayers, config, isOwner, isAdmin
+  myClub, allClubs, allPlayers, config, isOwner, isAdmin, initialTournamentId
 }: ClubTournamentsTabProps) {
   const [tournaments, setTournaments] = useState<ClubTournament[]>([]);
   const [fixtures, setFixtures] = useState<ClubFixture[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTournament, setActiveTournament] = useState<ClubTournament | null>(null);
   const [activeView, setActiveView] = useState<'standings' | 'fixtures' | 'results'>('standings');
+  
+  // Score Entry State (Admin)
+  const [editingFixture, setEditingFixture] = useState<ClubFixture | null>(null);
+  const [fixtureScores, setFixtureScores] = useState<Record<string, { p1: string, p2: string }>>({});
+  const [savingScores, setSavingScores] = useState(false);
+  const [scoreMsg, setScoreMsg] = useState({ text: '', type: '' });
+
+  const handleOpenScoreModal = (f: ClubFixture) => {
+    setEditingFixture(f);
+    const initialScores: Record<string, { p1: string, p2: string }> = {};
+    f.subMatches.forEach(sm => {
+      initialScores[sm.id] = {
+        p1: sm.p1Score !== null ? String(sm.p1Score) : '',
+        p2: sm.p2Score !== null ? String(sm.p2Score) : ''
+      };
+    });
+    setFixtureScores(initialScores);
+    setScoreMsg({ text: '', type: '' });
+  };
+
+  const handleSaveScores = async () => {
+    if (!editingFixture || !config) return;
+    setSavingScores(true);
+    setScoreMsg({ text: 'Saving...', type: 'info' });
+    try {
+      // For each sub-match, if scores are filled, we save it.
+      // Wait, we need to loop over subMatches and save sequentially.
+      let someSaved = false;
+      for (const sm of editingFixture.subMatches) {
+        const p1Str = fixtureScores[sm.id]?.p1;
+        const p2Str = fixtureScores[sm.id]?.p2;
+        if (p1Str && p2Str && !isNaN(Number(p1Str)) && !isNaN(Number(p2Str))) {
+          await saveClubFixtureResult(
+            editingFixture.id,
+            sm.id,
+            Number(p1Str),
+            Number(p2Str),
+            allPlayers,
+            config.season,
+            editingFixture.matchday || 1,
+            config
+          );
+          someSaved = true;
+        }
+      }
+      
+      if (someSaved) {
+        setScoreMsg({ text: '✅ Scores saved!', type: 'success' });
+        setTimeout(() => setEditingFixture(null), 1500);
+        
+        // Refresh fixtures
+        const fs = await fetchClubFixtures(config.season);
+        setFixtures(fs);
+      } else {
+        setScoreMsg({ text: 'No scores entered', type: 'error' });
+      }
+    } catch (e: any) {
+      setScoreMsg({ text: '❌ ' + e.message, type: 'error' });
+    } finally {
+      setSavingScores(false);
+    }
+  };
 
   // Tick every minute for countdowns
   const [, forceUpdate] = useState(0);
@@ -45,7 +108,7 @@ export default function ClubTournamentsTab({
   }, []);
 
   useEffect(() => {
-    const seasonId = config?.season || config?.activeInternalSeasonId || '';
+    const seasonId = config?.season || '';
     if (!seasonId) { setLoading(false); return; }
 
     const load = async () => {
@@ -59,7 +122,7 @@ export default function ClubTournamentsTab({
           .sort((a, b) => b.createdAt - a.createdAt);
         setTournaments(activeTourneys);
         setFixtures(fs);
-        const first = activeTourneys.find(t => t.status === 'active') || activeTourneys[0] || null;
+        const first = activeTourneys.find(t => t.id === initialTournamentId) || activeTourneys.find(t => t.status === 'active') || activeTourneys[0] || null;
         setActiveTournament(first);
       } catch (e) {
         console.error('[ClubTournamentsTab]', e);
@@ -68,7 +131,7 @@ export default function ClubTournamentsTab({
       }
     };
     load();
-  }, [config?.season, config?.activeInternalSeasonId]);
+  }, [config?.season]);
 
   const tournamentFixtures = useMemo(() =>
     fixtures.filter(f => f.tournamentId === activeTournament?.id),
@@ -326,7 +389,9 @@ export default function ClubTournamentsTab({
                     groups[md].push(f);
                     return groups;
                   }, {})
-                ).sort(([a], [b]) => Number(a) - Number(b)).map(([md, mdFixtures]) => (
+                ).sort(([a], [b]) => Number(a) - Number(b)).map(([md, mdFixtures]) => {
+                  const fixturesList = mdFixtures as ClubFixture[];
+                  return (
                   <div key={md}>
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
@@ -337,7 +402,7 @@ export default function ClubTournamentsTab({
                       </span>
                     </div>
                     <div className="space-y-3">
-                      {mdFixtures.map(f => {
+                      {fixturesList.map(f => {
                         const homeClub = allClubs.find(c => c.id === f.homeClubId);
                         const awayClub = allClubs.find(c => c.id === f.awayClubId);
                         const isMyMatch = f.homeClubId === myClub?.id || f.awayClubId === myClub?.id;
@@ -407,12 +472,24 @@ export default function ClubTournamentsTab({
                                 </div>
                               )}
                             </div>
+                            
+                            {isAdmin && (
+                              <div className="mt-4 pt-4 border-t border-white/5 flex justify-end">
+                                <button
+                                  onClick={() => handleOpenScoreModal(f)}
+                                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-black tracking-widest uppercase rounded-lg shadow-lg shadow-amber-500/20 transition-all"
+                                >
+                                  ENTER SCORES
+                                </button>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </motion.div>
           )}
@@ -491,6 +568,80 @@ export default function ClubTournamentsTab({
           )}
         </>
       )}
+
+      {/* Admin Score Entry Modal */}
+      <AnimatePresence>
+        {isAdmin && editingFixture && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="w-full max-w-lg bg-[#0f172a] border border-white/10 rounded-[2rem] p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto no-scrollbar">
+              <button onClick={() => setEditingFixture(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors">
+                <X size={24} />
+              </button>
+              
+              <h3 className="text-xl font-black uppercase tracking-tight mb-1">ENTER FIXTURE SCORES</h3>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-6 border-b border-white/10 pb-6">
+                MD{editingFixture.matchday} &bull; {editingFixture.homeClubName} vs {editingFixture.awayClubName}
+              </p>
+
+              <div className="space-y-4 mb-8">
+                {editingFixture.subMatches.map(sm => {
+                  const p1 = allPlayers.find(p => p.id === sm.p1Id);
+                  const p2 = allPlayers.find(p => p.id === sm.p2Id);
+                  return (
+                    <div key={sm.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4">
+                      <div className="flex-1 min-w-0 text-right">
+                        <p className="text-xs font-black text-white truncate uppercase">{p1?.name || sm.p1Name}</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase">Home</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          type="number"
+                          value={fixtureScores[sm.id]?.p1 || ''}
+                          onChange={e => setFixtureScores(prev => ({ ...prev, [sm.id]: { ...prev[sm.id], p1: e.target.value } }))}
+                          className="w-12 h-12 bg-[#020617] border border-white/10 rounded-xl text-center text-lg font-black focus:border-amber-500 outline-none transition-all"
+                        />
+                        <span className="text-slate-600 font-black">—</span>
+                        <input
+                          type="number"
+                          value={fixtureScores[sm.id]?.p2 || ''}
+                          onChange={e => setFixtureScores(prev => ({ ...prev, [sm.id]: { ...prev[sm.id], p2: e.target.value } }))}
+                          className="w-12 h-12 bg-[#020617] border border-white/10 rounded-xl text-center text-lg font-black focus:border-amber-500 outline-none transition-all"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-black text-white truncate uppercase">{p2?.name || sm.p2Name}</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase">Away</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setEditingFixture(null)}
+                  className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleSaveScores}
+                  disabled={savingScores}
+                  className="flex-[2] py-4 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Save size={16} />
+                  {savingScores ? 'SAVING...' : 'SAVE SCORES'}
+                </button>
+              </div>
+              {scoreMsg.text && (
+                <p className={cn("text-center mt-4 text-[10px] font-bold uppercase", scoreMsg.type === 'success' ? 'text-emerald-400' : scoreMsg.type === 'info' ? 'text-blue-400' : 'text-red-400')}>
+                  {scoreMsg.text}
+                </p>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -2348,10 +2348,6 @@ export async function unassignClubOwner(clubId: string): Promise<void> {
   const clubSnap = await getDoc(doc(db, 'clubs', clubId));
   const batch = writeBatch(db);
 
-  // Clear owner fields on the club document
-  batch.update(doc(db, 'clubs', clubId), { ownerId: null, ownerName: null });
-
-  // Also clear the player's owner flags so they appear as available again
   if (clubSnap.exists()) {
     const clubData = clubSnap.data();
     if (clubData.ownerId) {
@@ -2363,7 +2359,21 @@ export async function unassignClubOwner(clubId: string): Promise<void> {
         secondaryColor: null,
       });
     }
+    if (clubData.squadIds && clubData.squadIds.length > 0) {
+      for (const pid of clubData.squadIds) {
+        batch.update(doc(db, 'players', pid), {
+          clubId: null,
+          clubName: null,
+          primaryColor: null,
+          secondaryColor: null,
+          clubContract: null,
+          clubStats: null
+        });
+      }
+    }
   }
+
+  batch.update(doc(db, 'clubs', clubId), { ownerId: null, ownerName: null, squadIds: [] });
 
   await batch.commit();
   // Bust the cache so the next fetchClubs() call reads fresh from Firestore
@@ -2734,6 +2744,68 @@ export function computeClubStandings(
   return Object.values(table)
     .map(r => ({ ...r, goalDiff: r.goalsFor - r.goalsAgainst, points: r.won * 3 + r.drawn }))
     .sort((a, b) => b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor);
+}
+
+export async function endClubZoneSeason(
+  currentSeasonLabel: string,
+  activeGlobalSeasonName: string,
+  allPlayers: import('../types').Player[],
+  allClubs: import('../types').Club[]
+): Promise<void> {
+  await ensureAdminSession();
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+
+  const fixtures = await fetchClubFixtures(currentSeasonLabel);
+  const tournaments = await fetchClubTournaments(currentSeasonLabel);
+  
+  const clubSet = new Set<string>();
+  tournaments.forEach(t => t.participatingClubIds?.forEach(id => clubSet.add(id)));
+  const participatingClubs = allClubs.filter(c => clubSet.has(c.id));
+
+  const finalStandings = computeClubStandings(fixtures, participatingClubs);
+  
+  const standingsSnapshot: Record<string, any> = {};
+  finalStandings.forEach(s => {
+    standingsSnapshot[s.clubId] = s;
+  });
+
+  const batch = writeBatch(db);
+
+  const seasonDocRef = doc(db, 'clubSeasons', currentSeasonLabel.replace(/\s+/g, '_') + '_' + Date.now());
+  batch.set(seasonDocRef, {
+    id: seasonDocRef.id,
+    globalSeason: activeGlobalSeasonName,
+    seasonNumber: 1, 
+    label: currentSeasonLabel,
+    status: 'completed',
+    startedAt: null,
+    endedAt: Date.now(),
+    standingsSnapshot
+  });
+
+  // Chunking player updates
+  const batches = [batch];
+  let currentBatch = batches[0];
+  let opCount = 1;
+
+  for (const p of allPlayers) {
+    if (p.clubStats) {
+      if (opCount >= 490) {
+        currentBatch = writeBatch(db);
+        batches.push(currentBatch);
+        opCount = 0;
+      }
+      currentBatch.update(doc(db, 'players', p.id), { clubStats: null });
+      opCount++;
+    }
+  }
+
+  for (const b of batches) {
+    await b.commit();
+  }
+
+  invalidateCache('clubSeasons_active');
+  invalidateCacheByPrefix('clubSeasons_');
 }
 
 
