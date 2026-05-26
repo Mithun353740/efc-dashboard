@@ -220,7 +220,7 @@ function SquadTab({ myClub, squad, onShortlistPlayer, onRenewContract, onSetRele
 }
 
 function RankingsTab({ clubs, onViewSquad }: any) {
-  const sorted = [...clubs].sort((a,b) => (b.managerRating || 0) - (a.managerRating || 0));
+  const sorted = [...clubs].sort((a,b) => a.name.localeCompare(b.name));
   return (
     <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
       <table className="w-full text-left">
@@ -228,7 +228,7 @@ function RankingsTab({ clubs, onViewSquad }: any) {
           <tr>
             <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Pos</th>
             <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Club</th>
-            <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest hidden md:table-cell">Rating</th>
+
             <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Action</th>
           </tr>
         </thead>
@@ -242,7 +242,7 @@ function RankingsTab({ clubs, onViewSquad }: any) {
                   <span className="text-xs font-black text-white uppercase">{c.name}</span>
                 </div>
               </td>
-              <td className="px-6 py-4 text-xs font-black text-amber-500 hidden md:table-cell">{c.managerRating || 0}</td>
+
               <td className="px-6 py-4 text-right">
                 <button onClick={() => onViewSquad(c)} className="px-4 py-2 bg-white/5 hover:bg-brand-purple text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">View Squad</button>
               </td>
