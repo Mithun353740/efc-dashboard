@@ -3820,8 +3820,6 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       )}
 
 
-    </div>
-
       {/* SQUAD VIEW MODAL */}
       <AnimatePresence>
         {viewingSquadClubId && (() => {
@@ -3881,6 +3879,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
         })()}
       </AnimatePresence>
 
+    </div>
   );
 }
 
