@@ -308,6 +308,7 @@ export interface ClubFixtureSubMatch {
   p2Name: string;
   p1Score: number | null;
   p2Score: number | null;
+  globalMatchId?: string;
 }
 
 export interface ClubFixture {
@@ -392,6 +393,10 @@ export interface MatchRecord {
   tournament?: string;
   seasonId?: string;
   matchday?: number;
+  sourceTournamentId?: string;
+  sourceFixtureId?: string;
+  clubFixtureId?: string;
+  clubSubMatchId?: string;
 }
 
 export type { Tournament, Fixture, Team, TournamentFormat } from './types/tournament';

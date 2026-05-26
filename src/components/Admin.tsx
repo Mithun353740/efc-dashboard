@@ -1768,7 +1768,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     try {
       await deleteMatchFromHistory(m, players, []);
       setMsg({ text: 'Match deleted and stats reverted!', type: 'success' });
-      await loadSeasonMatches();
+      await loadHistory();
     } catch (e: any) { setMsg({ text: e.message, type: 'error' }); }
     finally { setHLoading(false); }
   };

@@ -763,8 +763,12 @@ export async function addMatch(
   tournament?: string,
   p2NameOverride?: string,
   seasonId?: string,
-  matchday?: number
-) {
+  matchday?: number,
+  sourceTournamentId?: string,
+  sourceFixtureId?: string,
+  clubFixtureId?: string,
+  clubSubMatchId?: string
+): Promise<string> {
   
   await ensureAdminSession();
   if (isQuotaExceeded) {
@@ -786,6 +790,10 @@ export async function addMatch(
     tournament: tournament || 'Friendly',
     seasonId: seasonId || '',
     matchday: matchday || 0,
+    sourceTournamentId,
+    sourceFixtureId,
+    clubFixtureId,
+    clubSubMatchId,
   };
   batch.set(matchRef, matchRecord);
 
@@ -845,9 +853,10 @@ export async function addMatch(
 
   try {
     await batch.commit();
-    
+    return matchRef.id;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-update');
+    throw error;
   }
 }
 
@@ -1023,6 +1032,74 @@ export async function deleteMatchFromHistory(
     }
   } catch(e) {
     console.warn("Could not recalculate manager ratings on delete", e);
+  }
+
+  // Bidirectional Sync: Clear parent global tournament fixture
+  if (matchRecord.sourceTournamentId && matchRecord.sourceFixtureId) {
+    try {
+      const tSnap = await getDoc(doc(db, 'tournaments', matchRecord.sourceTournamentId));
+      if (tSnap.exists()) {
+        const t = tSnap.data() as import('../types').Tournament;
+        const updatedFixtures = t.fixtures.map(f =>
+          f.id === matchRecord.sourceFixtureId
+            ? { ...f, homeScore: null, awayScore: null, status: 'upcoming' as const, globalMatchId: undefined }
+            : f
+        );
+        batch.update(doc(db, 'tournaments', matchRecord.sourceTournamentId), { fixtures: updatedFixtures });
+      }
+    } catch (e) {
+      console.warn('Failed to clear global tournament fixture', e);
+    }
+  }
+
+  // Bidirectional Sync: Clear parent club tournament fixture & revert club stats
+  if (matchRecord.clubFixtureId && matchRecord.clubSubMatchId) {
+    try {
+      const fSnap = await getDoc(doc(db, 'clubFixtures', matchRecord.clubFixtureId));
+      if (fSnap.exists()) {
+        const cf = fSnap.data() as import('../types').ClubFixture;
+        const subMatch = cf.subMatches.find(sm => sm.id === matchRecord.clubSubMatchId);
+        
+        const updatedSubMatches = cf.subMatches.map(sm =>
+          sm.id === matchRecord.clubSubMatchId
+            ? { ...sm, p1Score: null, p2Score: null, globalMatchId: undefined }
+            : sm
+        );
+        batch.update(doc(db, 'clubFixtures', matchRecord.clubFixtureId), {
+          subMatches: updatedSubMatches,
+          status: 'active'
+        });
+        
+        // Revert clubStats for both players
+        const revertClubStats = (playerId: string | undefined, won: boolean, drawn: boolean, myScore: number, oppScore: number) => {
+          if (!playerId) return;
+          const player = players.find(p => p.id === playerId);
+          if (!player || !player.clubStats) return;
+          const prev = player.clubStats;
+          
+          const updated: import('../types').ClubStats = {
+            ...prev,
+            played: Math.max(0, prev.played - 1),
+            won: Math.max(0, prev.won - (won ? 1 : 0)),
+            drawn: Math.max(0, prev.drawn - (drawn ? 1 : 0)),
+            lost: Math.max(0, prev.lost - (!won && !drawn ? 1 : 0)),
+            goalsScored: Math.max(0, prev.goalsScored - myScore),
+            goalsConceded: Math.max(0, prev.goalsConceded - oppScore),
+            points: Math.max(0, prev.points - (won ? 3 : drawn ? 1 : 0)),
+          };
+          batch.update(doc(db, 'players', playerId), { clubStats: updated });
+        };
+        
+        if (subMatch && subMatch.p1Score !== null && subMatch.p2Score !== null) {
+           const p1Won = subMatch.p1Score > subMatch.p2Score;
+           const drawn = subMatch.p1Score === subMatch.p2Score;
+           revertClubStats(subMatch.p1Id, p1Won, drawn, subMatch.p1Score, subMatch.p2Score);
+           revertClubStats(subMatch.p2Id, !p1Won && !drawn, drawn, subMatch.p2Score, subMatch.p1Score);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to clear club fixture and stats', e);
+    }
   }
 
   try {
@@ -2668,22 +2745,41 @@ export async function saveClubFixtureResult(
   const sm = fixture.subMatches.find(s => s.id === subMatchId);
   if (!sm) throw new Error('Sub-match not found.');
 
-  // 2. Update sub-match scores
+  // 2. Propagate to global match history FIRST to get the generated ID
+  const p1 = allPlayers.find(p => p.id === sm.p1Id);
+  const p2 = allPlayers.find(p => p.id === sm.p2Id);
+  let globalMatchId: string | undefined;
+
+  if (p1) {
+    try {
+      globalMatchId = await addMatch(
+        p1, p1Score, p2Score, p2, [],
+        fixture.tournamentName || config?.season || 'Club Zone',
+        p2?.name, seasonId, matchday,
+        undefined, undefined, // not a global tournament
+        fixtureId, subMatchId // pass club source links
+      );
+    } catch (err) {
+      console.warn('[saveClubFixtureResult] Global propagation failed (non-critical):', err);
+    }
+  }
+
+  // 3. Update sub-match scores AND attach globalMatchId
   const updatedSubMatches = fixture.subMatches.map(s =>
-    s.id === subMatchId ? { ...s, p1Score, p2Score } : s
+    s.id === subMatchId ? { ...s, p1Score, p2Score, globalMatchId } : s
   );
   const allScored = updatedSubMatches.every(s => s.p1Score !== null && s.p2Score !== null);
   const newFixtureStatus = allScored ? 'completed' : 'active';
 
   const batch = writeBatch(db);
 
-  // 3. Update fixture document
+  // 4. Update fixture document
   batch.update(doc(db, 'clubFixtures', fixtureId), {
     subMatches: updatedSubMatches,
     status: newFixtureStatus,
   });
 
-  // 4. Update clubStats on each player (isolated from global)
+  // 5. Update clubStats on each player (isolated from global)
   const updateClubStats = (playerId: string, myScore: number, oppScore: number) => {
     const player = allPlayers.find(p => p.id === playerId);
     if (!player) return;
@@ -2714,21 +2810,6 @@ export async function saveClubFixtureResult(
   updateClubStats(sm.p2Id, p2Score, p1Score);
 
   await batch.commit();
-
-  // 5. Propagate to global match history (OVR/ELO recalculation)
-  const p1 = allPlayers.find(p => p.id === sm.p1Id);
-  const p2 = allPlayers.find(p => p.id === sm.p2Id);
-  if (p1) {
-    try {
-      await addMatch(
-        p1, p1Score, p2Score, p2, [],
-        fixture.tournamentName || config?.season || 'Club Zone',
-        p2?.name, seasonId, matchday
-      );
-    } catch (err) {
-      console.warn('[saveClubFixtureResult] Global propagation failed (non-critical):', err);
-    }
-  }
 }
 
 /**
