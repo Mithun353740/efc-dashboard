@@ -17,7 +17,12 @@ import {
   subscribeToTournaments,
   fetchSystemLocks,
   ensureAdminSession,
+  subscribeToPlayers,
+  subscribeToLeaders,
+  subscribeToMatches,
+  subscribeToTournaments,
 } from './lib/store';
+import { isAdminUser } from './lib/utils';
 import { VERSION } from './constants';
 import {
   persistToStorage,
@@ -172,8 +177,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current || !customEvent.detail?.error) return;
       const errStr = String(customEvent.detail.error).toLowerCase();
       setIsLoading(false);
+      const isAdmin = isAdminUser();
       if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
-        setDbError('QUOTA_EXCEEDED');
+        if (isAdmin) setDbError('QUOTA_EXCEEDED');
       } else {
         setDbError('DATABASE_ERROR');
       }
@@ -210,7 +216,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+    // Check if either Master Password or Player Admin is active
+    const isAdmin = isAdminUser();
 
     if (isAdmin) {
       // ── ADMIN: REAL-TIME LISTENERS ──────────────────────────────────────────
