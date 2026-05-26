@@ -70,14 +70,51 @@ function Home() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { players } = useFirebase();
-  const isAdminLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
-  const playerLoggedIn = localStorage.getItem('playerLoggedIn') === 'true';
-  const playerId = localStorage.getItem('playerId');
-  
-  const assignedAdmin = playerLoggedIn && playerId && players.find(p => p.id === playerId)?.role === 'admin';
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
 
-  return (isAdminLoggedIn || assignedAdmin) ? <>{children}</> : <Navigate to="/login" />;
+  useEffect(() => {
+    const isAdminLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
+    if (isAdminLoggedIn) {
+      setIsAuthorized(true);
+      return;
+    }
+
+    const playerLoggedIn = localStorage.getItem('playerLoggedIn') === 'true';
+    const playerId = localStorage.getItem('playerId');
+    if (!playerLoggedIn || !playerId) {
+      setIsAuthorized(false);
+      return;
+    }
+
+    // Verify against LIVE database for player admins
+    import('./firebase').then(({ db }) => {
+      import('firebase/firestore').then(({ doc, getDoc }) => {
+        getDoc(doc(db, 'players', playerId)).then(snap => {
+          if (snap.exists() && snap.data().role === 'admin') {
+            setIsAuthorized(true);
+          } else {
+            // Revoked or not an admin!
+            const realRole = snap.data()?.role || 'player';
+            localStorage.setItem('playerRole', realRole);
+            localStorage.setItem('userType', 'player');
+            window.dispatchEvent(new StorageEvent('storage', { key: 'playerRole', newValue: realRole }));
+            setIsAuthorized(false);
+          }
+        }).catch(() => setIsAuthorized(false));
+      });
+    });
+  }, []);
+
+  if (isAuthorized === null) {
+    return (
+      <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center">
+        <div className="w-8 h-8 border-4 border-brand-purple border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Verifying Authorization...</p>
+      </div>
+    );
+  }
+
+  return isAuthorized ? <>{children}</> : <Navigate to="/login" />;
 }
 
 function AppContent() {

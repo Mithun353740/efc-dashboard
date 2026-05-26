@@ -11,6 +11,10 @@ import {
   fetchLeadersOnce,
   fetchMatchesOnce,
   fetchTournamentsOnce,
+  subscribeToPlayers,
+  subscribeToLeaders,
+  subscribeToMatches,
+  subscribeToTournaments,
   fetchSystemLocks,
   ensureAdminSession,
   subscribeToPlayers,
@@ -28,14 +32,14 @@ import {
 } from './lib/cache';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SESSION CACHE — 15-minute in-memory TTL (zero re-reads on tab navigation)
-// STORAGE CACHE — 10-minute localStorage TTL (zero re-reads on page refresh)
+// SESSION CACHE — 30-minute in-memory TTL (zero re-reads on tab navigation)
+// STORAGE CACHE — 30-minute localStorage TTL (zero re-reads on page refresh)
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes in-memory
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes in-memory
 /** How often non-admin users re-check systemLocks (tiny single doc). */
-const LOCKS_POLL_INTERVAL_MS = 60 * 1000; // 60 seconds
+const LOCKS_POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 /** How often admin auto-refreshes collection data (replaces persistent listeners). */
-const ADMIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const ADMIN_REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 let _globalCache: {
   players: Player[];
@@ -165,10 +169,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     mountedRef.current = true;
     const unsubscribers: (() => void)[] = [];
 
-    // Minimum branding delay
-    const minTimer = setTimeout(() => {
-      if (mountedRef.current) setIsLoading(false);
-    }, 1200);
+
 
     // Global error handler
     const errorHandler = (e: Event) => {
@@ -192,14 +193,37 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Real-time revocation listener for Player Admins
+    const pRole = localStorage.getItem('playerRole');
+    const pId = localStorage.getItem('playerId');
+    if (pRole === 'admin' && pId) {
+      import('./firebase').then(({ db }) => {
+        import('firebase/firestore').then(({ doc, onSnapshot }) => {
+          const unsub = onSnapshot(doc(db, 'players', pId), (snap) => {
+            if (snap.exists() && snap.data().role !== 'admin') {
+              const realRole = snap.data().role || 'player';
+              localStorage.setItem('playerRole', realRole);
+              localStorage.setItem('userType', 'player');
+              window.dispatchEvent(new StorageEvent('storage', { key: 'playerRole', newValue: realRole }));
+              window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: 'player' }));
+              if (window.location.hash.includes('/admin')) {
+                window.location.hash = '/';
+              }
+            }
+          });
+          unsubscribers.push(unsub);
+        });
+      });
+    }
+
     // Check if either Master Password or Player Admin is active
     const isAdmin = isAdminUser();
 
     if (isAdmin) {
-      // ── ADMIN: ONE-TIME FETCH + 5-min auto-refresh ────────────────────────
-      // Previously used 4 persistent onSnapshot listeners that re-fired on
-      // every write — causing ~350 reads per match entry. Now uses one-time
-      // fetches with a timed refresh, cutting admin reads by ~90%.
+      // ── ADMIN: REAL-TIME LISTENERS ──────────────────────────────────────────
+      // Restored onSnapshot listeners for admins. This drastically reduces quota usage
+      // because it only fetches documents that changed, rather than forcing 370+ reads
+      // every 5 minutes.
       ensureAdminSession();
       testFirestoreConnection();
 
@@ -215,36 +239,39 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (mountedRef.current && version) setAppVersion(version);
       }));
 
-      // Admin gets real-time listeners (extremely cheap for 1-2 users, and updates UI instantly)
-      unsubscribers.push(
-        subscribeToPlayers((p) => {
-          if (!mountedRef.current) return;
-          setPlayers(p);
-          if (_globalCache) _globalCache.players = p;
-          persistToStorage('players', p);
-          setIsLoading(false);
-        }, 200),
-        subscribeToLeaders((l) => {
-          if (!mountedRef.current) return;
-          setLeaders(l);
-          if (_globalCache) _globalCache.leaders = l;
-          persistToStorage('leaders', l);
-        }),
-        subscribeToMatches((m) => {
-          if (!mountedRef.current) return;
-          setMatches(m);
-          if (_globalCache) _globalCache.matches = m;
-          persistToStorage('matches', m);
-        }, 100),
-        subscribeToTournaments((t) => {
-          if (!mountedRef.current) return;
-          setTournaments(t);
-          if (_globalCache) _globalCache.tournaments = t;
-          persistToStorage('tournaments', t);
-        }, 50)
-      );
+      // Admin listeners
+      unsubscribers.push(subscribeToPlayers((p, pending) => {
+        if (!mountedRef.current) return;
+        setPlayers(p);
+        if (_globalCache) _globalCache.players = p;
+        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('players', p));
+        setHasPendingWrites(pending);
+        setIsLoading(false); // Stop loading once players arrive
+      }, 200, () => setIsLoading(false)));
 
-      _adminFetchRef = null;
+      unsubscribers.push(subscribeToLeaders((l, pending) => {
+        if (!mountedRef.current) return;
+        setLeaders(l);
+        if (_globalCache) _globalCache.leaders = l;
+        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('leaders', l));
+      }));
+
+      unsubscribers.push(subscribeToMatches((m, pending) => {
+        if (!mountedRef.current) return;
+        setMatches(m);
+        if (_globalCache) _globalCache.matches = m;
+        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('matches', m));
+      }, 100));
+
+      unsubscribers.push(subscribeToTournaments((t, pending) => {
+        if (!mountedRef.current) return;
+        setTournaments(t);
+        if (_globalCache) _globalCache.tournaments = t;
+        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('tournaments', t));
+      }, 50));
+
+      // Mock adminFetch to do nothing if called manually via refreshData
+      _adminFetchRef = async () => { console.log('adminFetch bypassed: using onSnapshot'); };
 
     } else {
       // ── PLAYER / GUEST: ONE-TIME FETCH + controlled polling ───────────────
@@ -319,17 +346,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    // Safety timeout — never block UI more than 8s
-    const timeout = setTimeout(() => {
-      if (mountedRef.current) setIsLoading(false);
-    }, 8000);
+
 
     return () => {
       mountedRef.current = false;
       window.removeEventListener('firestore-error', errorHandler);
       unsubscribers.forEach(u => u());
-      clearTimeout(timeout);
-      clearTimeout(minTimer);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
