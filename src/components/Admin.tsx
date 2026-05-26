@@ -8,7 +8,7 @@ import { doc, updateDoc, getDoc, collection, query, where, getDocs, writeBatch }
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
 import ClubTournamentsTab from './club/ClubTournamentsTab';
 import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture, AuctionState, ClubSeason, GlobalSeason } from '../types';
-import { getSeasonInfo, cn, getPlayerGrade } from '../lib/utils';
+import { getSeasonInfo, cn, getPlayerGrade, isAdminUser } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
 import { auth, loginAnonymously, db } from '../firebase';
 import { CLUB_LOGO, CLUB_NAME, VERSION } from '../constants';
@@ -2359,7 +2359,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   }
 
   const currentAdminPlayerId = localStorage.getItem('playerId');
-  const isSuperAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+  const isSuperAdmin = isAdminUser();
   const canModifyAuctionAdmin = isSuperAdmin || !config.auctionAdminId || config.auctionAdminId === currentAdminPlayerId;
 
   const ClubLogoComp = ({ club, size = 'sm' }: { club: Club; size?: 'sm' | 'md' }) => {
