@@ -200,7 +200,7 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
             </button>
             <button
               disabled={!auctionState.leadingClubId || !winningClub}
-              onClick={async () => { if (winningClub) await adminConfirmSold(auctionState, winningClub); }}
+              onClick={async () => { if (winningClub) await adminConfirmSold(auctionState, winningClub, config); }}
               className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 rounded-xl text-[10px] font-black uppercase transition-all disabled:opacity-30 flex items-center gap-1"
             >
               <Hammer size={13} /> SOLD

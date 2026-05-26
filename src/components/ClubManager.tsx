@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import ClubAuction from './club/ClubAuction';
 import ClubInbox from './club/ClubInbox';
 import PlayerInbox from './club/PlayerInbox';
+import ClubTournamentsTab from './club/ClubTournamentsTab';
 
 function fmtBudget(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -253,12 +254,66 @@ function RankingsTab({ clubs, onViewSquad }: any) {
   );
 }
 
-function TournamentsTab({ config }: any) {
+// PlayerDashboard — shown to players who are IN a club but are NOT the owner
+function PlayerDashboard({ myPlayer, myClub, allClubs, config, playerUnread, setActiveTab }: any) {
+  const contract = myPlayer?.clubContract;
+  const contractStr = contract
+    ? `${contract.amount} ${contract.type === 'matches' ? 'match' : 'day'}${contract.amount !== 1 ? 'es' : ''} remaining`
+    : 'No contract';
+  const cs = myPlayer?.clubStats;
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-       <Calendar size={48} className="text-slate-700 mb-4" />
-       <h3 className="text-sm font-black text-white uppercase tracking-widest">Match Center</h3>
-       <p className="text-[10px] text-slate-500 font-bold uppercase mt-2 italic">Season {config?.season || 'Active'}</p>
+    <div className="space-y-6">
+      {/* Player identity card */}
+      <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex items-center gap-6 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10" style={{ background: `linear-gradient(135deg, ${myClub?.primaryColor || '#8b5cf6'}, transparent)` }} />
+        <div className="w-20 h-20 rounded-2xl bg-slate-800 overflow-hidden border border-white/10 shrink-0">
+          {myPlayer?.image ? <img src={myPlayer.image} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-slate-600"><Users size={32} /></div>}
+        </div>
+        <div className="flex-1 min-w-0 relative z-10">
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Player Portal</p>
+          <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter truncate">{myPlayer?.name}</h2>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded" style={{ background: `${myClub?.primaryColor}30`, color: myClub?.primaryColor || '#8b5cf6' }}>{myClub?.name}</span>
+            <span className="text-[9px] font-black text-slate-500 uppercase">{myPlayer?.position}</span>
+            <span className="text-[9px] font-black text-white bg-white/10 px-2 py-0.5 rounded">{myPlayer?.ovr} OVR</span>
+          </div>
+        </div>
+        <div className="text-right shrink-0 relative z-10">
+          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Contract</p>
+          <p className={cn('text-xs font-black uppercase mt-1', contract ? 'text-emerald-400' : 'text-red-400')}>
+            {contractStr}
+          </p>
+        </div>
+      </div>
+
+      {/* Club Zone stats */}
+      {cs && (
+        <div className="grid grid-cols-4 gap-3">
+          {[['Played', cs.played || 0], ['Won', cs.won || 0], ['Drawn', cs.drawn || 0], ['Lost', cs.lost || 0]].map(([l, v]) => (
+            <div key={l} className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">{l}</p>
+              <p className={cn('text-xl font-black', l === 'Won' ? 'text-emerald-400' : l === 'Lost' ? 'text-red-400' : 'text-white')}>{v}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-2 gap-4">
+        <button onClick={() => setActiveTab('tournaments')} className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left hover:border-amber-500/40 transition-all group">
+          <Trophy size={20} className="text-amber-500 mb-3" />
+          <p className="text-xs font-black text-white uppercase tracking-tight">Tournaments</p>
+          <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">Season standings & fixtures</p>
+        </button>
+        <button onClick={() => setActiveTab('inbox')} className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left hover:border-violet-500/40 transition-all group relative">
+          <Bell size={20} className="text-violet-400 mb-3" />
+          <p className="text-xs font-black text-white uppercase tracking-tight">My Inbox</p>
+          <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">Contract offers & updates</p>
+          {playerUnread > 0 && (
+            <span className="absolute top-4 right-4 w-5 h-5 rounded-full bg-violet-500 text-white text-[9px] font-black flex items-center justify-center">{playerUnread}</span>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -297,7 +352,11 @@ export default function ClubManager() {
   const [auctionLive, setAuctionLive] = useState(false);
   const [shortlistPlayer, setShortlistPlayer] = useState<Player | null>(null);
   const [proposalStep, setProposalStep] = useState<'shortlist' | 'offer' | 'renewal' | null>(null);
-  const [offerType, setOfferType] = useState<'money' | 'swap'>('money');
+  const [offerType, setOfferType] = useState<'money' | 'swap' | 'money_swap'>('money');
+  const [swapPlayerId, setSwapPlayerId] = useState('');
+  const [swapMoneyAmount, setSwapMoneyAmount] = useState('');
+  const [swapPlayerSearch, setSwapPlayerSearch] = useState('');
+  const [showSwapDrop, setShowSwapDrop] = useState(false);
   const [offerAmount, setOfferAmount] = useState('');
   const [offerDuration, setOfferDuration] = useState('5');
   const [releaseTarget, setReleaseTarget] = useState<Player | null>(null);
@@ -469,7 +528,13 @@ export default function ClubManager() {
           </div>
         ) : (
           <div className="transition-all duration-300">
-            {activeTab === 'overview' && (myClub ? <OverviewTab myClub={myClub} squad={squad} allClubs={clubs} config={config} matches={matches} fixtures={fixtures} inboxUnread={inboxUnread} playerUnread={playerUnread} setActiveTab={setActiveTab} /> : <NoClubScreen />)}
+            {activeTab === 'overview' && (
+              myClub
+                ? (isOwner
+                    ? <OverviewTab myClub={myClub} squad={squad} allClubs={clubs} config={config} matches={matches} fixtures={fixtures} inboxUnread={inboxUnread} playerUnread={playerUnread} setActiveTab={setActiveTab} />
+                    : <PlayerDashboard myPlayer={myPlayer} myClub={myClub} allClubs={clubs} config={config} playerUnread={playerUnread} setActiveTab={setActiveTab} />)
+                : <NoClubScreen />
+            )}
             {activeTab === 'market' && <MarketTab listings={listings} clubs={clubs} myClub={myClub} players={players} isOwner={isOwner} config={config} onRefresh={() => load(true)} setMsg={setMsg} onViewSquad={setViewingClub} />}
             {activeTab === 'rankings' && <RankingsTab clubs={clubs} players={players} myClub={myClub} config={config} onViewSquad={setViewingClub} />}
             {activeTab === 'auction' && <ClubAuction myClub={myClub || null} allClubs={clubs} allPlayers={players} isAdmin={isAdmin} loggedInPlayerId={playerId} playerName={players.find(p => p.id === playerId)?.name} config={config} />}
@@ -479,7 +544,16 @@ export default function ClubManager() {
               </div>
             )}
             {activeTab === 'squad' && myClub && <SquadTab myClub={myClub} squad={squad} onShortlistPlayer={p => { setShortlistPlayer(p); setProposalStep('shortlist'); }} onRenewContract={p => { setShortlistPlayer(p); setProposalStep('renewal'); setOfferAmount('500000'); setOfferDuration('5'); }} onSetReleaseClause={p => { setReleaseTarget(p); setReleaseAmount(String(p.releaseClause?.amount || '')); }} />}
-            {activeTab === 'tournaments' && <TournamentsTab config={config} />}
+            {activeTab === 'tournaments' && (
+              <ClubTournamentsTab
+                myClub={myClub}
+                allClubs={clubs}
+                allPlayers={players}
+                config={config}
+                isOwner={isOwner}
+                isAdmin={isAdmin}
+              />
+            )}
           </div>
         )}
       </div>
@@ -516,31 +590,167 @@ export default function ClubManager() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {proposalStep === 'shortlist' && shortlistPlayer && myClub && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#0a0a14] border border-white/10 rounded-3xl p-8 w-full max-w-md">
-              <h3 className="text-lg font-black text-white uppercase italic mb-6">Propose: {shortlistPlayer.name}</h3>
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <button onClick={() => setOfferType('money')} className={cn("flex-1 py-2 rounded-xl text-[10px] font-black", offerType==='money'?'bg-violet-500 text-white':'bg-white/5 text-slate-500')}>MONEY</button>
-                  <button onClick={() => setOfferType('swap')} className={cn("flex-1 py-2 rounded-xl text-[10px] font-black", offerType==='swap'?'bg-amber-500 text-black':'bg-white/5 text-slate-500')}>SWAP</button>
+        {proposalStep === 'shortlist' && shortlistPlayer && myClub && (() => {
+          const seller = clubs.find(c => c.squadIds?.includes(shortlistPlayer.id));
+          const mySquad = players.filter(p => myClub.squadIds?.includes(p.id));
+          const selectedSwapPlayer = mySquad.find(p => p.id === swapPlayerId);
+          const filteredSwap = mySquad.filter(p =>
+            p.id !== shortlistPlayer.id &&
+            p.name.toLowerCase().includes(swapPlayerSearch.toLowerCase())
+          ).slice(0, 6);
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#0a0a14] border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center border border-violet-500/20">
+                    <DollarSign size={20} className="text-violet-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white uppercase italic">Transfer Proposal</h3>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{shortlistPlayer.name} · {shortlistPlayer.ovr} OVR</p>
+                  </div>
+                  <button onClick={() => { setProposalStep(null); setSwapPlayerId(''); setSwapPlayerSearch(''); }} className="ml-auto p-2 text-slate-500 hover:text-white">
+                    <X size={18} />
+                  </button>
                 </div>
-                <input type={offerType==='money'?'number':'text'} value={offerAmount} onChange={e => setOfferAmount(e.target.value)} placeholder={offerType==='money'?'Amount...':'Player ID...'} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white text-sm outline-none" />
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                  <button onClick={() => setProposalStep(null)} className="py-4 bg-white/5 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Cancel</button>
-                  <button onClick={async () => {
-                    const seller = clubs.find(c => c.squadIds?.includes(shortlistPlayer.id));
-                    if (!seller) return;
-                    try {
-                      await sendTransferProposal({ playerId: shortlistPlayer.id, playerName: shortlistPlayer.name, buyerClubId: myClub.id, buyerClubName: myClub.name, buyerOwnerId: playerId, sellerClubId: seller.id, sellerClubName: seller.name, sellerOwnerId: seller.ownerId, currentOffer: { type: offerType, amount: offerType==='money'?Number(offerAmount):null, swapPlayerId: offerType==='swap'?offerAmount:null, sentBy: 'buyer', sentAt: Date.now() } });
-                      setMsg({ text: 'Proposal Sent!', type: 'success' }); setProposalStep(null);
-                    } catch(e:any) { setMsg({ text: e.message, type: 'error' }); }
-                  }} className="py-4 bg-violet-500 text-white rounded-2xl text-[10px] font-black uppercase">Send Proposal</button>
+                <div className="space-y-4">
+                  {/* Offer Type Selector */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['money', 'swap', 'money_swap'] as const).map(t => (
+                      <button key={t} onClick={() => setOfferType(t)} className={cn(
+                        'py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all',
+                        offerType === t
+                          ? t === 'money' ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
+                          : t === 'swap' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+                          : 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                          : 'bg-white/5 text-slate-500 hover:text-white'
+                      )}>
+                        {t === 'money_swap' ? 'Money+Swap' : t}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Money amount input */}
+                  {(offerType === 'money' || offerType === 'money_swap') && (
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                        {offerType === 'money_swap' ? 'Money Amount (top-up)' : 'Transfer Fee'}
+                      </label>
+                      <input
+                        type="number"
+                        value={offerAmount}
+                        onChange={e => setOfferAmount(e.target.value)}
+                        placeholder="e.g. 500000"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white text-sm outline-none focus:border-violet-500/50 transition-colors"
+                      />
+                    </div>
+                  )}
+
+                  {/* Swap player selector */}
+                  {(offerType === 'swap' || offerType === 'money_swap') && (
+                    <div className="space-y-1 relative">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Your Player to Swap</label>
+                      <input
+                        value={selectedSwapPlayer ? selectedSwapPlayer.name : swapPlayerSearch}
+                        onChange={e => { setSwapPlayerSearch(e.target.value); setSwapPlayerId(''); setShowSwapDrop(true); }}
+                        onFocus={() => setShowSwapDrop(true)}
+                        placeholder="Search your squad..."
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white text-sm outline-none focus:border-amber-500/50 transition-colors"
+                      />
+                      <AnimatePresence>
+                        {showSwapDrop && filteredSwap.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute z-10 w-full mt-1 bg-[#0f172a] border border-white/10 rounded-2xl overflow-hidden shadow-2xl"
+                          >
+                            {filteredSwap.map(p => (
+                              <button
+                                key={p.id}
+                                onClick={() => { setSwapPlayerId(p.id); setSwapPlayerSearch(''); setShowSwapDrop(false); }}
+                                className="w-full flex items-center gap-3 p-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-0"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-slate-800 overflow-hidden shrink-0">
+                                  {p.image && <img src={p.image} className="w-full h-full object-cover" alt="" />}
+                                </div>
+                                <div>
+                                  <p className="text-xs font-black text-white">{p.name}</p>
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase">{p.position} · {p.ovr} OVR</p>
+                                </div>
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      {selectedSwapPlayer && (
+                        <div className="flex items-center gap-3 p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl mt-2">
+                          <div className="w-8 h-8 rounded-lg bg-slate-800 overflow-hidden shrink-0">
+                            {selectedSwapPlayer.image && <img src={selectedSwapPlayer.image} className="w-full h-full object-cover" alt="" />}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs font-black text-amber-400">{selectedSwapPlayer.name}</p>
+                            <p className="text-[9px] text-slate-500 font-bold uppercase">{selectedSwapPlayer.position} · {selectedSwapPlayer.ovr} OVR</p>
+                          </div>
+                          <button onClick={() => { setSwapPlayerId(''); setSwapPlayerSearch(''); }} className="text-slate-500 hover:text-red-400 transition-colors">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!seller && (
+                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                      <p className="text-[10px] font-black text-red-400 uppercase">Player has no current club — cannot send proposal</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <button
+                      onClick={() => { setProposalStep(null); setSwapPlayerId(''); setSwapPlayerSearch(''); }}
+                      className="py-4 bg-white/5 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-white/10 transition-colors"
+                    >Cancel</button>
+                    <button
+                      disabled={!seller || (offerType !== 'money' && !swapPlayerId) || (offerType !== 'swap' && !offerAmount)}
+                      onClick={async () => {
+                        if (!seller) return;
+                        try {
+                          await sendTransferProposal({
+                            playerId: shortlistPlayer.id,
+                            playerName: shortlistPlayer.name,
+                            buyerClubId: myClub.id,
+                            buyerClubName: myClub.name,
+                            buyerOwnerId: playerId,
+                            sellerClubId: seller.id,
+                            sellerClubName: seller.name,
+                            sellerOwnerId: seller.ownerId,
+                            currentOffer: {
+                              type: offerType,
+                              amount: offerType !== 'swap' ? Number(offerAmount) : null,
+                              swapPlayerId: offerType !== 'money' ? swapPlayerId : null,
+                              swapPlayerName: offerType !== 'money' ? selectedSwapPlayer?.name || null : null,
+                              swapAmount: offerType === 'money_swap' ? Number(offerAmount) : null,
+                              sentBy: 'buyer',
+                              sentAt: Date.now(),
+                            }
+                          });
+                          setMsg({ text: '✅ Proposal Sent!', type: 'success' });
+                          setProposalStep(null);
+                          setSwapPlayerId('');
+                          setSwapPlayerSearch('');
+                        } catch(e: any) {
+                          setMsg({ text: '❌ ' + e.message, type: 'error' });
+                        }
+                      }}
+                      className="py-4 bg-violet-500 disabled:opacity-30 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-violet-500/20 hover:bg-violet-400 transition-colors"
+                    >Send Proposal</button>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
       <AnimatePresence>

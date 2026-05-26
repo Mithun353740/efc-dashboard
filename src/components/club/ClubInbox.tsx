@@ -47,7 +47,7 @@ export default function ClubInbox({ ownerId, myClub, allClubs, allPlayers, onClo
   const [actionError, setActionError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   // For counter-offer flow
-  const [counterMode, setCounterMode] = useState<'money' | 'swap' | null>(null);
+  const [counterMode, setCounterMode] = useState<'money' | 'swap' | 'money_swap' | null>(null);
   const [counterAmount, setCounterAmount] = useState('');
   const [swapPlayerId, setSwapPlayerId] = useState('');
   const [counterNote, setCounterNote] = useState('');
@@ -103,9 +103,10 @@ export default function ClubInbox({ ownerId, myClub, allClubs, allPlayers, onClo
         if (!counterMode) { setActionError('Select a counter offer type.'); setActionLoading(false); return; }
         await respondToProposal(activeThread, 'counter', {
           type: counterMode,
-          amount: counterMode === 'money' ? Number(counterAmount) : null,
-          swapPlayerId: counterMode === 'swap' ? swapPlayerId : null,
-          swapPlayerName: counterMode === 'swap' ? allPlayers.find(p => p.id === swapPlayerId)?.name || null : null,
+          amount: (counterMode === 'money' || counterMode === 'money_swap') ? Number(counterAmount) : null,
+          swapPlayerId: (counterMode === 'swap' || counterMode === 'money_swap') ? swapPlayerId : null,
+          swapPlayerName: (counterMode === 'swap' || counterMode === 'money_swap') ? allPlayers.find(p => p.id === swapPlayerId)?.name || null : null,
+          swapAmount: counterMode === 'money_swap' ? Number(counterAmount) : null,
           sentBy: myClub.id === activeThread.sellerClubId ? 'seller' : 'buyer',
           note: counterNote,
         });
@@ -175,10 +176,17 @@ export default function ClubInbox({ ownerId, myClub, allClubs, allPlayers, onClo
               {/* Current offer */}
               <div className="p-4 bg-violet-500/5 border border-violet-500/20 rounded-2xl">
                 <p className="text-[10px] font-black text-violet-400 uppercase tracking-widest mb-2">Current Offer</p>
-                {activeThread.currentOffer.type === 'money' ? (
+                {activeThread.currentOffer.type === 'money' && (
                   <p className="text-2xl font-black text-white">💰 {activeThread.currentOffer.amount?.toLocaleString()} coins</p>
-                ) : (
+                )}
+                {activeThread.currentOffer.type === 'swap' && (
                   <p className="text-lg font-black text-white flex items-center gap-2"><ArrowLeftRight size={18} className="text-amber-400" /> Swap: {activeThread.currentOffer.swapPlayerName}</p>
+                )}
+                {activeThread.currentOffer.type === 'money_swap' && (
+                  <div className="space-y-1">
+                    <p className="text-lg font-black text-white">💰 {activeThread.currentOffer.amount?.toLocaleString()} coins</p>
+                    <p className="text-sm font-black text-amber-400 flex items-center gap-2"><ArrowLeftRight size={14} /> + Swap: {activeThread.currentOffer.swapPlayerName}</p>
+                  </div>
                 )}
                 {activeThread.currentOffer.note && <p className="text-xs text-slate-400 mt-2 italic">"{activeThread.currentOffer.note}"</p>}
                 <p className="text-[9px] text-slate-500 mt-2">Sent by: {activeThread.currentOffer.sentBy === 'buyer' ? activeThread.buyerClubName : activeThread.sellerClubName}</p>
@@ -192,25 +200,27 @@ export default function ClubInbox({ ownerId, myClub, allClubs, allPlayers, onClo
                     {[...activeThread.history].reverse().slice(0, 5).map((h, i) => (
                       <div key={i} className="p-3 bg-white/3 rounded-xl border border-white/5 text-xs text-slate-400">
                         <span className="font-bold text-white">{h.sentBy === 'buyer' ? activeThread.buyerClubName : activeThread.sellerClubName}: </span>
-                        {h.type === 'money' ? `${h.amount?.toLocaleString()} coins` : `Swap: ${h.swapPlayerName}`}
+                        {h.type === 'money' && `${h.amount?.toLocaleString()} coins`}
+                        {h.type === 'swap' && `Swap: ${h.swapPlayerName}`}
+                        {h.type === 'money_swap' && `${h.amount?.toLocaleString()} coins + Swap: ${h.swapPlayerName}`}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Counter offer builder */}
               {counterMode && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl space-y-3">
                   <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Counter Offer</p>
-                  <div className="flex gap-2">
-                    <button onClick={() => setCounterMode('money')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${counterMode === 'money' ? 'bg-amber-500 text-black' : 'bg-white/5 text-slate-400'}`}>💰 Money</button>
-                    <button onClick={() => setCounterMode('swap')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${counterMode === 'swap' ? 'bg-amber-500 text-black' : 'bg-white/5 text-slate-400'}`}><ArrowLeftRight size={12} className="inline mr-1" />Swap</button>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button onClick={() => setCounterMode('money')} className={`py-2 rounded-xl text-[9px] font-black uppercase transition-all ${counterMode === 'money' ? 'bg-amber-500 text-black' : 'bg-white/5 text-slate-400 hover:text-white'}`}>💰 Money</button>
+                    <button onClick={() => setCounterMode('swap')} className={`py-2 rounded-xl text-[9px] font-black uppercase transition-all ${counterMode === 'swap' ? 'bg-amber-500 text-black' : 'bg-white/5 text-slate-400 hover:text-white'}`}>⇄ Swap</button>
+                    <button onClick={() => setCounterMode('money_swap')} className={`py-2 rounded-xl text-[9px] font-black uppercase transition-all ${counterMode === 'money_swap' ? 'bg-emerald-500 text-black' : 'bg-white/5 text-slate-400 hover:text-white'}`}>Both</button>
                   </div>
-                  {counterMode === 'money' && (
+                  {(counterMode === 'money' || counterMode === 'money_swap') && (
                     <input type="number" value={counterAmount} onChange={e => setCounterAmount(e.target.value)} placeholder="Amount in coins" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-amber-500/50" />
                   )}
-                  {counterMode === 'swap' && (
+                  {(counterMode === 'swap' || counterMode === 'money_swap') && (
                     <select value={swapPlayerId} onChange={e => setSwapPlayerId(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-amber-500/50">
                       <option value="">Select player to offer...</option>
                       {mySquad.map(p => <option key={p.id} value={p.id}>{p.name} ({p.ovr} OVR)</option>)}
