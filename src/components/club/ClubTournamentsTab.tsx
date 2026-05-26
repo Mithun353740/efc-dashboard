@@ -2,7 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trophy, Calendar, Clock, CheckCircle, AlertCircle, Loader, X, Save } from 'lucide-react';
 import { Club, ClubTournament, ClubFixture, ClubSystemConfig, Player } from '../../types';
-import { fetchClubTournaments, fetchClubFixtures, computeClubStandings, saveClubFixtureResult } from '../../lib/store';
+import { fetchClubTournaments, fetchClubFixtures, computeClubStandings, saveClubFixtureResult, deleteMatchFromHistory } from '../../lib/store';
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '../../firebase';
+import { MatchRecord } from '../../types';
 
 function countdownStr(deadline: number) {
   const diff = deadline - Date.now();
@@ -62,13 +65,32 @@ export default function ClubTournamentsTab({
     setSavingScores(true);
     setScoreMsg({ text: 'Saving...', type: 'info' });
     try {
-      // For each sub-match, if scores are filled, we save it.
-      // Wait, we need to loop over subMatches and save sequentially.
       let someSaved = false;
+      let someCleared = false;
+
       for (const sm of editingFixture.subMatches) {
         const p1Str = fixtureScores[sm.id]?.p1;
         const p2Str = fixtureScores[sm.id]?.p2;
-        if (p1Str && p2Str && !isNaN(Number(p1Str)) && !isNaN(Number(p2Str))) {
+        const hasNewScores = p1Str !== '' && p2Str !== '' && !isNaN(Number(p1Str)) && !isNaN(Number(p2Str));
+        const wasScored = sm.p1Score !== null && sm.p2Score !== null;
+        const isCleared = !hasNewScores && wasScored;
+
+        if (isCleared) {
+          // Score was cleared — delete the global match record and revert stats
+          if (sm.globalMatchId) {
+            try {
+              const matchSnap = await getDoc(doc(db, 'matches', sm.globalMatchId));
+              if (matchSnap.exists()) {
+                const matchRecord = { id: matchSnap.id, ...matchSnap.data() } as MatchRecord;
+                await deleteMatchFromHistory(matchRecord, allPlayers, []);
+              }
+            } catch (err) {
+              console.warn('[handleSaveScores] Could not delete global match on clear:', err);
+            }
+          }
+          someCleared = true;
+        } else if (hasNewScores) {
+          // New or updated score — save it
           await saveClubFixtureResult(
             editingFixture.id,
             sm.id,
@@ -82,16 +104,15 @@ export default function ClubTournamentsTab({
           someSaved = true;
         }
       }
-      
-      if (someSaved) {
-        setScoreMsg({ text: '✅ Scores saved!', type: 'success' });
+
+      if (someSaved || someCleared) {
+        setScoreMsg({ text: someSaved ? '✅ Scores saved!' : '🗑️ Scores cleared!', type: 'success' });
         setTimeout(() => setEditingFixture(null), 1500);
-        
         // Refresh fixtures
         const fs = await fetchClubFixtures(config.season);
         setFixtures(fs);
       } else {
-        setScoreMsg({ text: 'No scores entered', type: 'error' });
+        setScoreMsg({ text: 'No changes made', type: 'error' });
       }
     } catch (e: any) {
       setScoreMsg({ text: '❌ ' + e.message, type: 'error' });

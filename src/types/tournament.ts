@@ -41,6 +41,7 @@ export interface Fixture {
   venue?: string | null;
   groupId?: number;
   pinned?: boolean;
+  globalMatchId?: string;
 }
 
 export interface Group {
