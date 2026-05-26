@@ -1,8 +1,9 @@
 import { 
   Player, PartialPlayerStats, Leader, MatchRecord, Tournament, AuctionState, 
   ClubSeason, ClubInboxMessage, TransferThread, TransferOffer, ReleaseClause, 
-  Club, GlobalSeason, PlayerInboxMessage, ClubSystemConfig, MarketListing, ClubTournament, ClubFixture
+  Club, GlobalSeason, PlayerInboxMessage, ClubSystemConfig, MarketListing, ClubTournament, ClubFixture, ClubStats
 } from '../types';
+
 import { db, auth } from '../firebase';
 import { resolveCanonicalTournamentName, getSeasonInfo } from './utils';
 import { trackRead, invalidateStorage } from './cache';
@@ -23,7 +24,8 @@ import {
   where,
   arrayUnion,
   arrayRemove,
-  increment
+  increment,
+  updateDoc
 } from 'firebase/firestore';
 
 /**
@@ -1707,8 +1709,20 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
     const batch = writeBatch(db);
     const winningClubDoc = await getDoc(doc(db, 'clubs', currentState.leadingClubId));
     if (winningClubDoc.exists()) {
-      const winningClub = winningClubDoc.data() as import('../types').Club;
-      batch.update(doc(db, 'clubs', winningClub.id), { budget: winningClub.budget - currentState.currentBid });
+      const winningClub = { id: winningClubDoc.id, ...winningClubDoc.data() } as Club;
+      // Load config for auto-contract defaults
+      let cfg: ClubSystemConfig | null = null;
+      try {
+        const cfgSnap = await getDoc(doc(db, 'clubSystem', 'config'));
+        if (cfgSnap.exists()) cfg = cfgSnap.data() as ClubSystemConfig;
+      } catch {}
+      const contractType = cfg?.defaultContractType || 'matches';
+      const contractAmount = cfg?.defaultContractAmount || 5;
+      const autoContract = cfg?.contractsActive !== false ? { type: contractType, amount: contractAmount } : null;
+      batch.update(doc(db, 'clubs', winningClub.id), {
+        budget: winningClub.budget - currentState.currentBid,
+        squadIds: arrayUnion(currentState.currentPlayer.id),
+      });
       batch.update(doc(db, 'players', currentState.currentPlayer.id), {
         clubId: winningClub.id,
         clubName: winningClub.name,
@@ -1716,6 +1730,8 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
         secondaryColor: winningClub.secondaryColor,
         isListed: false,
         listingPrice: null,
+        clubContract: autoContract,
+        clubStats: { played: 0, won: 0, drawn: 0, lost: 0, goalsScored: 0, goalsConceded: 0, points: 0, clubOvr: currentState.currentPlayer.ovr, form: [] },
       });
       batch.set(AUCTION_DOC, {
         foldedClubs: newFolded,
@@ -1724,7 +1740,6 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
         currentTurnIndex: currentState.currentTurnIndex,
       }, { merge: true });
       await batch.commit();
-      
       return;
     }
   }
@@ -1738,8 +1753,8 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
   }, { merge: true });
 }
 
-/** Admin: Confirm the sale G deduct budget from winning club, assign player. */
-export async function adminConfirmSold(currentState: AuctionState, winningClub: import('../types').Club): Promise<void> {
+/** Admin: Confirm the sale — deduct budget from winning club, assign player, apply auto-contract. */
+export async function adminConfirmSold(currentState: AuctionState, winningClub: import('../types').Club, config?: import('../types').ClubSystemConfig | null): Promise<void> {
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   if (!currentState.currentPlayer || !currentState.leadingClubId) return;
   const batch = writeBatch(db);
@@ -1748,7 +1763,11 @@ export async function adminConfirmSold(currentState: AuctionState, winningClub: 
     budget: winningClub.budget - currentState.currentBid,
     squadIds: arrayUnion(currentState.currentPlayer.id)
   });
-  // Transfer player to new club — reset club-scoped stats & contract so first renewal is direct
+  // Build automatic contract from config defaults
+  const contractType = config?.defaultContractType || 'matches';
+  const contractAmount = config?.defaultContractAmount || 5;
+  const autoContract = config?.contractsActive !== false ? { type: contractType, amount: contractAmount } : null;
+  // Transfer player to new club — reset club-scoped stats, apply auto-contract
   batch.update(doc(db, 'players', currentState.currentPlayer.id), {
     clubId: winningClub.id,
     clubName: winningClub.name,
@@ -1756,13 +1775,12 @@ export async function adminConfirmSold(currentState: AuctionState, winningClub: 
     secondaryColor: winningClub.secondaryColor,
     isListed: false,
     listingPrice: null,
-    clubContract: null,
-    clubStats: { goals: 0, matches: 0, wins: 0, losses: 0, draws: 0 },
+    clubContract: autoContract,
+    clubStats: { played: 0, won: 0, drawn: 0, lost: 0, goalsScored: 0, goalsConceded: 0, points: 0, clubOvr: currentState.currentPlayer.ovr, form: [] },
   });
   // Mark auction as sold
   batch.set(AUCTION_DOC, { status: 'sold', soldAt: Date.now() }, { merge: true });
   await batch.commit();
-  
 }
 
 /**
@@ -2029,6 +2047,29 @@ export async function removeFromShortlist(clubId: string, playerId: string): Pro
   if (isQuotaExceeded) return;
   // FIX: Use arrayRemove — saves 1 unnecessary getDoc read per shortlist removal
   await setDoc(doc(db, 'clubs', clubId), { shortlistedPlayerIds: arrayRemove(playerId) }, { merge: true });
+}
+
+/**
+ * Remove a player from a club's squad.
+ * - Removes playerId from club.squadIds
+ * - Clears player.clubId, clubName, clubContract, clubStats
+ * - Marks player as free agent
+ * Cost: 1 batch write (2 docs)
+ */
+export async function removePlayerFromSquad(clubId: string, playerId: string): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'clubs', clubId), { squadIds: arrayRemove(playerId) });
+  batch.update(doc(db, 'players', playerId), {
+    clubId: null,
+    clubName: null,
+    primaryColor: null,
+    secondaryColor: null,
+    clubContract: null,
+    clubStats: null,
+    isListed: false,
+  });
+  await batch.commit();
 }
 
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
@@ -2541,4 +2582,158 @@ export async function fetchTournamentsOnce(limitCount = 20): Promise<Tournament[
     return [];
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLUB FIXTURE RESULT — updates sub-match score + updates clubStats on players
+// + propagates to global match history for OVR/ELO recalculation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Records a sub-match result inside a ClubFixture.
+ * 1. Updates the sub-match scores on the fixture document.
+ * 2. If all sub-matches are scored, marks the fixture as 'completed'.
+ * 3. Updates clubStats on each player (isolated from global OVR).
+ * 4. Writes a global MatchRecord and recomputes OVR/ELO for ranking.
+ *
+ * Cost: 1 getDoc (fixture) + 1 batch write (fixture + players) + addMatch call
+ */
+export async function saveClubFixtureResult(
+  fixtureId: string,
+  subMatchId: string,
+  p1Score: number,
+  p2Score: number,
+  allPlayers: Player[],
+  seasonId: string,
+  matchday: number,
+  config?: ClubSystemConfig | null
+): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+
+  // 1. Fetch the fixture
+  const fixtureSnap = await getDoc(doc(db, 'clubFixtures', fixtureId));
+  if (!fixtureSnap.exists()) throw new Error('Fixture not found.');
+  const fixture = { id: fixtureSnap.id, ...fixtureSnap.data() } as ClubFixture;
+
+  const sm = fixture.subMatches.find(s => s.id === subMatchId);
+  if (!sm) throw new Error('Sub-match not found.');
+
+  // 2. Update sub-match scores
+  const updatedSubMatches = fixture.subMatches.map(s =>
+    s.id === subMatchId ? { ...s, p1Score, p2Score } : s
+  );
+  const allScored = updatedSubMatches.every(s => s.p1Score !== null && s.p2Score !== null);
+  const newFixtureStatus = allScored ? 'completed' : 'active';
+
+  const batch = writeBatch(db);
+
+  // 3. Update fixture document
+  batch.update(doc(db, 'clubFixtures', fixtureId), {
+    subMatches: updatedSubMatches,
+    status: newFixtureStatus,
+  });
+
+  // 4. Update clubStats on each player (isolated from global)
+  const updateClubStats = (playerId: string, myScore: number, oppScore: number) => {
+    const player = allPlayers.find(p => p.id === playerId);
+    if (!player) return;
+    const prev: ClubStats = player.clubStats || {
+      played: 0, won: 0, drawn: 0, lost: 0,
+      goalsScored: 0, goalsConceded: 0, points: 0,
+      clubOvr: player.ovr, form: []
+    };
+    const won = myScore > oppScore;
+    const drawn = myScore === oppScore;
+    const result = won ? 'W' : drawn ? 'D' : 'L';
+    const newForm = [result, ...prev.form].slice(0, 5);
+    const updated: ClubStats = {
+      played: prev.played + 1,
+      won: prev.won + (won ? 1 : 0),
+      drawn: prev.drawn + (drawn ? 1 : 0),
+      lost: prev.lost + (!won && !drawn ? 1 : 0),
+      goalsScored: prev.goalsScored + myScore,
+      goalsConceded: prev.goalsConceded + oppScore,
+      points: prev.points + (won ? 3 : drawn ? 1 : 0),
+      clubOvr: prev.clubOvr,
+      form: newForm,
+    };
+    batch.update(doc(db, 'players', playerId), { clubStats: updated });
+  };
+
+  updateClubStats(sm.p1Id, p1Score, p2Score);
+  updateClubStats(sm.p2Id, p2Score, p1Score);
+
+  await batch.commit();
+
+  // 5. Propagate to global match history (OVR/ELO recalculation)
+  const p1 = allPlayers.find(p => p.id === sm.p1Id);
+  const p2 = allPlayers.find(p => p.id === sm.p2Id);
+  if (p1) {
+    try {
+      await addMatch(
+        p1, p1Score, p2Score, p2, [],
+        fixture.tournamentName || config?.season || 'Club Zone',
+        p2?.name, seasonId, matchday
+      );
+    } catch (err) {
+      console.warn('[saveClubFixtureResult] Global propagation failed (non-critical):', err);
+    }
+  }
+}
+
+/**
+ * Compute live standings for a club tournament from its completed fixtures.
+ * Pure client-side computation — zero extra Firestore reads.
+ */
+export function computeClubStandings(
+  fixtures: ClubFixture[],
+  clubs: Club[]
+): Array<{
+  clubId: string; clubName: string; primaryColor: string;
+  played: number; won: number; drawn: number; lost: number;
+  goalsFor: number; goalsAgainst: number; goalDiff: number; points: number;
+}> {
+  const table: Record<string, {
+    clubId: string; clubName: string; primaryColor: string;
+    played: number; won: number; drawn: number; lost: number;
+    goalsFor: number; goalsAgainst: number;
+  }> = {};
+
+  clubs.forEach(c => {
+    table[c.id] = {
+      clubId: c.id, clubName: c.name, primaryColor: c.primaryColor,
+      played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0
+    };
+  });
+
+  fixtures.filter(f => f.status === 'completed').forEach(f => {
+    const homeGoals = f.subMatches.reduce((s, m) =>
+      s + (m.p1Score !== null && m.p2Score !== null && m.p1Score > m.p2Score ? 1 : 0), 0);
+    const awayGoals = f.subMatches.reduce((s, m) =>
+      s + (m.p1Score !== null && m.p2Score !== null && m.p2Score > m.p1Score ? 1 : 0), 0);
+    const hw = homeGoals > awayGoals;
+    const draw = homeGoals === awayGoals;
+
+    if (table[f.homeClubId]) {
+      table[f.homeClubId].played++;
+      table[f.homeClubId].goalsFor += homeGoals;
+      table[f.homeClubId].goalsAgainst += awayGoals;
+      if (hw) table[f.homeClubId].won++;
+      else if (draw) table[f.homeClubId].drawn++;
+      else table[f.homeClubId].lost++;
+    }
+    if (table[f.awayClubId]) {
+      table[f.awayClubId].played++;
+      table[f.awayClubId].goalsFor += awayGoals;
+      table[f.awayClubId].goalsAgainst += homeGoals;
+      if (!hw && !draw) table[f.awayClubId].won++;
+      else if (draw) table[f.awayClubId].drawn++;
+      else table[f.awayClubId].lost++;
+    }
+  });
+
+  return Object.values(table)
+    .map(r => ({ ...r, goalDiff: r.goalsFor - r.goalsAgainst, points: r.won * 3 + r.drawn }))
+    .sort((a, b) => b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor);
+}
+
 

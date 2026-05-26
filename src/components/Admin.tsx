@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Edit3, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons } from '../lib/store';
+import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
@@ -1472,6 +1472,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   });
   const [logoFile, setLogoFile] = React.useState<string | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [viewingSquadClubId, setViewingSquadClubId] = React.useState<string | null>(null);
   const [config, setConfig] = React.useState<ClubSystemConfig>(DEFAULT_CFG);
   const [configSaving, setConfigSaving] = React.useState(false);
 
@@ -2583,6 +2584,10 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                       }}
                       className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase"
                     >EDIT</button>
+                    <button
+                      onClick={() => setViewingSquadClubId(club.id)}
+                      className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase"
+                    >SQUAD</button>
                     <button onClick={() => handleDelete(club.id)} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase">DEL</button>
                   </div>
                 </div>
@@ -3816,6 +3821,66 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
 
     </div>
+
+      {/* SQUAD VIEW MODAL */}
+      <AnimatePresence>
+        {viewingSquadClubId && (() => {
+          const club = clubs.find(c => c.id === viewingSquadClubId);
+          if (!club) return null;
+          const squad = players.filter(p => club.squadIds?.includes(p.id));
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-[#0a0a14] border border-white/10 rounded-3xl p-8 w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+                <div className="flex items-center justify-between mb-6 shrink-0">
+                  <div className="flex items-center gap-4">
+                    <ClubLogoComp club={club} size="sm" />
+                    <div>
+                      <h3 className="text-xl font-black tracking-tight text-white uppercase italic">{club.name}</h3>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{squad.length} PLAYERS IN SQUAD</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setViewingSquadClubId(null)} className="p-2 text-slate-500 hover:text-white transition-colors bg-white/5 rounded-full"><X size={20} /></button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pr-2 custom-scrollbar">
+                  {squad.length === 0 ? (
+                    <div className="py-12 text-center border border-dashed border-white/10 rounded-2xl">
+                      <p className="text-slate-500 text-sm font-bold">No players in squad.</p>
+                    </div>
+                  ) : (
+                    squad.map(p => (
+                      <div key={p.id} className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-2xl">
+                        <div className="w-12 h-12 rounded-xl bg-slate-800 overflow-hidden shrink-0">
+                          {p.image ? <img src={p.image} className="w-full h-full object-cover" alt="" /> : <Users size={20} className="text-slate-600 m-auto mt-3" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-white">{p.name}</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase">{p.position} · {p.ovr} OVR</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (window.confirm(`Remove ${p.name} from ${club.name}? This will mark them as a free agent and clear their club stats.`)) {
+                              try {
+                                await removePlayerFromSquad(club.id, p.id);
+                              } catch (e: any) {
+                                alert(e.message);
+                              }
+                            }
+                          }}
+                          className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                          REMOVE
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
+
   );
 }
 

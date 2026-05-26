@@ -10,7 +10,7 @@ export interface PlayerInboxMessage {
   id: string;
   recipientId: string;
   senderId: string; // Owner ID or System
-  type: 'contract_renewal' | 'system' | 'news' | 'contract_response';
+  type: 'contract_renewal' | 'system' | 'news' | 'contract_response' | 'transfer_proposal' | 'contract_expired';
   title: string;
   body: string;
   data?: {
@@ -245,7 +245,7 @@ export interface ClubInbox {
 
 // ─── TRANSFER NEGOTIATION ─────────────────────────────────────────────────────
 
-export type TransferOfferType = 'money' | 'swap';
+export type TransferOfferType = 'money' | 'swap' | 'money_swap';
 export type TransferThreadStatus = 'pending' | 'negotiating' | 'accepted' | 'declined' | 'expired';
 
 export interface TransferOffer {
@@ -253,6 +253,7 @@ export interface TransferOffer {
   amount: number | null;             // For money deals
   swapPlayerId: string | null;       // For swap deals
   swapPlayerName: string | null;
+  swapAmount?: number | null;        // Money portion of a money+swap deal
   sentBy: 'buyer' | 'seller';        // Who sent this offer
   sentAt: number;
   note?: string;                     // Optional message attached to offer
