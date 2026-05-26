@@ -13,7 +13,12 @@ import {
   fetchTournamentsOnce,
   fetchSystemLocks,
   ensureAdminSession,
+  subscribeToPlayers,
+  subscribeToLeaders,
+  subscribeToMatches,
+  subscribeToTournaments,
 } from './lib/store';
+import { isAdminUser } from './lib/utils';
 import { VERSION } from './constants';
 import {
   persistToStorage,
@@ -171,8 +176,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current || !customEvent.detail?.error) return;
       const errStr = String(customEvent.detail.error).toLowerCase();
       setIsLoading(false);
+      const isAdmin = isAdminUser();
       if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
-        setDbError('QUOTA_EXCEEDED');
+        if (isAdmin) setDbError('QUOTA_EXCEEDED');
       } else {
         setDbError('DATABASE_ERROR');
       }
@@ -186,7 +192,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+    // Check if either Master Password or Player Admin is active
+    const isAdmin = isAdminUser();
 
     if (isAdmin) {
       // ── ADMIN: ONE-TIME FETCH + 5-min auto-refresh ────────────────────────
@@ -208,50 +215,36 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (mountedRef.current && version) setAppVersion(version);
       }));
 
-      // ONE-TIME fetch for the 4 large collections
-      const adminFetch = async () => {
-        if (!mountedRef.current) return;
-        try {
-          const [p, l, m, t] = await Promise.all([
-            fetchPlayersOnce(200),
-            fetchLeadersOnce(),
-            fetchMatchesOnce(100),
-            fetchTournamentsOnce(50),
-          ]);
+      // Admin gets real-time listeners (extremely cheap for 1-2 users, and updates UI instantly)
+      unsubscribers.push(
+        subscribeToPlayers((p) => {
           if (!mountedRef.current) return;
           setPlayers(p);
-          setLeaders(l);
-          setMatches(m);
-          setTournaments(t);
+          if (_globalCache) _globalCache.players = p;
+          persistToStorage('players', p);
           setIsLoading(false);
-          if (_globalCache) {
-            _globalCache.players = p;
-            _globalCache.leaders = l;
-            _globalCache.matches = m;
-            _globalCache.tournaments = t;
-            _globalCache.fetchedAt = Date.now();
-          } else {
-            _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: {}, fetchedAt: Date.now() };
-          }
-          // Persist for fast reloads
-          import('./lib/cache').then(({ persistToStorage }) => {
-            persistToStorage('players', p);
-            persistToStorage('leaders', l);
-            persistToStorage('matches', m);
-            persistToStorage('tournaments', t);
-          });
-        } catch (err) {
-          console.warn('[FirebaseContext] Admin fetch failed:', err);
-          if (mountedRef.current) setIsLoading(false);
-        }
-      };
+        }, 200),
+        subscribeToLeaders((l) => {
+          if (!mountedRef.current) return;
+          setLeaders(l);
+          if (_globalCache) _globalCache.leaders = l;
+          persistToStorage('leaders', l);
+        }),
+        subscribeToMatches((m) => {
+          if (!mountedRef.current) return;
+          setMatches(m);
+          if (_globalCache) _globalCache.matches = m;
+          persistToStorage('matches', m);
+        }, 100),
+        subscribeToTournaments((t) => {
+          if (!mountedRef.current) return;
+          setTournaments(t);
+          if (_globalCache) _globalCache.tournaments = t;
+          persistToStorage('tournaments', t);
+        }, 50)
+      );
 
-      // Expose to module-level ref so refreshData() can trigger a manual re-fetch
-      _adminFetchRef = adminFetch;
-      adminFetch();
-      // Auto-refresh every 5 minutes so admin sees fresh data without reads on every write
-      const adminRefreshInterval = setInterval(() => { if (mountedRef.current) adminFetch(); }, ADMIN_REFRESH_INTERVAL_MS);
-      unsubscribers.push(() => { clearInterval(adminRefreshInterval); _adminFetchRef = null; });
+      _adminFetchRef = null;
 
     } else {
       // ── PLAYER / GUEST: ONE-TIME FETCH + controlled polling ───────────────

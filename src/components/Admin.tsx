@@ -1046,7 +1046,6 @@ export default function Admin() {
                           try { 
                             await ensureAdminSession();
                             await toggleSystemLock('tournaments', !systemLocks?.tournaments); 
-                            await refreshData();
                           }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
@@ -1077,7 +1076,6 @@ export default function Admin() {
                           try { 
                             await ensureAdminSession();
                             await toggleSystemLock('tournamentRegistration', !isCurrentlyLocked); 
-                            await refreshData();
                           }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
@@ -1109,7 +1107,6 @@ export default function Admin() {
                           try { 
                             await ensureAdminSession();
                             await toggleSystemLock('clubManager', !systemLocks?.clubManager); 
-                            await refreshData();
                           }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
