@@ -1205,14 +1205,17 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
   const [isLoading, setIsLoading] = React.useState(false);
   const [showRoleWarning, setShowRoleWarning] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
-  const [assignedPlayerIds, setAssignedPlayerIds] = React.useState<string[]>([]);
+  const [formFlash, setFormFlash] = React.useState(false);
   const formRef = React.useRef<HTMLDivElement>(null);
 
-  const fetchAssignedPlayers = React.useCallback(async () => {
-    // Redundant - we now use the players array from context which already has emails
-  }, []);
+  // Derived from players array — players that have credentials set
+  const assignedPlayerIds = React.useMemo(
+    () => players.filter(p => p.email || p.role === 'admin').map(p => p.id),
+    [players]
+  );
 
-  React.useEffect(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const fetchAssignedPlayers = React.useCallback(async () => {
     // Redundant - we now use the players array from context which already has emails
   }, []);
 
@@ -1221,6 +1224,13 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
     setSearch(p.name);
     setMsg({ type: '', text: '' });
     setShowPassword(false);
+    setEmail('');
+    setPassword('');
+    setRole(p.role || 'player');
+
+    // Scroll the form panel into view first (works on all screen sizes)
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
     try {
       const snap = await getDoc(doc(db, 'players', p.id));
       if (snap.exists()) {
@@ -1228,12 +1238,13 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
         setEmail(data.email || '');
         setPassword(data.password || '');
         setRole(data.role || 'player');
+        // Flash the form to show it was freshly populated
+        setFormFlash(true);
+        setTimeout(() => setFormFlash(false), 700);
       }
     } catch (err) {
       console.error('Error fetching player credentials:', err);
     }
-    // Scroll form panel into view on mobile/small screens
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
 
   const handleSave = async () => {
@@ -1253,7 +1264,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       {/* Search & Select */}
-      <div ref={formRef} className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+      <div ref={formRef} className={cn("bg-white/5 border rounded-2xl p-8 backdrop-blur-xl transition-all duration-300", formFlash ? "border-brand-purple/60 shadow-[0_0_30px_rgba(139,92,246,0.2)]" : "border-white/10")}>
         <h3 className="text-xl font-black tracking-tight mb-2">PLAYER CREDENTIALS</h3>
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">Set login email, password & admin role</p>
         <div className="relative mb-6">
@@ -1265,7 +1276,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
                   <button key={p.id} type="button" onClick={() => handleSelectPlayer(p)} className="w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-0">
                     <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
                       {p.image ? (
-                        <img src={p.image} className="w-full h-full object-cover" alt="" />
+                        <img src={p.image} className="w-full h-full object-cover" loading="lazy" alt="" />
                       ) : (
                         <Users size={12} className="text-white/20" />
                       )}
@@ -1353,7 +1364,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
             <button key={p.id} onClick={() => handleSelectPlayer(p)} className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-left border border-white/5">
               <div className="w-9 h-9 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
                 {p.image ? (
-                  <img src={p.image} className="w-full h-full object-cover" alt="" />
+                  <img src={p.image} className="w-full h-full object-cover" loading="lazy" alt="" />
                 ) : (
                   <Users size={14} className="text-white/20" />
                 )}
@@ -1394,18 +1405,23 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
                 <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
                   {p.image ? (
-                    <img src={p.image} className="w-full h-full object-cover shrink-0 grayscale group-hover:grayscale-0 transition-all" alt="" />
+                    <img src={p.image} className="w-full h-full object-cover shrink-0 grayscale group-hover:grayscale-0 transition-all" loading="lazy" alt="" />
                   ) : (
                     <Users size={12} className="text-white/20" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1 relative z-10">
                   <p className="text-[10px] font-black text-slate-200 truncate uppercase tracking-tight">{p.name}</p>
-                  <div className="flex items-center gap-1">
-                    <div className="w-1 h-1 rounded-full bg-emerald-500" />
-                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">
-                      {p.role === 'admin' ? '⚡ ADMIN' : 'Active'}
-                    </span>
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1">
+                      <div className="w-1 h-1 rounded-full bg-emerald-500" />
+                      <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">
+                        {p.role === 'admin' ? '⚡ ADMIN' : 'Active'}
+                      </span>
+                    </div>
+                    {p.email && (
+                      <span className="text-[7px] font-bold text-brand-purple/70 truncate">{p.email}</span>
+                    )}
                   </div>
                 </div>
               </button>

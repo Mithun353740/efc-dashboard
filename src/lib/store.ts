@@ -798,7 +798,7 @@ export async function addMatch(
   
   const matchRecord = Object.fromEntries(
     Object.entries(rawRecord).filter(([_, v]) => v !== undefined)
-  ) as MatchRecord;
+  ) as unknown as MatchRecord;
 
   batch.set(matchRef, matchRecord);
 
