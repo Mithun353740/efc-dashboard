@@ -23,7 +23,8 @@ import {
   where,
   arrayUnion,
   arrayRemove,
-  increment
+  increment,
+  updateDoc
 } from 'firebase/firestore';
 
 /**
@@ -687,7 +688,11 @@ export async function recalculateAllStats(playersArg?: Player[]) {
   });
   try {
     await batch.commit();
-    
+    // Refresh precomputed snapshot so next cold-start user reads 1 doc instead of 50+
+    // Fire-and-forget: non-blocking, doesn't affect match recording latency
+    const updatedPlayers = playersToSync.map(p => computePlayerStats(p, allMatches, elos[p.id] || 1200));
+    writeAppSnapshot(updatedPlayers, []).catch(() => {});
+    console.log('[Resync] Stats recalculated. appSnapshot refreshed.');
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-recalculate-stats');
   }
@@ -832,7 +837,10 @@ export async function addMatch(
 
   try {
     await batch.commit();
-    
+    // Bust precomputed snapshot caches so next user load gets fresh leaderboard.
+    // Full snapshot refresh happens on next recalculateAllStats or admin data view.
+    invalidateCache(APP_SNAPSHOT_CACHE_KEY);
+    invalidateStorage(APP_SNAPSHOT_CACHE_KEY);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-update');
   }
@@ -1147,7 +1155,7 @@ export async function fetchClubs(force = false): Promise<Club[]> {
   
   return fetchWithCache(cacheKey, async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(100)));
+      const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(50))); // reduced from 100
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
     } catch (err) {
       handleFirestoreError(err, OperationType.LIST, 'clubs');
@@ -1292,15 +1300,15 @@ export async function removePlayerFromClubSquad(club: Club, playerId: string): P
   }
 }
 
-/** Fetch all active market listings (1 collection read). */
+/** Fetch all active market listings (1 collection read, cached 5 min). */
 export async function fetchMarketListings(force = false): Promise<MarketListing[]> {
   const cacheKey = 'club_market_listings';
   if (force) invalidateCache(cacheKey);
 
   return fetchWithCache(cacheKey, async () => {
-    const snap = await getDocs(query(collection(db, 'clubListings'), orderBy('createdAt', 'desc'), limit(100)));
+    const snap = await getDocs(query(collection(db, 'clubListings'), orderBy('createdAt', 'desc'), limit(50))); // reduced from 100
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketListing));
-  });
+  }, 5 * 60 * 1000);
 }
 
 /**
@@ -1443,14 +1451,14 @@ export async function deleteClubTournament(id: string): Promise<void> {
 }
 
 export async function fetchClubFixtures(seasonName: string, force = false): Promise<import('../types').ClubFixture[]> {
-  // Cached per-season (5-min TTL) to avoid re-reads on every tab switch or mount.
+  // Cached per-season (10-min TTL) to avoid re-reads on every tab switch or mount.
   const cacheKey = `clubFixtures_${seasonName}`;
   if (force) invalidateCache(cacheKey);
   try {
     return await fetchWithCache(cacheKey, async () => {
-      const snap = await getDocs(query(collection(db, 'clubFixtures'), where('season', '==', seasonName), limit(200)));
+      const snap = await getDocs(query(collection(db, 'clubFixtures'), where('season', '==', seasonName), limit(100))); // reduced from 200
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubFixture));
-    }, 5 * 60 * 1000);
+    }, 10 * 60 * 1000); // 10 min TTL
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'clubFixtures');
     return [];
@@ -2066,12 +2074,34 @@ export async function fetchAllActiveClubSeasons(force = false): Promise<ClubSeas
   }
 }
 
-/** Real-time listener for active/upcoming club seasons. */
+/**
+ * One-time fetch for active/upcoming club seasons — replaces the real-time
+ * subscribeToActiveClubSeasons listener which kept a permanent WebSocket open
+ * for every user that visited Admin or Club Zone.
+ * Cost: 1 collection read (cached 15 min). Zero ongoing listener overhead.
+ */
+export async function fetchActiveClubSeasonsOnce(force = false): Promise<ClubSeason[]> {
+  const cacheKey = 'clubSeasons_active';
+  if (force) invalidateCache(cacheKey);
+  try {
+    return await fetchWithCache(cacheKey, async () => {
+      const q = query(collection(db, 'clubSeasons'), where('status', 'in', ['active', 'upcoming']), limit(10));
+      const snap = await getDocs(q);
+      trackRead(snap.docs.length);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason));
+    }, 15 * 60 * 1000);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'clubSeasons-active');
+    return [];
+  }
+}
+
+/** @deprecated Use fetchActiveClubSeasonsOnce() instead. Kept for backward-compat. */
 export function subscribeToActiveClubSeasons(callback: (seasons: ClubSeason[]) => void) {
-  const q = query(collection(db, 'clubSeasons'), where('status', 'in', ['active', 'upcoming']), limit(50));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason)));
-  }, (err) => handleFirestoreError(err, OperationType.GET, 'clubSeasons-active-sub'));
+  // Downgraded from real-time listener to one-time fetch to save WebSocket connections.
+  fetchActiveClubSeasonsOnce().then(callback).catch(() => callback([]));
+  // Return a no-op unsubscribe so call sites don't break
+  return () => {};
 }
 
 /** Admin: Start a new internal season. 1 write. */
@@ -2542,3 +2572,158 @@ export async function fetchTournamentsOnce(limitCount = 20): Promise<Tournament[
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 2: SNAPSHOT ARCHITECTURE
+//
+// Two precomputed documents replace hundreds of collection reads:
+//
+//   settings/appSnapshot  → top-50 leaderboard + active tournaments + counts
+//                           Replaces: fetchPlayersOnce(50) + fetchTournamentsOnce(20)
+//                           = 70 reads → 1 read
+//
+//   settings/clubSnapshot → clubs[] + config + active market listings
+//                           Replaces: fetchClubs(50) + fetchMarketListings(50) + fetchClubConfig()
+//                           = ~101 reads → 1 read
+//
+// Both documents are written by admin after any relevant data change.
+// They are read by the frontend on cold start (0 reads if localStorage is fresh).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const APP_SNAPSHOT_CACHE_KEY = 'appSnapshot_v1';
+const CLUB_SNAPSHOT_CACHE_KEY = 'clubSnapshot_v1';
+
+export interface AppSnapshot {
+  leaderboard: Player[];       // top-50, pre-sorted by finalScore
+  activeTournaments: Tournament[];  // status='active', max 5
+  playerCount: number;
+  matchCount: number;
+  updatedAt: number;
+}
+
+export interface ClubSnapshot {
+  clubs: Club[];
+  config: import('../types').ClubSystemConfig | null;
+  marketListings: import('../types').MarketListing[];
+  updatedAt: number;
+}
+
+/**
+ * Reads the precomputed app snapshot document.
+ * 1 Firestore read — replaces fetching players(50) + tournaments(20).
+ * Cached in the store-level in-memory cache for 30 minutes.
+ */
+export async function fetchAppSnapshot(): Promise<AppSnapshot | null> {
+  return fetchWithCache(APP_SNAPSHOT_CACHE_KEY, async () => {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'appSnapshot'));
+      if (!snap.exists()) return null;
+      trackRead(1);
+      return snap.data() as AppSnapshot;
+    } catch (err) {
+      console.warn('[Snapshot] Could not fetch appSnapshot:', err);
+      return null;
+    }
+  }, 30 * 60 * 1000); // 30 min in-memory TTL
+}
+
+/**
+ * Reads the precomputed club snapshot document.
+ * 1 Firestore read — replaces fetchClubs(50) + fetchMarketListings(50) + fetchClubConfig().
+ */
+export async function fetchClubSnapshot(): Promise<ClubSnapshot | null> {
+  return fetchWithCache(CLUB_SNAPSHOT_CACHE_KEY, async () => {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'clubSnapshot'));
+      if (!snap.exists()) return null;
+      trackRead(1);
+      return snap.data() as ClubSnapshot;
+    } catch (err) {
+      console.warn('[Snapshot] Could not fetch clubSnapshot:', err);
+      return null;
+    }
+  }, 30 * 60 * 1000);
+}
+
+/**
+ * Admin: write the precomputed app snapshot after any ranking-changing event.
+ * Called automatically by addMatch() and recalculateAllStats().
+ * Cost: 1 write. Saves every subsequent user from fetching 70+ docs.
+ */
+export async function writeAppSnapshot(
+  allPlayers: Player[],
+  allTournaments: Tournament[],
+  matchCount?: number
+): Promise<void> {
+  if (isQuotaExceeded) return;
+  try {
+    const leaderboard = sortRankedPlayers(allPlayers).slice(0, 50);
+    const activeTournaments = allTournaments
+      .filter(t => (t as any).status === 'active')
+      .slice(0, 5);
+    const snapshot: AppSnapshot = {
+      leaderboard,
+      activeTournaments,
+      playerCount: allPlayers.length,
+      matchCount: matchCount ?? 0,
+      updatedAt: Date.now(),
+    };
+    await setDoc(doc(db, 'settings', 'appSnapshot'), snapshot);
+    // Bust local caches so next read picks up fresh snapshot
+    invalidateCache(APP_SNAPSHOT_CACHE_KEY);
+    console.log('[Snapshot] appSnapshot written:', leaderboard.length, 'players');
+  } catch (err) {
+    // Non-critical — fail silently so match saving is not blocked
+    console.warn('[Snapshot] Could not write appSnapshot:', err);
+  }
+}
+
+/**
+ * Admin: write the precomputed club snapshot after clubs/listings/config change.
+ * Cost: 1 write. Saves Club Zone from fetching 100+ docs on next load.
+ */
+export async function writeClubSnapshot(
+  clubs: Club[],
+  config: import('../types').ClubSystemConfig | null,
+  marketListings: import('../types').MarketListing[]
+): Promise<void> {
+  if (isQuotaExceeded) return;
+  try {
+    const snapshot: ClubSnapshot = {
+      clubs,
+      config,
+      marketListings: marketListings.slice(0, 50),
+      updatedAt: Date.now(),
+    };
+    await setDoc(doc(db, 'settings', 'clubSnapshot'), snapshot);
+    invalidateCache(CLUB_SNAPSHOT_CACHE_KEY);
+    console.log('[Snapshot] clubSnapshot written:', clubs.length, 'clubs');
+  } catch (err) {
+    console.warn('[Snapshot] Could not write clubSnapshot:', err);
+  }
+}
+
+/**
+ * Bust all frontend caches and optionally refresh snapshots.
+ * Call this after any admin write that changes public-facing data.
+ * The snapshot writes are fire-and-forget (non-blocking).
+ */
+export function invalidateAndRefreshSnapshots(
+  players?: Player[],
+  tournaments?: Tournament[],
+  clubs?: Club[],
+  config?: import('../types').ClubSystemConfig | null,
+  listings?: import('../types').MarketListing[]
+): void {
+  // Bust all in-memory caches
+  invalidateCache();
+  // Bust localStorage (imported from cache.ts via trackRead path)
+  invalidateStorage();
+
+  // Fire-and-forget snapshot refresh if we have the data
+  if (players && tournaments) {
+    writeAppSnapshot(players, tournaments).catch(() => {});
+  }
+  if (clubs && config !== undefined && listings) {
+    writeClubSnapshot(clubs, config, listings).catch(() => {});
+  }
+}

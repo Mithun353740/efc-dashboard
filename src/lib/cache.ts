@@ -6,8 +6,8 @@
  * Keys are versioned — changing CACHE_VERSION below auto-busts all stale entries.
  */
 
-const CACHE_VERSION = 'v2';
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const CACHE_VERSION = 'v3';
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes — bumped from 10 min to reduce cold-start reads
 
 interface PersistedEntry<T> {
   data: T;

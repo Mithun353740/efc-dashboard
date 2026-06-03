@@ -13,6 +13,7 @@ import {
   fetchTournamentsOnce,
   fetchSystemLocks,
   ensureAdminSession,
+  fetchAppSnapshot,
 } from './lib/store';
 import { VERSION } from './constants';
 import {
@@ -26,7 +27,7 @@ import {
 // SESSION CACHE — 15-minute in-memory TTL (zero re-reads on tab navigation)
 // STORAGE CACHE — 10-minute localStorage TTL (zero re-reads on page refresh)
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes in-memory
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes in-memory — matches localStorage TTL
 /** How often non-admin users re-check systemLocks (tiny single doc). */
 const LOCKS_POLL_INTERVAL_MS = 60 * 1000; // 60 seconds
 /** How often admin auto-refreshes collection data (replaces persistent listeners). */
@@ -100,9 +101,39 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     if (!force && cacheAge < CACHE_TTL_MS && storedPlayers.length > 0) return;
 
     const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
-    const playerLimit = isPlayer ? 200 : 50;
 
     try {
+      // ── SNAPSHOT FAST PATH (1 read instead of 70-120) ────────────────────
+      // Try the precomputed appSnapshot document first.
+      // Falls back to individual fetches if snapshot doesn't exist yet.
+      const snapshot = await fetchAppSnapshot();
+      if (snapshot && snapshot.leaderboard && snapshot.leaderboard.length > 0) {
+        if (!mountedRef.current) return;
+        const p = snapshot.leaderboard;
+        const t = snapshot.activeTournaments || [];
+        // Leaders and matches still need separate fetches (not in appSnapshot)
+        // but only if we're a logged-in player (guests see minimal data)
+        const [l, m] = await Promise.all([
+          fetchLeadersOnce(),
+          isPlayer ? fetchMatchesOnce(50) : Promise.resolve([] as MatchRecord[]),
+        ]);
+        if (!mountedRef.current) return;
+        setPlayers(p);
+        setLeaders(l);
+        setMatches(m);
+        setTournaments(t);
+        persistToStorage('players', p);
+        persistToStorage('leaders', l);
+        if (m.length) persistToStorage('matches', m);
+        if (t.length) persistToStorage('tournaments', t);
+        _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: _globalCache?.systemLocks || {}, fetchedAt: Date.now() };
+        lastFetchedAt.current = Date.now();
+        setIsLoading(false);
+        return; // ← done in 2-3 reads instead of 70-120
+      }
+
+      // ── FALLBACK: Individual fetches (first run, no snapshot yet) ─────────
+      const playerLimit = isPlayer ? 50 : 30;
       const [p, l, m, t] = await Promise.all([
         fetchPlayersOnce(playerLimit),
         fetchLeadersOnce(),
@@ -193,9 +224,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       // Previously used 4 persistent onSnapshot listeners that re-fired on
       // every write — causing ~350 reads per match entry. Now uses one-time
       // fetches with a timed refresh, cutting admin reads by ~90%.
+      // Register admin session (1 write — needed for Firestore security rules)
       ensureAdminSession();
-      testFirestoreConnection();
-
       // systemLocks — real-time for admin (tiny single doc, needed for instant lock control)
       unsubscribers.push(subscribeToSystemLocks((locks) => {
         if (!mountedRef.current) return;
@@ -213,10 +243,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (!mountedRef.current) return;
         try {
           const [p, l, m, t] = await Promise.all([
-            fetchPlayersOnce(200),
+            fetchPlayersOnce(50),          // reduced from 200 — sufficient for admin UI
             fetchLeadersOnce(),
-            fetchMatchesOnce(100),
-            fetchTournamentsOnce(50),
+            fetchMatchesOnce(50),          // reduced from 100
+            fetchTournamentsOnce(20),      // reduced from 50
           ]);
           if (!mountedRef.current) return;
           setPlayers(p);
