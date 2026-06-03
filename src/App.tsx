@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -11,17 +11,39 @@ import EliteRankings from './components/EliteRankings';
 import Leadership from './components/Leadership';
 import Legion from './components/Legion';
 import Footer from './components/Footer';
-import Admin from './components/Admin';
-import Rankings from './components/Rankings';
-import PlayerStats from './components/PlayerStats';
-import Login from './components/Login';
-import { NativeTournamentPage } from './components/tournament/NativeTournamentPage';
 import AutoUpdater from './components/AutoUpdater';
 import { FirebaseProvider, useFirebase } from './FirebaseContext';
-import { INITIAL_PLAYERS } from './lib/store';
-import ClubManager from './components/ClubManager';
-import firebaseConfig from '../firebase-applet-config.json';
 import { CLUB_LOGO, CLUB_NAME } from './constants';
+
+// ── Lazy-loaded route components ────────────────────────────────────────────
+// These are NOT bundled into the initial JS payload — they only download
+// when the user navigates to that route for the first time.
+const Admin       = lazy(() => import('./components/Admin'));
+const Rankings    = lazy(() => import('./components/Rankings'));
+const PlayerStats = lazy(() => import('./components/PlayerStats'));
+const Login       = lazy(() => import('./components/Login'));
+const ClubManager = lazy(() => import('./components/ClubManager'));
+const NativeTournamentPage = lazy(() =>
+  import('./components/tournament/NativeTournamentPage').then(m => ({ default: m.NativeTournamentPage }))
+);
+
+// Lightweight spinner shown while a lazy chunk is downloading
+function PageLoader() {
+  return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+      <div className="flex items-end gap-1.5">
+        {[14, 22, 18, 28, 20, 16, 26, 12, 24, 18].map((h, i) => (
+          <div
+            key={i}
+            className="w-1.5 bg-brand-purple rounded-full animate-bounce"
+            style={{ height: h + 'px', animationDelay: i * 0.08 + 's', animationDuration: '0.8s' }}
+          />
+        ))}
+      </div>
+      <p className="text-[10px] font-black text-slate-500 tracking-[0.3em] uppercase">Loading…</p>
+    </div>
+  );
+}
 
 function Home() {
   const { rankedPlayers, dbError, isLoading } = useFirebase();
@@ -164,15 +186,17 @@ function AppContent() {
       <AutoUpdater />
       <Navbar />
       <main className="flex-grow">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-          <Route path="/rankings" element={<Rankings />} />
-          <Route path="/stats" element={<PlayerStats />} />
-          <Route path="/tournament" element={<NativeTournamentPage forcePublic={true} />} />
-          <Route path="/club" element={<ClubManager />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            <Route path="/rankings" element={<Rankings />} />
+            <Route path="/stats" element={<PlayerStats />} />
+            <Route path="/tournament" element={<NativeTournamentPage forcePublic={true} />} />
+            <Route path="/club" element={<ClubManager />} />
+          </Routes>
+        </Suspense>
       </main>
       <Footer />
     </div>
