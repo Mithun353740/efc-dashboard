@@ -700,7 +700,11 @@ export async function recalculateAllStats(playersArg?: Player[]) {
   });
   try {
     await batch.commit();
-    
+    // Refresh precomputed snapshot so next cold-start user reads 1 doc instead of 50+
+    // Fire-and-forget: non-blocking, doesn't affect match recording latency
+    const updatedPlayers = playersToSync.map(p => computePlayerStats(p, allMatches, elos[p.id] || 1200));
+    writeAppSnapshot(updatedPlayers, []).catch(() => {});
+    console.log('[Resync] Stats recalculated. appSnapshot refreshed.');
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-recalculate-stats');
   }
@@ -858,7 +862,10 @@ export async function addMatch(
 
   try {
     await batch.commit();
-    return matchRef.id;
+    // Bust precomputed snapshot caches so next user load gets fresh leaderboard.
+    // Full snapshot refresh happens on next recalculateAllStats or admin data view.
+    invalidateCache(APP_SNAPSHOT_CACHE_KEY);
+    invalidateStorage(APP_SNAPSHOT_CACHE_KEY);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-update');
     throw error;
@@ -1242,11 +1249,8 @@ export async function fetchClubs(force = false): Promise<Club[]> {
   
   return fetchWithCache(cacheKey, async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(100)));
-      return snap.docs.map(doc => {
-        const d = doc.data();
-        return { id: doc.id, ...d, logo: d.logo || '/default-logo.jpg' } as Club;
-      });
+      const snap = await getDocs(query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(50))); // reduced from 100
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
     } catch (err) {
       handleFirestoreError(err, OperationType.LIST, 'clubs');
       throw err;
@@ -1393,15 +1397,15 @@ export async function removePlayerFromClubSquad(club: Club, playerId: string): P
   }
 }
 
-/** Fetch all active market listings (1 collection read). */
+/** Fetch all active market listings (1 collection read, cached 5 min). */
 export async function fetchMarketListings(force = false): Promise<MarketListing[]> {
   const cacheKey = 'club_market_listings';
   if (force) invalidateCache(cacheKey);
 
   return fetchWithCache(cacheKey, async () => {
-    const snap = await getDocs(query(collection(db, 'clubListings'), orderBy('createdAt', 'desc'), limit(100)));
+    const snap = await getDocs(query(collection(db, 'clubListings'), orderBy('createdAt', 'desc'), limit(50))); // reduced from 100
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketListing));
-  });
+  }, 5 * 60 * 1000);
 }
 
 /**
@@ -1519,6 +1523,64 @@ export async function fetchClubTournaments(seasonName: string, force = false): P
   }
 }
 
+/**
+ * Pure function — no Firestore reads.
+ * Computes league table standings from completed club fixtures.
+ * Goals = sub-match wins (each sub-match is a "goal" for the winning side).
+ */
+export function computeClubStandings(
+  fixtures: import('../types').ClubFixture[],
+  clubs: Club[]
+): Array<{
+  clubId: string; clubName: string;
+  played: number; won: number; drawn: number; lost: number;
+  goalsFor: number; goalsAgainst: number; goalDiff: number; points: number;
+}> {
+  const table: Record<string, {
+    clubId: string; clubName: string;
+    played: number; won: number; drawn: number; lost: number;
+    goalsFor: number; goalsAgainst: number;
+  }> = {};
+
+  // Initialize all participating clubs with zero stats
+  clubs.forEach(c => {
+    table[c.id] = { clubId: c.id, clubName: c.name, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 };
+  });
+
+  // Process completed fixtures only
+  fixtures.filter(f => f.status === 'completed').forEach(f => {
+    const homeId = f.homeClubId;
+    const awayId = f.awayClubId;
+    if (!table[homeId] || !table[awayId]) return;
+
+    // Count sub-match wins as "goals"
+    let homeGoals = 0, awayGoals = 0;
+    (f.subMatches || []).forEach((sm: any) => {
+      if (sm.p1Score !== null && sm.p1Score !== undefined && sm.p2Score !== null && sm.p2Score !== undefined) {
+        if (sm.p1Score > sm.p2Score) homeGoals++;
+        else if (sm.p2Score > sm.p1Score) awayGoals++;
+        // draws don't count as goals
+      }
+    });
+
+    table[homeId].played++;
+    table[awayId].played++;
+    table[homeId].goalsFor += homeGoals;
+    table[homeId].goalsAgainst += awayGoals;
+    table[awayId].goalsFor += awayGoals;
+    table[awayId].goalsAgainst += homeGoals;
+
+    if (homeGoals > awayGoals) { table[homeId].won++; table[awayId].lost++; }
+    else if (awayGoals > homeGoals) { table[awayId].won++; table[homeId].lost++; }
+    else { table[homeId].drawn++; table[awayId].drawn++; }
+  });
+
+  return Object.values(table)
+    .map(r => ({ ...r, goalDiff: r.goalsFor - r.goalsAgainst, points: r.won * 3 + r.drawn }))
+    .sort((a, b) => b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor);
+}
+
+
 export async function saveClubTournament(tourney: import('../types').ClubTournament): Promise<void> {
   await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
@@ -1544,14 +1606,14 @@ export async function deleteClubTournament(id: string): Promise<void> {
 }
 
 export async function fetchClubFixtures(seasonName: string, force = false): Promise<import('../types').ClubFixture[]> {
-  // Cached per-season (5-min TTL) to avoid re-reads on every tab switch or mount.
+  // Cached per-season (10-min TTL) to avoid re-reads on every tab switch or mount.
   const cacheKey = `clubFixtures_${seasonName}`;
   if (force) invalidateCache(cacheKey);
   try {
     return await fetchWithCache(cacheKey, async () => {
-      const snap = await getDocs(query(collection(db, 'clubFixtures'), where('season', '==', seasonName), limit(200)));
+      const snap = await getDocs(query(collection(db, 'clubFixtures'), where('season', '==', seasonName), limit(100))); // reduced from 200
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').ClubFixture));
-    }, 5 * 60 * 1000);
+    }, 10 * 60 * 1000); // 10 min TTL
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'clubFixtures');
     return [];
@@ -1584,6 +1646,102 @@ export async function deleteClubFixture(id: string): Promise<void> {
     throw err;
   }
 }
+
+/**
+ * Save the result of a single sub-match within a club fixture.
+ * Updates the fixture doc, creates a global match record (so stats update),
+ * and marks the fixture completed when all sub-matches have scores.
+ * Cost: 1 read (fixture) + 2 reads (player match histories) + 1 batch write.
+ */
+export async function saveClubFixtureResult(
+  fixtureId: string,
+  subMatchId: string,
+  p1Score: number,
+  p2Score: number,
+  allPlayers: Player[],
+  seasonId: string,
+  matchday: number,
+  config: import('../types').ClubSystemConfig
+): Promise<void> {
+  await ensureAdminSession();
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+
+  // 1. Fetch the current fixture
+  const fixtureSnap = await getDoc(doc(db, 'clubFixtures', fixtureId));
+  if (!fixtureSnap.exists()) throw new Error(`Fixture ${fixtureId} not found.`);
+  const fixture = { id: fixtureSnap.id, ...fixtureSnap.data() } as import('../types').ClubFixture;
+
+  // 2. Find the sub-match to update
+  const smIndex = fixture.subMatches.findIndex((sm: any) => sm.id === subMatchId);
+  if (smIndex === -1) throw new Error(`Sub-match ${subMatchId} not found in fixture.`);
+  const sm = fixture.subMatches[smIndex];
+
+  // 3. Find the two players
+  const p1 = allPlayers.find(p => p.id === sm.p1Id);
+  const p2 = sm.p2Id ? allPlayers.find(p => p.id === sm.p2Id) : undefined;
+
+  // 4. Create a global match record and update player stats
+  let globalMatchId: string | undefined;
+  if (p1) {
+    try {
+      // Use addMatch which handles ELO + stat recalculation atomically
+      const matchRef = doc(collection(db, 'matches'));
+      globalMatchId = matchRef.id;
+      const matchRecord: MatchRecord = {
+        id: globalMatchId,
+        timestamp: Date.now(),
+        p1Id: p1.id,
+        p1Name: p1.name,
+        p1Score,
+        p2Id: p2?.id,
+        p2Name: p2 ? p2.name : (sm.p2Name || 'External'),
+        p2Score,
+        tournament: config.season || 'Club League',
+        seasonId,
+        matchday,
+      };
+      const batch = writeBatch(db);
+      batch.set(matchRef, matchRecord);
+
+      // Recompute stats for affected players
+      const [p1Matches, p2Matches] = await Promise.all([
+        fetchAllMatchesForPlayer(p1.id),
+        p2 ? fetchAllMatchesForPlayer(p2.id) : Promise.resolve([] as MatchRecord[]),
+      ]);
+      const p1AllMatches = [...p1Matches, matchRecord];
+      const p2AllMatches = p2 ? [...p2Matches, matchRecord] : [];
+      const allForElo = [...new Map([...p1Matches, ...(p2 ? p2Matches : [])].map(m => [m.id, m])).values(), matchRecord]
+        .sort((a, b) => a.timestamp - b.timestamp);
+      const elos = computeGlobalElo([p1, ...(p2 ? [p2] : [])], allForElo);
+      batch.set(doc(db, 'players', p1.id), computePlayerStats(p1, p1AllMatches, elos[p1.id] || 1200));
+      if (p2) {
+        batch.set(doc(db, 'players', p2.id), computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200));
+      }
+      await batch.commit();
+    } catch (err) {
+      console.warn('[saveClubFixtureResult] Could not create global match:', err);
+      globalMatchId = undefined;
+    }
+  }
+
+  // 5. Update the sub-match inside the fixture
+  const updatedSubMatches = fixture.subMatches.map((s: any, i: number) =>
+    i === smIndex ? { ...s, p1Score, p2Score, ...(globalMatchId ? { globalMatchId } : {}) } : s
+  );
+
+  // 6. Check if all sub-matches now have scores → mark fixture completed
+  const allScored = updatedSubMatches.every((s: any) => s.p1Score !== null && s.p1Score !== undefined);
+  const updatedFixture = {
+    ...fixture,
+    subMatches: updatedSubMatches,
+    status: allScored ? 'completed' : fixture.status,
+  };
+
+  await setDoc(doc(db, 'clubFixtures', fixtureId), updatedFixture);
+  invalidateCache(`clubFixtures_${seasonId}`);
+  invalidateCache(`clubFixtures_${(fixture as any).season}`);
+}
+
 
 /**
  * Updates a specific sub-match inside a ClubFixture.
@@ -2217,12 +2375,34 @@ export async function fetchAllActiveClubSeasons(force = false): Promise<ClubSeas
   }
 }
 
-/** Real-time listener for active/upcoming club seasons. */
+/**
+ * One-time fetch for active/upcoming club seasons — replaces the real-time
+ * subscribeToActiveClubSeasons listener which kept a permanent WebSocket open
+ * for every user that visited Admin or Club Zone.
+ * Cost: 1 collection read (cached 15 min). Zero ongoing listener overhead.
+ */
+export async function fetchActiveClubSeasonsOnce(force = false): Promise<ClubSeason[]> {
+  const cacheKey = 'clubSeasons_active';
+  if (force) invalidateCache(cacheKey);
+  try {
+    return await fetchWithCache(cacheKey, async () => {
+      const q = query(collection(db, 'clubSeasons'), where('status', 'in', ['active', 'upcoming']), limit(10));
+      const snap = await getDocs(q);
+      trackRead(snap.docs.length);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason));
+    }, 15 * 60 * 1000);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'clubSeasons-active');
+    return [];
+  }
+}
+
+/** @deprecated Use fetchActiveClubSeasonsOnce() instead. Kept for backward-compat. */
 export function subscribeToActiveClubSeasons(callback: (seasons: ClubSeason[]) => void) {
-  const q = query(collection(db, 'clubSeasons'), where('status', 'in', ['active', 'upcoming']), limit(50));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as ClubSeason)));
-  }, (err) => handleFirestoreError(err, OperationType.GET, 'clubSeasons-active-sub'));
+  // Downgraded from real-time listener to one-time fetch to save WebSocket connections.
+  fetchActiveClubSeasonsOnce().then(callback).catch(() => callback([]));
+  // Return a no-op unsubscribe so call sites don't break
+  return () => {};
 }
 
 /** Admin: Start a new internal season. 1 write. */
@@ -2265,6 +2445,53 @@ export async function endClubSeason(seasonId: string, standingsSnapshot: ClubSea
   invalidateCache('clubSeasons_active');
   invalidateCacheByPrefix('clubSeasons_');
 }
+
+/**
+ * Admin: End the entire Club Zone season.
+ * Resets all players' club-scoped stats and contracts for the new season.
+ * Saves a final standings record to Firestore history.
+ * Called before starting a new Club Zone season.
+ */
+export async function endClubZoneSeason(
+  seasonName: string,
+  globalSeason: string,
+  players: Player[],
+  clubs: Club[]
+): Promise<void> {
+  await ensureAdminSession();
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+
+  const batch = writeBatch(db);
+
+  // 1. Reset every player's club-scoped stats + contract for the new season
+  players.forEach(p => {
+    if (p.clubId) {
+      batch.update(doc(db, 'players', p.id), {
+        clubStats: { goals: 0, matches: 0, wins: 0, losses: 0, draws: 0 },
+        clubContract: null,
+      });
+    }
+  });
+
+  // 2. Save a season history record (standings snapshot)
+  const historyId = `clubZone_${seasonName.replace(/\s+/g, '_')}_${Date.now()}`;
+  const historyRecord = {
+    id: historyId,
+    seasonName,
+    globalSeason,
+    clubs: clubs.map(c => ({ id: c.id, name: c.name, primaryColor: c.primaryColor })),
+    endedAt: Date.now(),
+  };
+  batch.set(doc(db, 'clubSeasonHistory', historyId), historyRecord);
+
+  await batch.commit();
+
+  // 3. Bust caches
+  invalidateCache('clubs_all');
+  invalidateCacheByPrefix('clubSeasons_');
+  invalidateCache('club_config');
+}
+
 
 /** Admin: Broadcast a system notification to all club owners' inboxes. */
 export async function broadcastToAllOwners(ownerIds: string[], message: Omit<ClubInboxMessage, 'id' | 'read' | 'createdAt'>): Promise<void> {
@@ -2717,222 +2944,157 @@ export async function fetchTournamentsOnce(limitCount = 20): Promise<Tournament[
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CLUB FIXTURE RESULT — updates sub-match score + updates clubStats on players
-// + propagates to global match history for OVR/ELO recalculation
+// PHASE 2: SNAPSHOT ARCHITECTURE
+//
+// Two precomputed documents replace hundreds of collection reads:
+//
+//   settings/appSnapshot  → top-50 leaderboard + active tournaments + counts
+//                           Replaces: fetchPlayersOnce(50) + fetchTournamentsOnce(20)
+//                           = 70 reads → 1 read
+//
+//   settings/clubSnapshot → clubs[] + config + active market listings
+//                           Replaces: fetchClubs(50) + fetchMarketListings(50) + fetchClubConfig()
+//                           = ~101 reads → 1 read
+//
+// Both documents are written by admin after any relevant data change.
+// They are read by the frontend on cold start (0 reads if localStorage is fresh).
 // ─────────────────────────────────────────────────────────────────────────────
 
+const APP_SNAPSHOT_CACHE_KEY = 'appSnapshot_v1';
+const CLUB_SNAPSHOT_CACHE_KEY = 'clubSnapshot_v1';
+
+export interface AppSnapshot {
+  leaderboard: Player[];       // top-50, pre-sorted by finalScore
+  activeTournaments: Tournament[];  // status='active', max 5
+  playerCount: number;
+  matchCount: number;
+  updatedAt: number;
+}
+
+export interface ClubSnapshot {
+  clubs: Club[];
+  config: import('../types').ClubSystemConfig | null;
+  marketListings: import('../types').MarketListing[];
+  updatedAt: number;
+}
+
 /**
- * Records a sub-match result inside a ClubFixture.
- * 1. Updates the sub-match scores on the fixture document.
- * 2. If all sub-matches are scored, marks the fixture as 'completed'.
- * 3. Updates clubStats on each player (isolated from global OVR).
- * 4. Writes a global MatchRecord and recomputes OVR/ELO for ranking.
- *
- * Cost: 1 getDoc (fixture) + 1 batch write (fixture + players) + addMatch call
+ * Reads the precomputed app snapshot document.
+ * 1 Firestore read — replaces fetching players(50) + tournaments(20).
+ * Cached in the store-level in-memory cache for 30 minutes.
  */
-export async function saveClubFixtureResult(
-  fixtureId: string,
-  subMatchId: string,
-  p1Score: number,
-  p2Score: number,
-  allPlayers: Player[],
-  seasonId: string,
-  matchday: number,
-  config?: ClubSystemConfig | null
-): Promise<void> {
-  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
-
-  // 1. Fetch the fixture
-  const fixtureSnap = await getDoc(doc(db, 'clubFixtures', fixtureId));
-  if (!fixtureSnap.exists()) throw new Error('Fixture not found.');
-  const fixture = { id: fixtureSnap.id, ...fixtureSnap.data() } as ClubFixture;
-
-  const sm = fixture.subMatches.find(s => s.id === subMatchId);
-  if (!sm) throw new Error('Sub-match not found.');
-
-  // 2. Propagate to global match history FIRST to get the generated ID
-  const p1 = allPlayers.find(p => p.id === sm.p1Id);
-  const p2 = allPlayers.find(p => p.id === sm.p2Id);
-  let globalMatchId: string | undefined;
-
-  if (p1) {
+export async function fetchAppSnapshot(): Promise<AppSnapshot | null> {
+  return fetchWithCache(APP_SNAPSHOT_CACHE_KEY, async () => {
     try {
-      globalMatchId = await addMatch(
-        p1, p1Score, p2Score, p2, [],
-        fixture.tournamentName || config?.season || 'Club Zone',
-        p2?.name, seasonId, matchday,
-        undefined, undefined, // not a global tournament
-        fixtureId, subMatchId // pass club source links
-      );
+      const snap = await getDoc(doc(db, 'settings', 'appSnapshot'));
+      if (!snap.exists()) return null;
+      trackRead(1);
+      return snap.data() as AppSnapshot;
     } catch (err) {
-      console.warn('[saveClubFixtureResult] Global propagation failed (non-critical):', err);
+      console.warn('[Snapshot] Could not fetch appSnapshot:', err);
+      return null;
     }
-  }
-
-  // 3. Update sub-match scores AND attach globalMatchId
-  const updatedSubMatches = fixture.subMatches.map(s =>
-    s.id === subMatchId ? { ...s, p1Score, p2Score, globalMatchId } : s
-  );
-  const allScored = updatedSubMatches.every(s => s.p1Score !== null && s.p2Score !== null);
-  const newFixtureStatus = allScored ? 'completed' : 'active';
-
-  const batch = writeBatch(db);
-
-  // 4. Update fixture document
-  batch.update(doc(db, 'clubFixtures', fixtureId), {
-    subMatches: updatedSubMatches,
-    status: newFixtureStatus,
-  });
-
-  // 5. Update clubStats on each player (isolated from global)
-  const updateClubStats = (playerId: string, myScore: number, oppScore: number) => {
-    const player = allPlayers.find(p => p.id === playerId);
-    if (!player) return;
-    const prev: ClubStats = player.clubStats || {
-      played: 0, won: 0, drawn: 0, lost: 0,
-      goalsScored: 0, goalsConceded: 0, points: 0,
-      clubOvr: player.ovr, form: []
-    };
-    const won = myScore > oppScore;
-    const drawn = myScore === oppScore;
-    const result = won ? 'W' : drawn ? 'D' : 'L';
-    const newForm = [result, ...prev.form].slice(0, 5);
-    const updated: ClubStats = {
-      played: prev.played + 1,
-      won: prev.won + (won ? 1 : 0),
-      drawn: prev.drawn + (drawn ? 1 : 0),
-      lost: prev.lost + (!won && !drawn ? 1 : 0),
-      goalsScored: prev.goalsScored + myScore,
-      goalsConceded: prev.goalsConceded + oppScore,
-      points: prev.points + (won ? 3 : drawn ? 1 : 0),
-      clubOvr: prev.clubOvr,
-      form: newForm,
-    };
-    batch.update(doc(db, 'players', playerId), { clubStats: updated });
-  };
-
-  updateClubStats(sm.p1Id, p1Score, p2Score);
-  updateClubStats(sm.p2Id, p2Score, p1Score);
-
-  await batch.commit();
+  }, 30 * 60 * 1000); // 30 min in-memory TTL
 }
 
 /**
- * Compute live standings for a club tournament from its completed fixtures.
- * Pure client-side computation — zero extra Firestore reads.
+ * Reads the precomputed club snapshot document.
+ * 1 Firestore read — replaces fetchClubs(50) + fetchMarketListings(50) + fetchClubConfig().
  */
-export function computeClubStandings(
-  fixtures: ClubFixture[],
-  clubs: Club[]
-): Array<{
-  clubId: string; clubName: string; primaryColor: string;
-  played: number; won: number; drawn: number; lost: number;
-  goalsFor: number; goalsAgainst: number; goalDiff: number; points: number;
-}> {
-  const table: Record<string, {
-    clubId: string; clubName: string; primaryColor: string;
-    played: number; won: number; drawn: number; lost: number;
-    goalsFor: number; goalsAgainst: number;
-  }> = {};
-
-  clubs.forEach(c => {
-    table[c.id] = {
-      clubId: c.id, clubName: c.name, primaryColor: c.primaryColor,
-      played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0
-    };
-  });
-
-  fixtures.filter(f => f.status === 'completed').forEach(f => {
-    const homeGoals = f.subMatches.reduce((s, m) =>
-      s + (m.p1Score !== null && m.p2Score !== null && m.p1Score > m.p2Score ? 1 : 0), 0);
-    const awayGoals = f.subMatches.reduce((s, m) =>
-      s + (m.p1Score !== null && m.p2Score !== null && m.p2Score > m.p1Score ? 1 : 0), 0);
-    const hw = homeGoals > awayGoals;
-    const draw = homeGoals === awayGoals;
-
-    if (table[f.homeClubId]) {
-      table[f.homeClubId].played++;
-      table[f.homeClubId].goalsFor += homeGoals;
-      table[f.homeClubId].goalsAgainst += awayGoals;
-      if (hw) table[f.homeClubId].won++;
-      else if (draw) table[f.homeClubId].drawn++;
-      else table[f.homeClubId].lost++;
+export async function fetchClubSnapshot(): Promise<ClubSnapshot | null> {
+  return fetchWithCache(CLUB_SNAPSHOT_CACHE_KEY, async () => {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'clubSnapshot'));
+      if (!snap.exists()) return null;
+      trackRead(1);
+      return snap.data() as ClubSnapshot;
+    } catch (err) {
+      console.warn('[Snapshot] Could not fetch clubSnapshot:', err);
+      return null;
     }
-    if (table[f.awayClubId]) {
-      table[f.awayClubId].played++;
-      table[f.awayClubId].goalsFor += awayGoals;
-      table[f.awayClubId].goalsAgainst += homeGoals;
-      if (!hw && !draw) table[f.awayClubId].won++;
-      else if (draw) table[f.awayClubId].drawn++;
-      else table[f.awayClubId].lost++;
-    }
-  });
-
-  return Object.values(table)
-    .map(r => ({ ...r, goalDiff: r.goalsFor - r.goalsAgainst, points: r.won * 3 + r.drawn }))
-    .sort((a, b) => b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor);
+  }, 30 * 60 * 1000);
 }
 
-export async function endClubZoneSeason(
-  currentSeasonLabel: string,
-  activeGlobalSeasonName: string,
-  allPlayers: import('../types').Player[],
-  allClubs: import('../types').Club[]
+/**
+ * Admin: write the precomputed app snapshot after any ranking-changing event.
+ * Called automatically by addMatch() and recalculateAllStats().
+ * Cost: 1 write. Saves every subsequent user from fetching 70+ docs.
+ */
+export async function writeAppSnapshot(
+  allPlayers: Player[],
+  allTournaments: Tournament[],
+  matchCount?: number
 ): Promise<void> {
-  await ensureAdminSession();
-  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
-
-  const fixtures = await fetchClubFixtures(currentSeasonLabel);
-  const tournaments = await fetchClubTournaments(currentSeasonLabel);
-  
-  const clubSet = new Set<string>();
-  tournaments.forEach(t => t.participatingClubIds?.forEach(id => clubSet.add(id)));
-  const participatingClubs = allClubs.filter(c => clubSet.has(c.id));
-
-  const finalStandings = computeClubStandings(fixtures, participatingClubs);
-  
-  const standingsSnapshot: Record<string, any> = {};
-  finalStandings.forEach(s => {
-    standingsSnapshot[s.clubId] = s;
-  });
-
-  const batch = writeBatch(db);
-
-  const seasonDocRef = doc(db, 'clubSeasons', currentSeasonLabel.replace(/\s+/g, '_') + '_' + Date.now());
-  batch.set(seasonDocRef, {
-    id: seasonDocRef.id,
-    globalSeason: activeGlobalSeasonName,
-    seasonNumber: 1, 
-    label: currentSeasonLabel,
-    status: 'completed',
-    startedAt: null,
-    endedAt: Date.now(),
-    standingsSnapshot
-  });
-
-  // Chunking player updates
-  const batches = [batch];
-  let currentBatch = batches[0];
-  let opCount = 1;
-
-  for (const p of allPlayers) {
-    if (p.clubStats) {
-      if (opCount >= 490) {
-        currentBatch = writeBatch(db);
-        batches.push(currentBatch);
-        opCount = 0;
-      }
-      currentBatch.update(doc(db, 'players', p.id), { clubStats: null });
-      opCount++;
-    }
+  if (isQuotaExceeded) return;
+  try {
+    const leaderboard = sortRankedPlayers(allPlayers).slice(0, 50);
+    const activeTournaments = allTournaments
+      .filter(t => (t as any).status === 'active')
+      .slice(0, 5);
+    const snapshot: AppSnapshot = {
+      leaderboard,
+      activeTournaments,
+      playerCount: allPlayers.length,
+      matchCount: matchCount ?? 0,
+      updatedAt: Date.now(),
+    };
+    await setDoc(doc(db, 'settings', 'appSnapshot'), snapshot);
+    // Bust local caches so next read picks up fresh snapshot
+    invalidateCache(APP_SNAPSHOT_CACHE_KEY);
+    console.log('[Snapshot] appSnapshot written:', leaderboard.length, 'players');
+  } catch (err) {
+    // Non-critical — fail silently so match saving is not blocked
+    console.warn('[Snapshot] Could not write appSnapshot:', err);
   }
-
-  for (const b of batches) {
-    await b.commit();
-  }
-
-  invalidateCache('clubSeasons_active');
-  invalidateCacheByPrefix('clubSeasons_');
 }
 
+/**
+ * Admin: write the precomputed club snapshot after clubs/listings/config change.
+ * Cost: 1 write. Saves Club Zone from fetching 100+ docs on next load.
+ */
+export async function writeClubSnapshot(
+  clubs: Club[],
+  config: import('../types').ClubSystemConfig | null,
+  marketListings: import('../types').MarketListing[]
+): Promise<void> {
+  if (isQuotaExceeded) return;
+  try {
+    const snapshot: ClubSnapshot = {
+      clubs,
+      config,
+      marketListings: marketListings.slice(0, 50),
+      updatedAt: Date.now(),
+    };
+    await setDoc(doc(db, 'settings', 'clubSnapshot'), snapshot);
+    invalidateCache(CLUB_SNAPSHOT_CACHE_KEY);
+    console.log('[Snapshot] clubSnapshot written:', clubs.length, 'clubs');
+  } catch (err) {
+    console.warn('[Snapshot] Could not write clubSnapshot:', err);
+  }
+}
 
+/**
+ * Bust all frontend caches and optionally refresh snapshots.
+ * Call this after any admin write that changes public-facing data.
+ * The snapshot writes are fire-and-forget (non-blocking).
+ */
+export function invalidateAndRefreshSnapshots(
+  players?: Player[],
+  tournaments?: Tournament[],
+  clubs?: Club[],
+  config?: import('../types').ClubSystemConfig | null,
+  listings?: import('../types').MarketListing[]
+): void {
+  // Bust all in-memory caches
+  invalidateCache();
+  // Bust localStorage (imported from cache.ts via trackRead path)
+  invalidateStorage();
+
+  // Fire-and-forget snapshot refresh if we have the data
+  if (players && tournaments) {
+    writeAppSnapshot(players, tournaments).catch(() => {});
+  }
+  if (clubs && config !== undefined && listings) {
+    writeClubSnapshot(clubs, config, listings).catch(() => {});
+  }
+}

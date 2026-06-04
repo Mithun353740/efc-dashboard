@@ -7,7 +7,7 @@
  */
 
 const CACHE_VERSION = 'v3';
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes — was 10min, tripled to cut cold-start reads for 50 users
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes — bumped from 10 min to reduce cold-start reads
 
 interface PersistedEntry<T> {
   data: T;
