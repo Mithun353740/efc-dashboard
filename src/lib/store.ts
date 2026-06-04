@@ -2891,56 +2891,67 @@ export async function ensureAdminSession(): Promise<void> {
 
 /** One-shot fetch for guests — no real-time listener. */
 export async function fetchPlayersOnce(limitCount = 15): Promise<Player[]> {
-  try {
-    const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
-    const snap = await getDocs(q);
-    return snap.docs.map(doc => {
-      const d = doc.data();
-      return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Player;
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, 'players');
-    return [];
-  }
+  const cacheKey = `players_once_${limitCount}`;
+  return fetchWithCache(cacheKey, async () => {
+    try {
+      const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => {
+        const d = doc.data();
+        return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Player;
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'players');
+      return [];
+    }
+  }, 30 * 60 * 1000);
 }
 
 /** One-shot fetch for guests — no real-time listener. */
 export async function fetchLeadersOnce(): Promise<Leader[]> {
-  try {
-    const q = query(collection(db, 'leaders'), limit(20));
-    const snap = await getDocs(q);
-    return snap.docs.map(doc => {
-      const d = doc.data();
-      return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Leader;
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, 'leaders');
-    return [];
-  }
+  return fetchWithCache('leaders_once', async () => {
+    try {
+      const q = query(collection(db, 'leaders'), limit(20));
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => {
+        const d = doc.data();
+        return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Leader;
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'leaders');
+      return [];
+    }
+  }, 30 * 60 * 1000);
 }
 
 /** One-shot fetch — no real-time listener. Replaces subscribeToMatches for non-admin users. */
 export async function fetchMatchesOnce(limitCount = 50): Promise<MatchRecord[]> {
-  try {
-    const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(limitCount));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, 'matches');
-    return [];
-  }
+  const cacheKey = `matches_once_${limitCount}`;
+  return fetchWithCache(cacheKey, async () => {
+    try {
+      const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(limitCount));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'matches');
+      return [];
+    }
+  }, 30 * 60 * 1000);
 }
 
 /** One-shot fetch — no real-time listener. Replaces subscribeToTournaments for non-admin users. */
 export async function fetchTournamentsOnce(limitCount = 20): Promise<Tournament[]> {
-  try {
-    const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(limitCount));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Tournament));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, 'tournaments');
-    return [];
-  }
+  const cacheKey = `tournaments_once_${limitCount}`;
+  return fetchWithCache(cacheKey, async () => {
+    try {
+      const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(limitCount));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Tournament));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'tournaments');
+      return [];
+    }
+  }, 30 * 60 * 1000);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

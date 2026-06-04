@@ -34,7 +34,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes in-memory — matches localStorage TTL
 /** How often non-admin users re-check systemLocks (tiny single doc). */
-const LOCKS_POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const LOCKS_POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes — matches cache TTL (was 5 min = 4,800 reads/day for 50 users)
 /** How often admin auto-refreshes collection data (replaces persistent listeners). */
 const ADMIN_REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
