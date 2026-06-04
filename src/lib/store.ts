@@ -1,8 +1,9 @@
 import { 
   Player, PartialPlayerStats, Leader, MatchRecord, Tournament, AuctionState, 
   ClubSeason, ClubInboxMessage, TransferThread, TransferOffer, ReleaseClause, 
-  Club, GlobalSeason, PlayerInboxMessage, ClubSystemConfig, MarketListing, ClubTournament, ClubFixture
+  Club, GlobalSeason, PlayerInboxMessage, ClubSystemConfig, MarketListing, ClubTournament, ClubFixture, ClubStats
 } from '../types';
+
 import { db, auth } from '../firebase';
 import { resolveCanonicalTournamentName, getSeasonInfo } from './utils';
 import { trackRead, invalidateStorage } from './cache';
@@ -330,7 +331,7 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const CACHE_TTL = 15 * 60 * 1000; // 15 minutes — matches FirebaseContext session TTL
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes — matches FirebaseContext/localStorage session TTL
 const _cache = new Map<string, CacheEntry<any>>();
 const _pendingRequests = new Map<string, Promise<any>>();
 
@@ -391,7 +392,10 @@ export async function fetchPlayers(limitCount = 100, force = false): Promise<Pla
   return fetchWithCache(cacheKey, async () => {
     const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Player;
+    });
   });
 }
 
@@ -402,7 +406,10 @@ export async function fetchLeaders(force = false): Promise<Leader[]> {
   return fetchWithCache(cacheKey, async () => {
     const q = query(collection(db, 'leaders'), limit(50));
     const snap = await getDocs(q);
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Leader;
+    });
   });
 }
 
@@ -509,19 +516,24 @@ export async function updatePlayerProfile(
  * recomputing stats during admin writes.
  */
 async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]> {
-  const [snap1, snap2] = await Promise.all([
-    getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId), orderBy('timestamp', 'desc'), limit(100))),
-    getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId), orderBy('timestamp', 'desc'), limit(100))),
-  ]);
-  const seen = new Set<string>();
-  const results: MatchRecord[] = [];
-  [...snap1.docs, ...snap2.docs].forEach(d => {
-    if (!seen.has(d.id)) {
-      seen.add(d.id);
-      results.push({ id: d.id, ...d.data() } as MatchRecord);
-    }
-  });
-  return results.sort((a, b) => a.timestamp - b.timestamp);
+  // Short 2-minute cache — prevents duplicate reads when addMatch/editMatch
+  // call this for both p1 and p2 within the same operation.
+  const cacheKey = `playerMatches_${playerId}`;
+  return fetchWithCache(cacheKey, async () => {
+    const [snap1, snap2] = await Promise.all([
+      getDocs(query(collection(db, 'matches'), where('p1Id', '==', playerId), orderBy('timestamp', 'desc'), limit(100))),
+      getDocs(query(collection(db, 'matches'), where('p2Id', '==', playerId), orderBy('timestamp', 'desc'), limit(100))),
+    ]);
+    const seen = new Set<string>();
+    const results: MatchRecord[] = [];
+    [...snap1.docs, ...snap2.docs].forEach(d => {
+      if (!seen.has(d.id)) {
+        seen.add(d.id);
+        results.push({ id: d.id, ...d.data() } as MatchRecord);
+      }
+    });
+    return results.sort((a, b) => a.timestamp - b.timestamp);
+  }, 2 * 60 * 1000); // 2-min TTL — short enough to stay accurate, long enough to deduplicate
 }
 
 // Admin-only real-time listener. Limit=200 is sufficient for any club.
@@ -755,8 +767,12 @@ export async function addMatch(
   tournament?: string,
   p2NameOverride?: string,
   seasonId?: string,
-  matchday?: number
-) {
+  matchday?: number,
+  sourceTournamentId?: string,
+  sourceFixtureId?: string,
+  clubFixtureId?: string,
+  clubSubMatchId?: string
+): Promise<string> {
   
   await ensureAdminSession();
   if (isQuotaExceeded) {
@@ -766,7 +782,7 @@ export async function addMatch(
 
   // 1. Write the new match document first
   const matchRef = doc(collection(db, 'matches'));
-  const matchRecord: MatchRecord = {
+  const rawRecord = {
     id: matchRef.id,
     timestamp: Date.now(),
     p1Id: p1.id,
@@ -778,7 +794,16 @@ export async function addMatch(
     tournament: tournament || 'Friendly',
     seasonId: seasonId || '',
     matchday: matchday || 0,
+    sourceTournamentId,
+    sourceFixtureId,
+    clubFixtureId,
+    clubSubMatchId,
   };
+  
+  const matchRecord = Object.fromEntries(
+    Object.entries(rawRecord).filter(([_, v]) => v !== undefined)
+  ) as unknown as MatchRecord;
+
   batch.set(matchRef, matchRecord);
 
   // 2. Fetch full match history for each affected player from Firestore
@@ -843,6 +868,7 @@ export async function addMatch(
     invalidateStorage(APP_SNAPSHOT_CACHE_KEY);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-update');
+    throw error;
   }
 }
 
@@ -1020,6 +1046,74 @@ export async function deleteMatchFromHistory(
     console.warn("Could not recalculate manager ratings on delete", e);
   }
 
+  // Bidirectional Sync: Clear parent global tournament fixture
+  if (matchRecord.sourceTournamentId && matchRecord.sourceFixtureId) {
+    try {
+      const tSnap = await getDoc(doc(db, 'tournaments', matchRecord.sourceTournamentId));
+      if (tSnap.exists()) {
+        const t = tSnap.data() as import('../types').Tournament;
+        const updatedFixtures = t.fixtures.map(f =>
+          f.id === matchRecord.sourceFixtureId
+            ? { ...f, homeScore: null, awayScore: null, status: 'upcoming' as const, globalMatchId: undefined }
+            : f
+        );
+        batch.update(doc(db, 'tournaments', matchRecord.sourceTournamentId), { fixtures: updatedFixtures });
+      }
+    } catch (e) {
+      console.warn('Failed to clear global tournament fixture', e);
+    }
+  }
+
+  // Bidirectional Sync: Clear parent club tournament fixture & revert club stats
+  if (matchRecord.clubFixtureId && matchRecord.clubSubMatchId) {
+    try {
+      const fSnap = await getDoc(doc(db, 'clubFixtures', matchRecord.clubFixtureId));
+      if (fSnap.exists()) {
+        const cf = fSnap.data() as import('../types').ClubFixture;
+        const subMatch = cf.subMatches.find(sm => sm.id === matchRecord.clubSubMatchId);
+        
+        const updatedSubMatches = cf.subMatches.map(sm =>
+          sm.id === matchRecord.clubSubMatchId
+            ? { ...sm, p1Score: null, p2Score: null, globalMatchId: undefined }
+            : sm
+        );
+        batch.update(doc(db, 'clubFixtures', matchRecord.clubFixtureId), {
+          subMatches: updatedSubMatches,
+          status: 'active'
+        });
+        
+        // Revert clubStats for both players
+        const revertClubStats = (playerId: string | undefined, won: boolean, drawn: boolean, myScore: number, oppScore: number) => {
+          if (!playerId) return;
+          const player = players.find(p => p.id === playerId);
+          if (!player || !player.clubStats) return;
+          const prev = player.clubStats;
+          
+          const updated: import('../types').ClubStats = {
+            ...prev,
+            played: Math.max(0, prev.played - 1),
+            won: Math.max(0, prev.won - (won ? 1 : 0)),
+            drawn: Math.max(0, prev.drawn - (drawn ? 1 : 0)),
+            lost: Math.max(0, prev.lost - (!won && !drawn ? 1 : 0)),
+            goalsScored: Math.max(0, prev.goalsScored - myScore),
+            goalsConceded: Math.max(0, prev.goalsConceded - oppScore),
+            points: Math.max(0, prev.points - (won ? 3 : drawn ? 1 : 0)),
+          };
+          batch.update(doc(db, 'players', playerId), { clubStats: updated });
+        };
+        
+        if (subMatch && subMatch.p1Score !== null && subMatch.p2Score !== null) {
+           const p1Won = subMatch.p1Score > subMatch.p2Score;
+           const drawn = subMatch.p1Score === subMatch.p2Score;
+           revertClubStats(subMatch.p1Id, p1Won, drawn, subMatch.p1Score, subMatch.p2Score);
+           revertClubStats(subMatch.p2Id, !p1Won && !drawn, drawn, subMatch.p2Score, subMatch.p1Score);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to clear club fixture and stats', e);
+    }
+  }
+
   try {
     await batch.commit();
     
@@ -1167,7 +1261,10 @@ export async function fetchClubs(force = false): Promise<Club[]> {
 export function subscribeToClubs(callback: (clubs: Club[]) => void, limitCount = 50) {
     const q = query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(limitCount));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Club)));
+    callback(snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, logo: d.logo || '/default-logo.jpg' } as Club;
+    }));
   }, (err) => handleFirestoreError(err, OperationType.GET, 'clubs'));
 }
 
@@ -1629,7 +1726,12 @@ const AUCTION_DOC = doc(db, 'auctions', 'live');
 /** Real-time listener on the single auction document. */
 export function subscribeToAuction(callback: (state: AuctionState | null) => void) {
   return onSnapshot(AUCTION_DOC, (snap) => {
-    callback(snap.exists() ? (snap.data() as AuctionState) : null);
+    if (!snap.exists()) return callback(null);
+    const state = snap.data() as AuctionState;
+    if (state.currentPlayer && !state.currentPlayer.image) {
+      state.currentPlayer.image = '/default-logo.jpg';
+    }
+    callback(state);
   }, (err) => handleFirestoreError(err, OperationType.GET, 'auctions/live'));
 }
 
@@ -1715,8 +1817,20 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
     const batch = writeBatch(db);
     const winningClubDoc = await getDoc(doc(db, 'clubs', currentState.leadingClubId));
     if (winningClubDoc.exists()) {
-      const winningClub = winningClubDoc.data() as import('../types').Club;
-      batch.update(doc(db, 'clubs', winningClub.id), { budget: winningClub.budget - currentState.currentBid });
+      const winningClub = { id: winningClubDoc.id, ...winningClubDoc.data() } as Club;
+      // Load config for auto-contract defaults
+      let cfg: ClubSystemConfig | null = null;
+      try {
+        const cfgSnap = await getDoc(doc(db, 'clubSystem', 'config'));
+        if (cfgSnap.exists()) cfg = cfgSnap.data() as ClubSystemConfig;
+      } catch {}
+      const contractType = cfg?.defaultContractType || 'matches';
+      const contractAmount = cfg?.defaultContractAmount || 5;
+      const autoContract = cfg?.contractsActive !== false ? { type: contractType, amount: contractAmount } : null;
+      batch.update(doc(db, 'clubs', winningClub.id), {
+        budget: winningClub.budget - currentState.currentBid,
+        squadIds: arrayUnion(currentState.currentPlayer.id),
+      });
       batch.update(doc(db, 'players', currentState.currentPlayer.id), {
         clubId: winningClub.id,
         clubName: winningClub.name,
@@ -1724,6 +1838,8 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
         secondaryColor: winningClub.secondaryColor,
         isListed: false,
         listingPrice: null,
+        clubContract: autoContract,
+        clubStats: { played: 0, won: 0, drawn: 0, lost: 0, goalsScored: 0, goalsConceded: 0, points: 0, clubOvr: currentState.currentPlayer.ovr, form: [] },
       });
       batch.set(AUCTION_DOC, {
         foldedClubs: newFolded,
@@ -1732,7 +1848,6 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
         currentTurnIndex: currentState.currentTurnIndex,
       }, { merge: true });
       await batch.commit();
-      
       return;
     }
   }
@@ -1746,8 +1861,8 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
   }, { merge: true });
 }
 
-/** Admin: Confirm the sale G deduct budget from winning club, assign player. */
-export async function adminConfirmSold(currentState: AuctionState, winningClub: import('../types').Club): Promise<void> {
+/** Admin: Confirm the sale — deduct budget from winning club, assign player, apply auto-contract. */
+export async function adminConfirmSold(currentState: AuctionState, winningClub: import('../types').Club, config?: import('../types').ClubSystemConfig | null): Promise<void> {
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   if (!currentState.currentPlayer || !currentState.leadingClubId) return;
   const batch = writeBatch(db);
@@ -1756,7 +1871,11 @@ export async function adminConfirmSold(currentState: AuctionState, winningClub: 
     budget: winningClub.budget - currentState.currentBid,
     squadIds: arrayUnion(currentState.currentPlayer.id)
   });
-  // Transfer player to new club — reset club-scoped stats & contract so first renewal is direct
+  // Build automatic contract from config defaults
+  const contractType = config?.defaultContractType || 'matches';
+  const contractAmount = config?.defaultContractAmount || 5;
+  const autoContract = config?.contractsActive !== false ? { type: contractType, amount: contractAmount } : null;
+  // Transfer player to new club — reset club-scoped stats, apply auto-contract
   batch.update(doc(db, 'players', currentState.currentPlayer.id), {
     clubId: winningClub.id,
     clubName: winningClub.name,
@@ -1764,13 +1883,12 @@ export async function adminConfirmSold(currentState: AuctionState, winningClub: 
     secondaryColor: winningClub.secondaryColor,
     isListed: false,
     listingPrice: null,
-    clubContract: null,
-    clubStats: { goals: 0, matches: 0, wins: 0, losses: 0, draws: 0 },
+    clubContract: autoContract,
+    clubStats: { played: 0, won: 0, drawn: 0, lost: 0, goalsScored: 0, goalsConceded: 0, points: 0, clubOvr: currentState.currentPlayer.ovr, form: [] },
   });
   // Mark auction as sold
   batch.set(AUCTION_DOC, { status: 'sold', soldAt: Date.now() }, { merge: true });
   await batch.commit();
-  
 }
 
 /**
@@ -1933,19 +2051,25 @@ export async function respondToProposal(
     if (offer.type === 'money' && offer.amount !== null) {
       batch.update(doc(db, 'clubs', clubs.buyerClub.id), { budget: clubs.buyerClub.budget - offer.amount });
       batch.update(doc(db, 'clubs', clubs.sellerClub.id), { budget: clubs.sellerClub.budget + offer.amount });
-    } else if (offer.type === 'swap' && offer.swapPlayerId) {
-      // Swap: move each player to the other club
-      batch.update(doc(db, 'players', player.id), { clubId: clubs.buyerClub.id, clubName: clubs.buyerClub.name, primaryColor: clubs.buyerClub.primaryColor, secondaryColor: clubs.buyerClub.secondaryColor });
-      batch.update(doc(db, 'players', offer.swapPlayerId), { clubId: clubs.sellerClub.id, clubName: clubs.sellerClub.name, primaryColor: clubs.sellerClub.primaryColor, secondaryColor: clubs.sellerClub.secondaryColor });
-      batch.update(doc(db, 'clubs', clubs.buyerClub.id), { squadIds: [...clubs.buyerClub.squadIds.filter(id => id !== offer.swapPlayerId), player.id] });
-      batch.update(doc(db, 'clubs', clubs.sellerClub.id), { squadIds: [...clubs.sellerClub.squadIds.filter(id => id !== player.id), offer.swapPlayerId] });
-    }
-
-    // Move bought player to buyer club (for money deal)
-    if (offer.type === 'money') {
+      
       batch.update(doc(db, 'players', player.id), { clubId: clubs.buyerClub.id, clubName: clubs.buyerClub.name, primaryColor: clubs.buyerClub.primaryColor, secondaryColor: clubs.buyerClub.secondaryColor, isListed: false, listingPrice: null });
       batch.update(doc(db, 'clubs', clubs.buyerClub.id), { squadIds: [...clubs.buyerClub.squadIds, player.id] });
       batch.update(doc(db, 'clubs', clubs.sellerClub.id), { squadIds: clubs.sellerClub.squadIds.filter(id => id !== player.id) });
+    } else if (offer.type === 'swap' && offer.swapPlayerId) {
+      // Swap: move each player to the other club
+      batch.update(doc(db, 'players', player.id), { clubId: clubs.buyerClub.id, clubName: clubs.buyerClub.name, primaryColor: clubs.buyerClub.primaryColor, secondaryColor: clubs.buyerClub.secondaryColor, isListed: false, listingPrice: null });
+      batch.update(doc(db, 'players', offer.swapPlayerId), { clubId: clubs.sellerClub.id, clubName: clubs.sellerClub.name, primaryColor: clubs.sellerClub.primaryColor, secondaryColor: clubs.sellerClub.secondaryColor, isListed: false, listingPrice: null });
+      batch.update(doc(db, 'clubs', clubs.buyerClub.id), { squadIds: [...clubs.buyerClub.squadIds.filter(id => id !== offer.swapPlayerId), player.id] });
+      batch.update(doc(db, 'clubs', clubs.sellerClub.id), { squadIds: [...clubs.sellerClub.squadIds.filter(id => id !== player.id), offer.swapPlayerId] });
+    } else if (offer.type === 'money_swap' && offer.swapPlayerId && offer.swapAmount !== null && offer.swapAmount !== undefined) {
+      // Money + Swap: exchange players AND transfer budget
+      batch.update(doc(db, 'clubs', clubs.buyerClub.id), { budget: clubs.buyerClub.budget - offer.swapAmount });
+      batch.update(doc(db, 'clubs', clubs.sellerClub.id), { budget: clubs.sellerClub.budget + offer.swapAmount });
+
+      batch.update(doc(db, 'players', player.id), { clubId: clubs.buyerClub.id, clubName: clubs.buyerClub.name, primaryColor: clubs.buyerClub.primaryColor, secondaryColor: clubs.buyerClub.secondaryColor, isListed: false, listingPrice: null });
+      batch.update(doc(db, 'players', offer.swapPlayerId), { clubId: clubs.sellerClub.id, clubName: clubs.sellerClub.name, primaryColor: clubs.sellerClub.primaryColor, secondaryColor: clubs.sellerClub.secondaryColor, isListed: false, listingPrice: null });
+      batch.update(doc(db, 'clubs', clubs.buyerClub.id), { squadIds: [...clubs.buyerClub.squadIds.filter(id => id !== offer.swapPlayerId), player.id] });
+      batch.update(doc(db, 'clubs', clubs.sellerClub.id), { squadIds: [...clubs.sellerClub.squadIds.filter(id => id !== player.id), offer.swapPlayerId] });
     }
 
     batch.update(threadRef, { status: 'accepted', updatedAt: now });
@@ -2037,6 +2161,29 @@ export async function removeFromShortlist(clubId: string, playerId: string): Pro
   if (isQuotaExceeded) return;
   // FIX: Use arrayRemove — saves 1 unnecessary getDoc read per shortlist removal
   await setDoc(doc(db, 'clubs', clubId), { shortlistedPlayerIds: arrayRemove(playerId) }, { merge: true });
+}
+
+/**
+ * Remove a player from a club's squad.
+ * - Removes playerId from club.squadIds
+ * - Clears player.clubId, clubName, clubContract, clubStats
+ * - Marks player as free agent
+ * Cost: 1 batch write (2 docs)
+ */
+export async function removePlayerFromSquad(clubId: string, playerId: string): Promise<void> {
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'clubs', clubId), { squadIds: arrayRemove(playerId) });
+  batch.update(doc(db, 'players', playerId), {
+    clubId: null,
+    clubName: null,
+    primaryColor: null,
+    secondaryColor: null,
+    clubContract: null,
+    clubStats: null,
+    isListed: false,
+  });
+  await batch.commit();
 }
 
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
@@ -2337,10 +2484,6 @@ export async function unassignClubOwner(clubId: string): Promise<void> {
   const clubSnap = await getDoc(doc(db, 'clubs', clubId));
   const batch = writeBatch(db);
 
-  // Clear owner fields on the club document
-  batch.update(doc(db, 'clubs', clubId), { ownerId: null, ownerName: null });
-
-  // Also clear the player's owner flags so they appear as available again
   if (clubSnap.exists()) {
     const clubData = clubSnap.data();
     if (clubData.ownerId) {
@@ -2352,7 +2495,21 @@ export async function unassignClubOwner(clubId: string): Promise<void> {
         secondaryColor: null,
       });
     }
+    if (clubData.squadIds && clubData.squadIds.length > 0) {
+      for (const pid of clubData.squadIds) {
+        batch.update(doc(db, 'players', pid), {
+          clubId: null,
+          clubName: null,
+          primaryColor: null,
+          secondaryColor: null,
+          clubContract: null,
+          clubStats: null
+        });
+      }
+    }
   }
+
+  batch.update(doc(db, 'clubs', clubId), { ownerId: null, ownerName: null, squadIds: [] });
 
   await batch.commit();
   // Bust the cache so the next fetchClubs() call reads fresh from Firestore
@@ -2414,13 +2571,20 @@ export async function respondToContractRenewal(msg: PlayerInboxMessage, accepted
   let responseMessageBody = '';
 
   if (accepted && msg.data?.playerId) {
-    // Player accepted: update contract
+    // Player accepted: update contract and deduct club budget
     batch.update(doc(db, 'players', msg.data.playerId), {
       clubContract: {
         type: 'matches',
         amount: msg.data.duration || 10
       }
     });
+    
+    if (msg.data.clubId && msg.data.salary) {
+      batch.update(doc(db, 'clubs', msg.data.clubId), {
+        budget: increment(-msg.data.salary)
+      });
+    }
+
     responseMessageBody = `✅ ${msg.data.playerName || 'Player'} accepted the contract renewal for ${msg.data.clubName || 'the club'}!`;
   } else if (!accepted && msg.data?.playerId) {
     // Player rejected: automatically list them on the Transfer Market
@@ -2529,7 +2693,10 @@ export async function fetchPlayersOnce(limitCount = 15): Promise<Player[]> {
   try {
     const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Player));
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Player;
+    });
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, 'players');
     return [];
@@ -2541,7 +2708,10 @@ export async function fetchLeadersOnce(): Promise<Leader[]> {
   try {
     const q = query(collection(db, 'leaders'), limit(20));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Leader));
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, image: d.image || '/default-logo.jpg' } as Leader;
+    });
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, 'leaders');
     return [];

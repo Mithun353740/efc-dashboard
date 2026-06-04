@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Edit3, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons } from '../lib/store';
+import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, endClubZoneSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
+import ClubTournamentsTab from './club/ClubTournamentsTab';
 import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture, AuctionState, ClubSeason, GlobalSeason } from '../types';
-import { getSeasonInfo, cn, getPlayerGrade } from '../lib/utils';
+import { getSeasonInfo, cn, getPlayerGrade, isAdminUser } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
 import { auth, loginAnonymously, db } from '../firebase';
 import { CLUB_LOGO, CLUB_NAME, VERSION } from '../constants';
@@ -15,7 +16,7 @@ import { bergerRoundRobin } from '../lib/fixtureGen';
 
 
 export default function Admin() {
-  const { players, leaders, matches, tournaments, systemLocks, dbError, hasPendingWrites, appVersion, refreshData } = useFirebase();
+  const { players, leaders, matches, tournaments, systemLocks, dbError, hasPendingWrites, appVersion } = useFirebase();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials' | 'clubs' | 'auction'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
@@ -1046,7 +1047,6 @@ export default function Admin() {
                           try { 
                             await ensureAdminSession();
                             await toggleSystemLock('tournaments', !systemLocks?.tournaments); 
-                            await refreshData();
                           }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
@@ -1077,7 +1077,6 @@ export default function Admin() {
                           try { 
                             await ensureAdminSession();
                             await toggleSystemLock('tournamentRegistration', !isCurrentlyLocked); 
-                            await refreshData();
                           }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
@@ -1109,7 +1108,6 @@ export default function Admin() {
                           try { 
                             await ensureAdminSession();
                             await toggleSystemLock('clubManager', !systemLocks?.clubManager); 
-                            await refreshData();
                           }
                           catch (err) { console.error(err); alert('Failed to update lock.'); }
                         }}
@@ -1207,14 +1205,17 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
   const [isLoading, setIsLoading] = React.useState(false);
   const [showRoleWarning, setShowRoleWarning] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
-  const [assignedPlayerIds, setAssignedPlayerIds] = React.useState<string[]>([]);
+  const [formFlash, setFormFlash] = React.useState(false);
   const formRef = React.useRef<HTMLDivElement>(null);
 
-  const fetchAssignedPlayers = React.useCallback(async () => {
-    // Redundant - we now use the players array from context which already has emails
-  }, []);
+  // Derived from players array — players that have credentials set
+  const assignedPlayerIds = React.useMemo(
+    () => players.filter(p => p.email || p.role === 'admin').map(p => p.id),
+    [players]
+  );
 
-  React.useEffect(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const fetchAssignedPlayers = React.useCallback(async () => {
     // Redundant - we now use the players array from context which already has emails
   }, []);
 
@@ -1223,6 +1224,13 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
     setSearch(p.name);
     setMsg({ type: '', text: '' });
     setShowPassword(false);
+    setEmail('');
+    setPassword('');
+    setRole(p.role || 'player');
+
+    // Scroll the form panel into view first (works on all screen sizes)
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
     try {
       const snap = await getDoc(doc(db, 'players', p.id));
       if (snap.exists()) {
@@ -1230,12 +1238,13 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
         setEmail(data.email || '');
         setPassword(data.password || '');
         setRole(data.role || 'player');
+        // Flash the form to show it was freshly populated
+        setFormFlash(true);
+        setTimeout(() => setFormFlash(false), 700);
       }
     } catch (err) {
       console.error('Error fetching player credentials:', err);
     }
-    // Scroll form panel into view on mobile/small screens
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
 
   const handleSave = async () => {
@@ -1255,7 +1264,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       {/* Search & Select */}
-      <div ref={formRef} className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+      <div ref={formRef} className={cn("bg-white/5 border rounded-2xl p-8 backdrop-blur-xl transition-all duration-300", formFlash ? "border-brand-purple/60 shadow-[0_0_30px_rgba(139,92,246,0.2)]" : "border-white/10")}>
         <h3 className="text-xl font-black tracking-tight mb-2">PLAYER CREDENTIALS</h3>
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">Set login email, password & admin role</p>
         <div className="relative mb-6">
@@ -1267,7 +1276,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
                   <button key={p.id} type="button" onClick={() => handleSelectPlayer(p)} className="w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-0">
                     <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
                       {p.image ? (
-                        <img src={p.image} className="w-full h-full object-cover" alt="" />
+                        <img src={p.image} className="w-full h-full object-cover" loading="lazy" alt="" />
                       ) : (
                         <Users size={12} className="text-white/20" />
                       )}
@@ -1355,7 +1364,7 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
             <button key={p.id} onClick={() => handleSelectPlayer(p)} className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-left border border-white/5">
               <div className="w-9 h-9 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
                 {p.image ? (
-                  <img src={p.image} className="w-full h-full object-cover" alt="" />
+                  <img src={p.image} className="w-full h-full object-cover" loading="lazy" alt="" />
                 ) : (
                   <Users size={14} className="text-white/20" />
                 )}
@@ -1396,18 +1405,23 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
                 <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
                   {p.image ? (
-                    <img src={p.image} className="w-full h-full object-cover shrink-0 grayscale group-hover:grayscale-0 transition-all" alt="" />
+                    <img src={p.image} className="w-full h-full object-cover shrink-0 grayscale group-hover:grayscale-0 transition-all" loading="lazy" alt="" />
                   ) : (
                     <Users size={12} className="text-white/20" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1 relative z-10">
                   <p className="text-[10px] font-black text-slate-200 truncate uppercase tracking-tight">{p.name}</p>
-                  <div className="flex items-center gap-1">
-                    <div className="w-1 h-1 rounded-full bg-emerald-500" />
-                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">
-                      {p.role === 'admin' ? '⚡ ADMIN' : 'Active'}
-                    </span>
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1">
+                      <div className="w-1 h-1 rounded-full bg-emerald-500" />
+                      <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">
+                        {p.role === 'admin' ? '⚡ ADMIN' : 'Active'}
+                      </span>
+                    </div>
+                    {p.email && (
+                      <span className="text-[7px] font-bold text-brand-purple/70 truncate">{p.email}</span>
+                    )}
                   </div>
                 </div>
               </button>
@@ -1472,6 +1486,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   });
   const [logoFile, setLogoFile] = React.useState<string | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [viewingSquadClubId, setViewingSquadClubId] = React.useState<string | null>(null);
   const [config, setConfig] = React.useState<ClubSystemConfig>(DEFAULT_CFG);
   const [configSaving, setConfigSaving] = React.useState(false);
 
@@ -1480,6 +1495,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const [viewState, setViewState] = React.useState<'landing' | 'season_management' | 'global_history' | 'franchise_registry'>('landing');
   const [selectedSeason, setSelectedSeason] = React.useState<ClubSeason | null>(null);
   const [subTab, setSubTab] = React.useState<'clubs'|'tournaments'|'fixtures'|'matches'|'auction'|'config'|'seasons'|'history'|'franchise'>('auction');
+  const [activeAdminTournamentId, setActiveAdminTournamentId] = React.useState<string | null>(null);
 
   // Sync subTab if forced changes
   React.useEffect(() => {
@@ -1715,6 +1731,36 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     if (subTab === 'history') loadSeasonMatches();
   }, [hSelectedSeasonId, subTab]);
 
+  const handleEndClubZoneSeason = async () => {
+    if (!config.season) return;
+    const activeGlobal = gSeasons.find(g => g.status === 'active')?.name;
+    if (!activeGlobal) {
+      setMsg({ text: '❌ No active Global Season found to link history.', type: 'error' });
+      return;
+    }
+
+    const nextSeason = prompt(`Are you sure you want to end "${config.season}"?\nPlayer club stats will be reset, and standings will move to History.\n\nEnter the new season name to proceed (e.g. "Club Season 2"):`);
+    if (!nextSeason) return;
+
+    setConfigSaving(true);
+    setMsg({ text: 'Ending season...', type: 'info' });
+    try {
+      await endClubZoneSeason(config.season, activeGlobal, players, clubs);
+      
+      const newConfig = { ...config, season: nextSeason };
+      await saveClubConfig(newConfig);
+      setConfig(newConfig);
+      
+      setMsg({ text: '✅ Season ended successfully. Welcome to ' + nextSeason + '!', type: 'success' });
+      
+      await loadAllSeasons(); // Refresh history
+    } catch (e: any) {
+      setMsg({ text: '❌ ' + e.message, type: 'error' });
+    } finally {
+      setConfigSaving(false);
+    }
+  };
+
   const handleHistoryEditMatch = async () => {
     if (!hEditingMatch) return;
     setHLoading(true);
@@ -1735,7 +1781,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     try {
       await deleteMatchFromHistory(m, players, []);
       setMsg({ text: 'Match deleted and stats reverted!', type: 'success' });
-      await loadSeasonMatches();
+      await loadHistory();
     } catch (e: any) { setMsg({ text: e.message, type: 'error' }); }
     finally { setHLoading(false); }
   };
@@ -2329,7 +2375,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   }
 
   const currentAdminPlayerId = localStorage.getItem('playerId');
-  const isSuperAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+  const isSuperAdmin = isAdminUser();
   const canModifyAuctionAdmin = isSuperAdmin || !config.auctionAdminId || config.auctionAdminId === currentAdminPlayerId;
 
   const ClubLogoComp = ({ club, size = 'sm' }: { club: Club; size?: 'sm' | 'md' }) => {
@@ -2583,6 +2629,10 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
                       }}
                       className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase"
                     >EDIT</button>
+                    <button
+                      onClick={() => setViewingSquadClubId(club.id)}
+                      className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase"
+                    >SQUAD</button>
                     <button onClick={() => handleDelete(club.id)} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-[10px] font-black tracking-widest transition-all uppercase">DEL</button>
                   </div>
                 </div>
@@ -2780,51 +2830,63 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
       {subTab === 'tournaments' && (
         <div className="space-y-6">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl flex items-center justify-between">
-            <div>
-              <h3 className="text-2xl font-black tracking-tight mb-1">TOURNAMENTS</h3>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                Active in <span className="text-amber-400 font-black">{selectedSeason?.label || config.season}</span>
-              </p>
+          {activeAdminTournamentId ? (
+            <div className="space-y-4">
+              <button onClick={() => setActiveAdminTournamentId(null)} className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all w-fit">
+                ← BACK TO ALL TOURNAMENTS
+              </button>
+              <ClubTournamentsTab myClub={null} allClubs={clubs} allPlayers={players} config={config} isOwner={false} isAdmin={true} initialTournamentId={activeAdminTournamentId} />
             </div>
-            <button onClick={() => setShowTSetup(true)} className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl shadow-lg shadow-amber-500/20 transition-all uppercase">
-              CREATE NEW TOURNAMENT
-            </button>
-          </div>
-          
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-            <h3 className="text-xl font-black tracking-tight mb-6 uppercase">Active Tournaments ({tournaments.length})</h3>
-            {!tLoaded ? <p className="text-slate-500 text-xs font-bold animate-pulse">Loading...</p> : tournaments.length === 0 ? <p className="text-slate-500 text-xs font-bold">No club tournaments created for this season.</p> : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tournaments.map(t => (
-                  <div key={t.id} className="group bg-[#0f172a] rounded-2xl border border-white/10 p-6 flex flex-col gap-4 relative overflow-hidden">
-                    <div className="relative z-10">
-                      <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">{t.type.replace('_',' ')}</p>
-                      <h4 className="font-black text-lg text-white uppercase mb-2">{t.name}</h4>
-                      <div className="flex items-center gap-3 mb-4">
-                         <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded",
-                            t.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
-                            t.status === 'paused' ? 'bg-amber-500/20 text-amber-400' :
-                            t.status === 'postponed' ? 'bg-red-500/20 text-red-400' :
-                            'bg-slate-500/20 text-slate-400'
-                          )}>
-                            {t.status}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-bold">{t.participatingClubIds?.length || 0} CLUBS</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => {
-                          setEditingTId(t.id); 
-                          setTStatusForm({ status: t.status || 'active', reason: t.statusReason || '' });
-                        }} className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl text-[10px] font-black uppercase transition-all">EDIT STATUS</button>
-                        <button onClick={() => handleDelTournament(t.id)} className="px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all"><Trash2 size={16} /></button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+          ) : (
+            <>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-black tracking-tight mb-1">TOURNAMENTS</h3>
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Active in <span className="text-amber-400 font-black">{selectedSeason?.label || config.season}</span>
+                  </p>
+                </div>
+                <button onClick={() => setShowTSetup(true)} className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs tracking-widest rounded-xl shadow-lg shadow-amber-500/20 transition-all uppercase">
+                  CREATE NEW TOURNAMENT
+                </button>
               </div>
-            )}
-          </div>
+              
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
+                <h3 className="text-xl font-black tracking-tight mb-6 uppercase">Active Tournaments ({tournaments.length})</h3>
+                {!tLoaded ? <p className="text-slate-500 text-xs font-bold animate-pulse">Loading...</p> : tournaments.length === 0 ? <p className="text-slate-500 text-xs font-bold">No club tournaments created for this season.</p> : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {tournaments.map(t => (
+                      <div key={t.id} className="group bg-[#0f172a] rounded-2xl border border-white/10 p-6 flex flex-col gap-4 relative overflow-hidden">
+                        <div className="relative z-10">
+                          <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">{t.type.replace('_',' ')}</p>
+                          <h4 className="font-black text-lg text-white uppercase mb-2">{t.name}</h4>
+                          <div className="flex items-center gap-3 mb-4">
+                             <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded",
+                                t.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
+                                t.status === 'paused' ? 'bg-amber-500/20 text-amber-400' :
+                                t.status === 'postponed' ? 'bg-red-500/20 text-red-400' :
+                                'bg-slate-500/20 text-slate-400'
+                              )}>
+                                {t.status}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-bold">{t.participatingClubIds?.length || 0} CLUBS</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => setActiveAdminTournamentId(t.id)} className="flex-[2] py-3 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-amber-500/20">DASHBOARD</button>
+                            <button onClick={() => {
+                              setEditingTId(t.id); 
+                              setTStatusForm({ status: t.status || 'active', reason: t.statusReason || '' });
+                            }} className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl text-[10px] font-black uppercase transition-all">STATUS</button>
+                            <button onClick={() => handleDelTournament(t.id)} className="px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all"><Trash2 size={16} /></button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           <AnimatePresence>
             {showTSetup && (
@@ -3684,6 +3746,9 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
               <button onClick={handleSaveConfig} disabled={configSaving} className="w-full py-4 glossy-btn rounded-xl disabled:opacity-50 uppercase text-xs font-black tracking-widest">
                 {configSaving ? 'SAVING...' : 'SAVE CONFIG'}
               </button>
+              <button onClick={handleEndClubZoneSeason} disabled={configSaving} className="w-full py-4 mt-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl disabled:opacity-50 uppercase text-xs font-black tracking-widest transition-all">
+                {configSaving ? 'PROCESSING...' : 'END CLUB ZONE SEASON'}
+              </button>
               {msg.text && <p className={cn('text-[10px] font-bold text-center mt-2', msg.type === 'success' ? 'text-emerald-400' : 'text-red-400')}>{msg.text}</p>}
             </div>
           </div>
@@ -3814,6 +3879,65 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
         </div>
       )}
 
+
+      {/* SQUAD VIEW MODAL */}
+      <AnimatePresence>
+        {viewingSquadClubId && (() => {
+          const club = clubs.find(c => c.id === viewingSquadClubId);
+          if (!club) return null;
+          const squad = players.filter(p => club.squadIds?.includes(p.id));
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-[#0a0a14] border border-white/10 rounded-3xl p-8 w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+                <div className="flex items-center justify-between mb-6 shrink-0">
+                  <div className="flex items-center gap-4">
+                    <ClubLogoComp club={club} size="sm" />
+                    <div>
+                      <h3 className="text-xl font-black tracking-tight text-white uppercase italic">{club.name}</h3>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{squad.length} PLAYERS IN SQUAD</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setViewingSquadClubId(null)} className="p-2 text-slate-500 hover:text-white transition-colors bg-white/5 rounded-full"><X size={20} /></button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pr-2 custom-scrollbar">
+                  {squad.length === 0 ? (
+                    <div className="py-12 text-center border border-dashed border-white/10 rounded-2xl">
+                      <p className="text-slate-500 text-sm font-bold">No players in squad.</p>
+                    </div>
+                  ) : (
+                    squad.map(p => (
+                      <div key={p.id} className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-2xl">
+                        <div className="w-12 h-12 rounded-xl bg-slate-800 overflow-hidden shrink-0">
+                          {p.image ? <img src={p.image} className="w-full h-full object-cover" alt="" /> : <Users size={20} className="text-slate-600 m-auto mt-3" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-white">{p.name}</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase">{p.position} · {p.ovr} OVR</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (window.confirm(`Remove ${p.name} from ${club.name}? This will mark them as a free agent and clear their club stats.`)) {
+                              try {
+                                await removePlayerFromSquad(club.id, p.id);
+                              } catch (e: any) {
+                                alert(e.message);
+                              }
+                            }
+                          }}
+                          className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                          REMOVE
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
 
     </div>
   );

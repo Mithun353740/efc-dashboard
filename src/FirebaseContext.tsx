@@ -11,10 +11,15 @@ import {
   fetchLeadersOnce,
   fetchMatchesOnce,
   fetchTournamentsOnce,
+  subscribeToPlayers,
+  subscribeToLeaders,
+  subscribeToMatches,
+  subscribeToTournaments,
   fetchSystemLocks,
   ensureAdminSession,
   fetchAppSnapshot,
 } from './lib/store';
+import { isAdminUser } from './lib/utils';
 import { VERSION } from './constants';
 import {
   persistToStorage,
@@ -24,14 +29,14 @@ import {
 } from './lib/cache';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SESSION CACHE — 15-minute in-memory TTL (zero re-reads on tab navigation)
-// STORAGE CACHE — 10-minute localStorage TTL (zero re-reads on page refresh)
+// SESSION CACHE — 30-minute in-memory TTL (zero re-reads on tab navigation)
+// STORAGE CACHE — 30-minute localStorage TTL (zero re-reads on page refresh)
 // ─────────────────────────────────────────────────────────────────────────────
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes in-memory — matches localStorage TTL
 /** How often non-admin users re-check systemLocks (tiny single doc). */
-const LOCKS_POLL_INTERVAL_MS = 60 * 1000; // 60 seconds
+const LOCKS_POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 /** How often admin auto-refreshes collection data (replaces persistent listeners). */
-const ADMIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const ADMIN_REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 let _globalCache: {
   players: Player[];
@@ -191,10 +196,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     mountedRef.current = true;
     const unsubscribers: (() => void)[] = [];
 
-    // Minimum branding delay
-    const minTimer = setTimeout(() => {
-      if (mountedRef.current) setIsLoading(false);
-    }, 1200);
+
 
     // Global error handler
     const errorHandler = (e: Event) => {
@@ -202,8 +204,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current || !customEvent.detail?.error) return;
       const errStr = String(customEvent.detail.error).toLowerCase();
       setIsLoading(false);
+      const isAdmin = isAdminUser();
       if (errStr.includes('resource-exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
-        setDbError('QUOTA_EXCEEDED');
+        if (isAdmin) setDbError('QUOTA_EXCEEDED');
       } else {
         setDbError('DATABASE_ERROR');
       }
@@ -217,7 +220,31 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    const isAdmin = localStorage.getItem('adminLoggedIn') === 'true';
+    // Real-time revocation listener for Player Admins
+    const pRole = localStorage.getItem('playerRole');
+    const pId = localStorage.getItem('playerId');
+    if (pRole === 'admin' && pId) {
+      import('./firebase').then(({ db }) => {
+        import('firebase/firestore').then(({ doc, onSnapshot }) => {
+          const unsub = onSnapshot(doc(db, 'players', pId), (snap) => {
+            if (snap.exists() && snap.data().role !== 'admin') {
+              const realRole = snap.data().role || 'player';
+              localStorage.setItem('playerRole', realRole);
+              localStorage.setItem('userType', 'player');
+              window.dispatchEvent(new StorageEvent('storage', { key: 'playerRole', newValue: realRole }));
+              window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: 'player' }));
+              if (window.location.hash.includes('/admin')) {
+                window.location.hash = '/';
+              }
+            }
+          });
+          unsubscribers.push(unsub);
+        });
+      });
+    }
+
+    // Check if either Master Password or Player Admin is active
+    const isAdmin = isAdminUser();
 
     if (isAdmin) {
       // ── ADMIN: ONE-TIME FETCH + 5-min auto-refresh ────────────────────────
@@ -238,8 +265,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (mountedRef.current && version) setAppVersion(version);
       }));
 
-      // ONE-TIME fetch for the 4 large collections
-      const adminFetch = async () => {
+      // Admin listeners
+      unsubscribers.push(subscribeToPlayers((p, pending) => {
         if (!mountedRef.current) return;
         try {
           const [p, l, m, t] = await Promise.all([
@@ -276,12 +303,29 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      // Expose to module-level ref so refreshData() can trigger a manual re-fetch
-      _adminFetchRef = adminFetch;
-      adminFetch();
-      // Auto-refresh every 5 minutes so admin sees fresh data without reads on every write
-      const adminRefreshInterval = setInterval(() => { if (mountedRef.current) adminFetch(); }, ADMIN_REFRESH_INTERVAL_MS);
-      unsubscribers.push(() => { clearInterval(adminRefreshInterval); _adminFetchRef = null; });
+      unsubscribers.push(subscribeToLeaders((l, pending) => {
+        if (!mountedRef.current) return;
+        setLeaders(l);
+        if (_globalCache) _globalCache.leaders = l;
+        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('leaders', l));
+      }));
+
+      unsubscribers.push(subscribeToMatches((m, pending) => {
+        if (!mountedRef.current) return;
+        setMatches(m);
+        if (_globalCache) _globalCache.matches = m;
+        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('matches', m));
+      }, 100));
+
+      unsubscribers.push(subscribeToTournaments((t, pending) => {
+        if (!mountedRef.current) return;
+        setTournaments(t);
+        if (_globalCache) _globalCache.tournaments = t;
+        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('tournaments', t));
+      }, 50));
+
+      // Mock adminFetch to do nothing if called manually via refreshData
+      _adminFetchRef = async () => { console.log('adminFetch bypassed: using onSnapshot'); };
 
     } else {
       // ── PLAYER / GUEST: ONE-TIME FETCH + controlled polling ───────────────
@@ -356,17 +400,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    // Safety timeout — never block UI more than 8s
-    const timeout = setTimeout(() => {
-      if (mountedRef.current) setIsLoading(false);
-    }, 8000);
+
 
     return () => {
       mountedRef.current = false;
       window.removeEventListener('firestore-error', errorHandler);
       unsubscribers.forEach(u => u());
-      clearTimeout(timeout);
-      clearTimeout(minTimer);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tournament, Fixture, Team } from '../../types';
-import { saveTournament, addMatch, deleteMatchFromHistory } from '../../lib/store';
+import { saveTournament, addMatch, deleteMatchFromHistory, editMatch } from '../../lib/store';
 import { useFirebase } from '../../FirebaseContext';
 import {
   ChevronLeft, ChevronRight, CheckCircle, Clock, Zap, Edit3, X, Check,
@@ -130,32 +130,59 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
     const awayNum = editingScore.away !== '' ? parseInt(editingScore.away) : null;
     const hasValidScore = homeNum !== null && awayNum !== null && !isNaN(homeNum) && !isNaN(awayNum);
 
-    const updatedFixtures = fixtures.map(f => {
-      if (f.id !== editingScore.fixtureId) return f;
-      return {
-        ...f,
-        ...(hasValidScore ? { homeScore: homeNum, awayScore: awayNum, status: 'completed' as const } : {}),
-        date: editingScore.date || null,
-        time: editingScore.time || null,
-        venue: editingScore.venue || null,
-        updatedAt: Date.now(),
-      };
-    });
+    const fixture = fixtures.find(f => f.id === editingScore.fixtureId);
+    let newGlobalMatchId = fixture?.globalMatchId;
 
-    if (hasValidScore) {
-      const fixture = fixtures.find(f => f.id === editingScore.fixtureId);
-      if (fixture && fixture.status !== 'completed') {
-        const p1 = players.find(p => p.id === fixture.homeId);
-        const p2 = players.find(p => p.id === fixture.awayId);
-        if (p1) {
-          try {
-            await addMatch(p1, homeNum!, awayNum!, p2, matches, tournament.name);
-          } catch (err) {
-            console.error('Failed to link tournament match to global stats:', err);
+    if (fixture) {
+      if (hasValidScore) {
+        if (fixture.status !== 'completed' || !fixture.globalMatchId) {
+          // Add new match
+          const p1 = players.find(p => p.id === fixture.homeId);
+          const p2 = players.find(p => p.id === fixture.awayId);
+          if (p1) {
+            try {
+              newGlobalMatchId = await addMatch(
+                p1, homeNum!, awayNum!, p2, matches, tournament.name,
+                undefined, undefined, undefined,
+                tournament.id, fixture.id
+              );
+            } catch (err) { console.error('Failed to link match:', err); }
+          }
+        } else {
+          // Edit existing match
+          const linkedMatch = matches.find(m => m.id === fixture.globalMatchId);
+          if (linkedMatch) {
+            try {
+              await editMatch(linkedMatch, homeNum!, awayNum!, players, [], tournament.name);
+            } catch (err) { console.error('Failed to edit match:', err); }
+          }
+        }
+      } else {
+        // Clearing inputs (deleting score)
+        if (fixture.status === 'completed' && fixture.globalMatchId) {
+          const linkedMatch = matches.find(m => m.id === fixture.globalMatchId);
+          if (linkedMatch) {
+            try {
+              await deleteMatchFromHistory(linkedMatch, players, []);
+              newGlobalMatchId = undefined;
+            } catch (err) { console.error('Failed to remove match:', err); }
           }
         }
       }
     }
+
+    const updatedFixtures = fixtures.map(f => {
+      if (f.id !== editingScore.fixtureId) return f;
+      return {
+        ...f,
+        ...(hasValidScore ? { homeScore: homeNum, awayScore: awayNum, status: 'completed' as const } : { homeScore: null, awayScore: null, status: 'upcoming' as const }),
+        date: editingScore.date || null,
+        time: editingScore.time || null,
+        venue: editingScore.venue || null,
+        updatedAt: Date.now(),
+        globalMatchId: newGlobalMatchId,
+      };
+    });
 
     const updated: Tournament = { ...tournament, fixtures: updatedFixtures };
     await saveTournament(updated);
@@ -174,14 +201,19 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
       );
       if (!confirmed) return;
 
-      // Find and delete the corresponding match record from global history
-      const linkedMatch = matches.find(m =>
-        m.tournament === tournament.name &&
-        ((m.p1Id === fixture.homeId && m.p2Id === fixture.awayId) ||
-         (m.p1Id === fixture.awayId && m.p2Id === fixture.homeId)) &&
-        m.p1Score === fixture.homeScore &&
-        m.p2Score === fixture.awayScore
-      );
+      // Find and delete the corresponding match record from global history using the link
+      let linkedMatch = fixture.globalMatchId ? matches.find(m => m.id === fixture.globalMatchId) : undefined;
+      
+      // Fallback for old fixtures
+      if (!linkedMatch) {
+        linkedMatch = matches.find(m =>
+          m.tournament === tournament.name &&
+          ((m.p1Id === fixture.homeId && m.p2Id === fixture.awayId) ||
+           (m.p1Id === fixture.awayId && m.p2Id === fixture.homeId)) &&
+          m.p1Score === fixture.homeScore &&
+          m.p2Score === fixture.awayScore
+        );
+      }
       if (linkedMatch) {
         try {
           await deleteMatchFromHistory(linkedMatch, players, []);
@@ -195,7 +227,7 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
     }
 
     const updatedFixtures = fixtures.map(f =>
-      f.id === fixtureId ? { ...f, homeScore: null, awayScore: null, status: 'upcoming' as const } : f
+      f.id === fixtureId ? { ...f, homeScore: null, awayScore: null, status: 'upcoming' as const, globalMatchId: undefined } : f
     );
     const updated: Tournament = { ...tournament, fixtures: updatedFixtures };
     await saveTournament(updated);
@@ -208,10 +240,17 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
 
     const confirmed = window.confirm(
       fixture.status === 'completed'
-        ? '⚠️ WARNING: This fixture has a score. Deleting it will NOT automatically remove the match from player history.\n\nUse "Reset Score" first to revert stats, then delete.\n\nDelete anyway?'
+        ? '⚠️ WARNING: This fixture has a score. Deleting it will PERMANENTLY remove the match from player history too.\n\nAre you sure you want to completely delete this?'
         : 'Delete this fixture? This cannot be undone.'
     );
     if (!confirmed) return;
+
+    if (fixture.status === 'completed' && fixture.globalMatchId) {
+      const linkedMatch = matches.find(m => m.id === fixture.globalMatchId);
+      if (linkedMatch) {
+        try { await deleteMatchFromHistory(linkedMatch, players, []); } catch (e) {}
+      }
+    }
 
     const updatedFixtures = fixtures.filter(f => f.id !== fixtureId);
     const updated: Tournament = { ...tournament, fixtures: updatedFixtures };
