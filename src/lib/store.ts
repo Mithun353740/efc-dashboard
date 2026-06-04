@@ -1523,6 +1523,64 @@ export async function fetchClubTournaments(seasonName: string, force = false): P
   }
 }
 
+/**
+ * Pure function — no Firestore reads.
+ * Computes league table standings from completed club fixtures.
+ * Goals = sub-match wins (each sub-match is a "goal" for the winning side).
+ */
+export function computeClubStandings(
+  fixtures: import('../types').ClubFixture[],
+  clubs: Club[]
+): Array<{
+  clubId: string; clubName: string;
+  played: number; won: number; drawn: number; lost: number;
+  goalsFor: number; goalsAgainst: number; goalDiff: number; points: number;
+}> {
+  const table: Record<string, {
+    clubId: string; clubName: string;
+    played: number; won: number; drawn: number; lost: number;
+    goalsFor: number; goalsAgainst: number;
+  }> = {};
+
+  // Initialize all participating clubs with zero stats
+  clubs.forEach(c => {
+    table[c.id] = { clubId: c.id, clubName: c.name, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 };
+  });
+
+  // Process completed fixtures only
+  fixtures.filter(f => f.status === 'completed').forEach(f => {
+    const homeId = f.homeClubId;
+    const awayId = f.awayClubId;
+    if (!table[homeId] || !table[awayId]) return;
+
+    // Count sub-match wins as "goals"
+    let homeGoals = 0, awayGoals = 0;
+    (f.subMatches || []).forEach((sm: any) => {
+      if (sm.p1Score !== null && sm.p1Score !== undefined && sm.p2Score !== null && sm.p2Score !== undefined) {
+        if (sm.p1Score > sm.p2Score) homeGoals++;
+        else if (sm.p2Score > sm.p1Score) awayGoals++;
+        // draws don't count as goals
+      }
+    });
+
+    table[homeId].played++;
+    table[awayId].played++;
+    table[homeId].goalsFor += homeGoals;
+    table[homeId].goalsAgainst += awayGoals;
+    table[awayId].goalsFor += awayGoals;
+    table[awayId].goalsAgainst += homeGoals;
+
+    if (homeGoals > awayGoals) { table[homeId].won++; table[awayId].lost++; }
+    else if (awayGoals > homeGoals) { table[awayId].won++; table[homeId].lost++; }
+    else { table[homeId].drawn++; table[awayId].drawn++; }
+  });
+
+  return Object.values(table)
+    .map(r => ({ ...r, goalDiff: r.goalsFor - r.goalsAgainst, points: r.won * 3 + r.drawn }))
+    .sort((a, b) => b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor);
+}
+
+
 export async function saveClubTournament(tourney: import('../types').ClubTournament): Promise<void> {
   await ensureAdminSession();
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
@@ -1588,6 +1646,102 @@ export async function deleteClubFixture(id: string): Promise<void> {
     throw err;
   }
 }
+
+/**
+ * Save the result of a single sub-match within a club fixture.
+ * Updates the fixture doc, creates a global match record (so stats update),
+ * and marks the fixture completed when all sub-matches have scores.
+ * Cost: 1 read (fixture) + 2 reads (player match histories) + 1 batch write.
+ */
+export async function saveClubFixtureResult(
+  fixtureId: string,
+  subMatchId: string,
+  p1Score: number,
+  p2Score: number,
+  allPlayers: Player[],
+  seasonId: string,
+  matchday: number,
+  config: import('../types').ClubSystemConfig
+): Promise<void> {
+  await ensureAdminSession();
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+
+  // 1. Fetch the current fixture
+  const fixtureSnap = await getDoc(doc(db, 'clubFixtures', fixtureId));
+  if (!fixtureSnap.exists()) throw new Error(`Fixture ${fixtureId} not found.`);
+  const fixture = { id: fixtureSnap.id, ...fixtureSnap.data() } as import('../types').ClubFixture;
+
+  // 2. Find the sub-match to update
+  const smIndex = fixture.subMatches.findIndex((sm: any) => sm.id === subMatchId);
+  if (smIndex === -1) throw new Error(`Sub-match ${subMatchId} not found in fixture.`);
+  const sm = fixture.subMatches[smIndex];
+
+  // 3. Find the two players
+  const p1 = allPlayers.find(p => p.id === sm.p1Id);
+  const p2 = sm.p2Id ? allPlayers.find(p => p.id === sm.p2Id) : undefined;
+
+  // 4. Create a global match record and update player stats
+  let globalMatchId: string | undefined;
+  if (p1) {
+    try {
+      // Use addMatch which handles ELO + stat recalculation atomically
+      const matchRef = doc(collection(db, 'matches'));
+      globalMatchId = matchRef.id;
+      const matchRecord: MatchRecord = {
+        id: globalMatchId,
+        timestamp: Date.now(),
+        p1Id: p1.id,
+        p1Name: p1.name,
+        p1Score,
+        p2Id: p2?.id,
+        p2Name: p2 ? p2.name : (sm.p2Name || 'External'),
+        p2Score,
+        tournament: config.season || 'Club League',
+        seasonId,
+        matchday,
+      };
+      const batch = writeBatch(db);
+      batch.set(matchRef, matchRecord);
+
+      // Recompute stats for affected players
+      const [p1Matches, p2Matches] = await Promise.all([
+        fetchAllMatchesForPlayer(p1.id),
+        p2 ? fetchAllMatchesForPlayer(p2.id) : Promise.resolve([] as MatchRecord[]),
+      ]);
+      const p1AllMatches = [...p1Matches, matchRecord];
+      const p2AllMatches = p2 ? [...p2Matches, matchRecord] : [];
+      const allForElo = [...new Map([...p1Matches, ...(p2 ? p2Matches : [])].map(m => [m.id, m])).values(), matchRecord]
+        .sort((a, b) => a.timestamp - b.timestamp);
+      const elos = computeGlobalElo([p1, ...(p2 ? [p2] : [])], allForElo);
+      batch.set(doc(db, 'players', p1.id), computePlayerStats(p1, p1AllMatches, elos[p1.id] || 1200));
+      if (p2) {
+        batch.set(doc(db, 'players', p2.id), computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200));
+      }
+      await batch.commit();
+    } catch (err) {
+      console.warn('[saveClubFixtureResult] Could not create global match:', err);
+      globalMatchId = undefined;
+    }
+  }
+
+  // 5. Update the sub-match inside the fixture
+  const updatedSubMatches = fixture.subMatches.map((s: any, i: number) =>
+    i === smIndex ? { ...s, p1Score, p2Score, ...(globalMatchId ? { globalMatchId } : {}) } : s
+  );
+
+  // 6. Check if all sub-matches now have scores → mark fixture completed
+  const allScored = updatedSubMatches.every((s: any) => s.p1Score !== null && s.p1Score !== undefined);
+  const updatedFixture = {
+    ...fixture,
+    subMatches: updatedSubMatches,
+    status: allScored ? 'completed' : fixture.status,
+  };
+
+  await setDoc(doc(db, 'clubFixtures', fixtureId), updatedFixture);
+  invalidateCache(`clubFixtures_${seasonId}`);
+  invalidateCache(`clubFixtures_${(fixture as any).season}`);
+}
+
 
 /**
  * Updates a specific sub-match inside a ClubFixture.
@@ -2291,6 +2445,53 @@ export async function endClubSeason(seasonId: string, standingsSnapshot: ClubSea
   invalidateCache('clubSeasons_active');
   invalidateCacheByPrefix('clubSeasons_');
 }
+
+/**
+ * Admin: End the entire Club Zone season.
+ * Resets all players' club-scoped stats and contracts for the new season.
+ * Saves a final standings record to Firestore history.
+ * Called before starting a new Club Zone season.
+ */
+export async function endClubZoneSeason(
+  seasonName: string,
+  globalSeason: string,
+  players: Player[],
+  clubs: Club[]
+): Promise<void> {
+  await ensureAdminSession();
+  if (isQuotaExceeded) throw new Error('SYSTEM LOCKED: Quota exceeded.');
+
+  const batch = writeBatch(db);
+
+  // 1. Reset every player's club-scoped stats + contract for the new season
+  players.forEach(p => {
+    if (p.clubId) {
+      batch.update(doc(db, 'players', p.id), {
+        clubStats: { goals: 0, matches: 0, wins: 0, losses: 0, draws: 0 },
+        clubContract: null,
+      });
+    }
+  });
+
+  // 2. Save a season history record (standings snapshot)
+  const historyId = `clubZone_${seasonName.replace(/\s+/g, '_')}_${Date.now()}`;
+  const historyRecord = {
+    id: historyId,
+    seasonName,
+    globalSeason,
+    clubs: clubs.map(c => ({ id: c.id, name: c.name, primaryColor: c.primaryColor })),
+    endedAt: Date.now(),
+  };
+  batch.set(doc(db, 'clubSeasonHistory', historyId), historyRecord);
+
+  await batch.commit();
+
+  // 3. Bust caches
+  invalidateCache('clubs_all');
+  invalidateCacheByPrefix('clubSeasons_');
+  invalidateCache('club_config');
+}
+
 
 /** Admin: Broadcast a system notification to all club owners' inboxes. */
 export async function broadcastToAllOwners(ownerIds: string[], message: Omit<ClubInboxMessage, 'id' | 'read' | 'createdAt'>): Promise<void> {

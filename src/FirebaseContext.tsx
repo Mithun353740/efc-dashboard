@@ -265,8 +265,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (mountedRef.current && version) setAppVersion(version);
       }));
 
-      // Admin listeners
-      unsubscribers.push(subscribeToPlayers((p, pending) => {
+      // ── ADMIN: One-time fetch on mount + 5-min auto-refresh ───────────────
+      // Previously used 4 persistent onSnapshot listeners that re-fired on
+      // every write — causing ~350 reads per match entry. Now uses one-time
+      // fetches with a timed refresh, cutting admin reads by ~90%.
+      const doFetch = async () => {
         if (!mountedRef.current) return;
         try {
           const [p, l, m, t] = await Promise.all([
@@ -291,41 +294,24 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
             _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: {}, fetchedAt: Date.now() };
           }
           // Persist for fast reloads
-          import('./lib/cache').then(({ persistToStorage }) => {
-            persistToStorage('players', p);
-            persistToStorage('leaders', l);
-            persistToStorage('matches', m);
-            persistToStorage('tournaments', t);
-          });
+          persistToStorage('players', p);
+          persistToStorage('leaders', l);
+          persistToStorage('matches', m);
+          persistToStorage('tournaments', t);
         } catch (err) {
           console.warn('[FirebaseContext] Admin fetch failed:', err);
           if (mountedRef.current) setIsLoading(false);
         }
       };
 
-      unsubscribers.push(subscribeToLeaders((l, pending) => {
-        if (!mountedRef.current) return;
-        setLeaders(l);
-        if (_globalCache) _globalCache.leaders = l;
-        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('leaders', l));
-      }));
+      // Run immediately on mount, then every 5 minutes
+      doFetch();
+      const adminRefreshTimer = setInterval(doFetch, ADMIN_REFRESH_INTERVAL_MS);
+      unsubscribers.push(() => clearInterval(adminRefreshTimer));
 
-      unsubscribers.push(subscribeToMatches((m, pending) => {
-        if (!mountedRef.current) return;
-        setMatches(m);
-        if (_globalCache) _globalCache.matches = m;
-        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('matches', m));
-      }, 100));
+      // Expose doFetch so refreshData can trigger it manually
+      _adminFetchRef = doFetch;
 
-      unsubscribers.push(subscribeToTournaments((t, pending) => {
-        if (!mountedRef.current) return;
-        setTournaments(t);
-        if (_globalCache) _globalCache.tournaments = t;
-        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('tournaments', t));
-      }, 50));
-
-      // Mock adminFetch to do nothing if called manually via refreshData
-      _adminFetchRef = async () => { console.log('adminFetch bypassed: using onSnapshot'); };
 
     } else {
       // ── PLAYER / GUEST: ONE-TIME FETCH + controlled polling ───────────────
