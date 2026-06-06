@@ -1548,6 +1548,9 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     finally { setHLoading(false); }
   };
 
+  // Cache for initial load state - prevents duplicate fetches
+  const hasInitialLoadCompleted = React.useRef(false);
+
   const loadGlobalSeasons = async () => {
     try {
       const gs = await fetchGlobalSeasons();
@@ -1561,14 +1564,17 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
   const loadRegistry = async () => {
     try {
-      // force=true bypasses the module-level cache so we always get fresh
-      // owner data after assign / unassign operations
-      const cs = await fetchClubs(true);
+      // Don't use force=true here - we want to use cache to avoid excessive reads
+      // Admin can manually refresh if needed
+      const cs = await fetchClubs(false);
       setFClubs(cs);
     } catch (e) { console.error(e); }
   };
 
   React.useEffect(() => {
+    // Only run once - use ref to prevent StrictMode double-execution
+    if (hasInitialLoadCompleted.current) return;
+    hasInitialLoadCompleted.current = true;
     loadGlobalSeasons();
     loadRegistry();
   }, []);

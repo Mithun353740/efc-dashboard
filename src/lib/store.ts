@@ -343,13 +343,16 @@ async function fetchWithCache<T>(key: string, queryFn: () => Promise<T>, ttl = C
   const cached = _cache.get(key);
   
   if (cached && (now - cached.timestamp < ttl)) {
+    console.log(`[CACHE HIT] ${key} - 0 reads`);
     return cached.data;
   }
 
   if (_pendingRequests.has(key)) {
+    console.log(`[CACHE PENDING] ${key} - waiting for existing request`);
     return _pendingRequests.get(key);
   }
 
+  console.log(`[CACHE MISS] ${key} - fetching from Firestore`);
   const promise = queryFn().finally(() => _pendingRequests.delete(key));
   _pendingRequests.set(key, promise);
 
@@ -357,8 +360,13 @@ async function fetchWithCache<T>(key: string, queryFn: () => Promise<T>, ttl = C
     const data = await promise;
     _cache.set(key, { data, timestamp: now });
     // Track reads for quota monitoring
-    if (Array.isArray(data)) trackRead(data.length || 1);
-    else trackRead(1);
+    if (Array.isArray(data)) {
+      console.log(`[FETCH COMPLETE] ${key} - ${data.length} docs read`);
+      trackRead(data.length || 1);
+    } else {
+      console.log(`[FETCH COMPLETE] ${key} - 1 doc read`);
+      trackRead(1);
+    }
     return data;
   } catch (error) {
     throw error;
