@@ -70,12 +70,10 @@ let _sessionReadCount = 0;
 /** Call this every time a Firestore getDocs/getDoc fires (count = number of docs returned). */
 export function trackRead(count = 1): void {
   _sessionReadCount += count;
-  if (_sessionReadCount > 0 && _sessionReadCount % 100 === 0) {
-    console.warn(
-      `[Firestore] ⚠️ Session read count hit ${_sessionReadCount}. ` +
-      `Review recent queries for unbounded fetches.`
-    );
-  }
+  // Log EVERY read batch for debugging
+  const stack = new Error().stack || '';
+  const caller = (stack.split('\n')[2] || 'unknown').trim();
+  console.log(`[FIRESTORE READ] +${count} (session total: ${_sessionReadCount}) caller: ${caller}`);
 }
 
 export function getSessionReadCount(): number {

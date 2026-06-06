@@ -51,6 +51,9 @@ let _globalCache: {
 let _adminFetchRef: (() => Promise<void>) | null = null;
 // StrictMode protection - prevents double initialization
 let _initStarted = false;
+// Global read counter for debugging
+let _sessionReadCount = 0;
+const _readLog: string[] = [];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Context type
