@@ -721,7 +721,7 @@ export default function Admin() {
                           )}
                         </AnimatePresence>
                       </div>
-                      <input type="number" value={match.p1Score} onChange={e => setMatch({...match, p1Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />
+                      <input id="p1-score" name="p1-score" type="number" value={match.p1Score} onChange={e => setMatch({...match, p1Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />
                     </div>
 
                     <div className="text-brand-purple font-black text-2xl italic">VS</div>
@@ -760,7 +760,7 @@ export default function Admin() {
                           />
                         )}
                       </div>
-                      <input type="number" value={match.p2Score} onChange={e => setMatch({...match, p2Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />
+                      <input id="p2-score" name="p2-score" type="number" value={match.p2Score} onChange={e => setMatch({...match, p2Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />
                     </div>
                   </div>
 
@@ -1187,11 +1187,12 @@ function NavBtn({ active, onClick, icon, label }: { active: boolean; onClick: ()
   );
 }
 
-function Input({ label, value, onChange, placeholder, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; type?: string }) {
+function Input({ label, value, onChange, placeholder, type = 'text', id }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; type?: string; id?: string }) {
+  const inputId = id || label.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="space-y-1">
-      <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder={placeholder} />
+      <label htmlFor={inputId} className="text-[9px] font-black tracking-widest text-slate-500 uppercase">{label}</label>
+      <input id={inputId} name={inputId} type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder={placeholder} />
     </div>
   );
 }
@@ -1321,12 +1322,12 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
 
             <div className="space-y-1">
               <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2"><Mail size={10} className="text-brand-purple" />EMAIL ADDRESS</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="player@email.com" />
+              <input id="player-email" name="player-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="player@email.com" />
             </div>
             <div className="space-y-1">
               <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2"><Lock size={10} className="text-brand-purple" />PASSWORD</label>
               <div className="relative">
-                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 pr-12 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Set login password" />
+                <input id="player-password" name="player-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 pr-12 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Set login password" />
                 <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
                   {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
