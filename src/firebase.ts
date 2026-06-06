@@ -1,18 +1,16 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Bounded persistent cache to prevent excessive reads from cache sync
-// Limit: 10MB max cache size to reduce background reads
+// Memory-only cache (no IndexedDB persistence)
+// This prevents background reads from SDK cache sync
+// Our localStorage caching handles persistence separately
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ 
-    tabManager: persistentMultipleTabManager(),
-    cacheSizeBytes: 10 * 1024 * 1024, // 10MB limit - reduces background sync reads
-  }),
+  localCache: memoryLocalCache(),
 }, firebaseConfig.firestoreDatabaseId);
 
 export const googleProvider = new GoogleAuthProvider();
