@@ -29,14 +29,14 @@ import {
 } from './lib/cache';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SESSION CACHE — 30-minute in-memory TTL (zero re-reads on tab navigation)
-// STORAGE CACHE — 30-minute localStorage TTL (zero re-reads on page refresh)
+// SESSION CACHE — 60-minute in-memory TTL (zero re-reads on tab navigation)
+// STORAGE CACHE — 60-minute localStorage TTL (zero re-reads on page refresh)
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes in-memory — matches localStorage TTL
+const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes in-memory — reduces cold-start reads by 50%
 /** How often non-admin users re-check systemLocks (tiny single doc). */
-const LOCKS_POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes — matches cache TTL (was 5 min = 4,800 reads/day for 50 users)
+const LOCKS_POLL_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes — reduced from 30 min (was 5 min = 4,800 reads/day for 50 users)
 /** How often admin auto-refreshes collection data (replaces persistent listeners). */
-const ADMIN_REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const ADMIN_REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes
 
 let _globalCache: {
   players: Player[];
@@ -247,23 +247,47 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const isAdmin = isAdminUser();
 
     if (isAdmin) {
-      // ── ADMIN: ONE-TIME FETCH + 5-min auto-refresh ────────────────────────
-      // Previously used 4 persistent onSnapshot listeners that re-fired on
-      // every write — causing ~350 reads per match entry. Now uses one-time
-      // fetches with a timed refresh, cutting admin reads by ~90%.
+      // ── ADMIN: ONE-TIME FETCH + polling ─────────────────────────────────
+      // Replaced persistent onSnapshot listeners with polling to reduce reads.
+      // onSnapshot fires on EVERY write to the collection, causing ~350 reads per match entry.
+      // Polling only reads once per interval, cutting listener-related reads by ~95%.
       // Register admin session (1 write — needed for Firestore security rules)
       ensureAdminSession();
-      // systemLocks — real-time for admin (tiny single doc, needed for instant lock control)
-      unsubscribers.push(subscribeToSystemLocks((locks) => {
-        if (!mountedRef.current) return;
-        setSystemLocks(locks);
-        if (_globalCache) _globalCache.systemLocks = locks;
-      }));
 
-      // appVersion — real-time for admin (tiny single doc)
-      unsubscribers.push(subscribeToAppVersion((version) => {
-        if (mountedRef.current && version) setAppVersion(version);
-      }));
+      // systemLocks — polling instead of real-time listener (saves ~1440 reads/day)
+      const pollSystemLocks = async () => {
+        if (!mountedRef.current) return;
+        try {
+          const locks = await fetchSystemLocks();
+          trackRead(1);
+          setSystemLocks(locks);
+          if (_globalCache) _globalCache.systemLocks = locks;
+        } catch {
+          // Non-critical — fail silently
+        }
+      };
+      pollSystemLocks(); // immediate fetch on mount
+      const locksPollInterval = setInterval(pollSystemLocks, LOCKS_POLL_INTERVAL_MS);
+      unsubscribers.push(() => clearInterval(locksPollInterval));
+
+      // appVersion — polling instead of real-time listener (saves ~1440 reads/day)
+      const pollAppVersion = async () => {
+        if (!mountedRef.current) return;
+        try {
+          const { db } = await import('./firebase');
+          const { getDoc, doc } = await import('firebase/firestore');
+          const snap = await getDoc(doc(db, 'settings', 'version'));
+          if (snap.exists() && mountedRef.current) {
+            setAppVersion(snap.data().currentVersion || VERSION);
+          }
+          trackRead(1);
+        } catch {
+          // Non-critical — fail silently
+        }
+      };
+      pollAppVersion(); // immediate fetch on mount
+      const versionPollInterval = setInterval(pollAppVersion, LOCKS_POLL_INTERVAL_MS);
+      unsubscribers.push(() => clearInterval(versionPollInterval));
 
       // ── ADMIN: One-time fetch on mount + 5-min auto-refresh ───────────────
       // Previously used 4 persistent onSnapshot listeners that re-fired on

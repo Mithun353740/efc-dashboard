@@ -1,13 +1,13 @@
 /**
  * Persistent localStorage cache layer.
  * Survives page refreshes (unlike the in-memory TTL cache in store.ts).
- * TTL: 30 minutes. On expiry the entry is evicted and Firestore is queried once.
+ * TTL: 60 minutes. On expiry the entry is evicted and Firestore is queried once.
  *
  * Keys are versioned — changing CACHE_VERSION below auto-busts all stale entries.
  */
 
-const CACHE_VERSION = 'v3';
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes — bumped from 10 min to reduce cold-start reads
+const CACHE_VERSION = 'v4'; // Bumped to bust old 30-min cache entries
+const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes — reduced from 30 min to cut reads by ~50%
 
 interface PersistedEntry<T> {
   data: T;
