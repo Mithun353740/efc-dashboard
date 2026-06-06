@@ -232,10 +232,12 @@ export default function Login() {
 
         <form onSubmit={loginType === 'admin' ? handleAdminLogin : handlePlayerLogin} className="space-y-6">
           <div className="space-y-2">
-            <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">
+            <label htmlFor="login-username" className="text-[9px] font-black tracking-widest text-slate-500 uppercase">
               {loginType === 'admin' ? 'USERNAME' : 'GMAIL ADDRESS'}
             </label>
             <input
+              id="login-username"
+              name="username"
               type={loginType === 'admin' ? 'text' : 'email'}
               value={user}
               onChange={e => setUser(e.target.value)}
@@ -246,9 +248,11 @@ export default function Login() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">PASSWORD</label>
+            <label htmlFor="login-password" className="text-[9px] font-black tracking-widest text-slate-500 uppercase">PASSWORD</label>
             <div className="relative">
               <input
+                id="login-password"
+                name="password"
                 type="password"
                 value={pass}
                 onChange={e => setPass(e.target.value)}
