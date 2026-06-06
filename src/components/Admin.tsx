@@ -7,6 +7,7 @@ import { doc, updateDoc, getDoc, collection, query, where, getDocs, writeBatch }
 
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
 import ClubTournamentsTab from './club/ClubTournamentsTab';
+import { AdminTournamentManager } from './tournament/AdminTournamentManager';
 import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture, AuctionState, ClubSeason, GlobalSeason } from '../types';
 import { getSeasonInfo, cn, getPlayerGrade, isAdminUser } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
@@ -1012,7 +1013,7 @@ export default function Admin() {
                 key="tournaments"
                 className="fixed inset-0 z-[100] bg-[#050508] overflow-auto"
               >
-                <NativeTournamentPage forcePublic={false} adminOverride={true} />
+                <AdminTournamentManager forcePublic={false} adminOverride={true} onBack={() => setActiveTab('players')} />
                 {/* Overlay back button to return to dashboard */}
                 <button 
                   onClick={() => setActiveTab('players')}
