@@ -49,6 +49,8 @@ let _globalCache: {
 
 // Admin fetch function ref — set during useEffect, called by refreshData
 let _adminFetchRef: (() => Promise<void>) | null = null;
+// StrictMode protection - prevents double initialization
+let _initStarted = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Context type
@@ -103,8 +105,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     // Only re-fetch if forced or cache is expired
     const cacheAge = Date.now() - lastFetchedAt.current;
-    if (!force && cacheAge < CACHE_TTL_MS && storedPlayers.length > 0) return;
+    if (!force && cacheAge < CACHE_TTL_MS && storedPlayers.length > 0) {
+      console.log('[FirebaseContext] Skipping load - cache fresh (age:', cacheAge, 'ms)');
+      return;
+    }
 
+    console.log('[FirebaseContext] Starting loadOnce', { force, cacheAge, storedPlayers: storedPlayers.length });
     const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
 
     try {
@@ -114,6 +120,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       const snapshot = await fetchAppSnapshot();
       if (snapshot && snapshot.leaderboard && snapshot.leaderboard.length > 0) {
         if (!mountedRef.current) return;
+        console.log('[FirebaseContext] Using appSnapshot fast path');
         const p = snapshot.leaderboard;
         const t = snapshot.activeTournaments || [];
         // Leaders and matches still need separate fetches (not in appSnapshot)
@@ -134,10 +141,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: _globalCache?.systemLocks || {}, fetchedAt: Date.now() };
         lastFetchedAt.current = Date.now();
         setIsLoading(false);
+        console.log('[FirebaseContext] loadOnce complete via appSnapshot - players:', p.length, 'matches:', m.length);
         return; // ← done in 2-3 reads instead of 70-120
       }
 
       // ── FALLBACK: Individual fetches (first run, no snapshot yet) ─────────
+      console.log('[FirebaseContext] Using fallback individual fetches');
       const playerLimit = isPlayer ? 50 : 30;
       const [p, l, m, t] = await Promise.all([
         fetchPlayersOnce(playerLimit),
@@ -148,6 +157,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
       // Track reads
       trackRead(p.length + l.length + m.length + t.length);
+      console.log('[FirebaseContext] Individual fetches complete - players:', p.length, 'leaders:', l.length, 'matches:', m.length, 'tournaments:', t.length);
 
       if (!mountedRef.current) return;
 
@@ -372,7 +382,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         };
       } else {
         // Cold start — fetch from Firestore once
-        loadOnce(true);
+        // Use ref to prevent StrictMode double-execution
+        if (!_initStarted) {
+          _initStarted = true;
+          loadOnce(true);
+        }
       }
 
       // ── systemLocks: one-time fetch + 60s poll (ONLY when visible) ─────────
