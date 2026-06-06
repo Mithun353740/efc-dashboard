@@ -750,7 +750,21 @@ function MatchManager({ tournament, onUpdate, players }: MatchManagerProps) {
     return players.find(p => p.id === id)?.name || 'Unknown';
   };
 
-  const updateMatchScore = (match: Fixture, home: number, away: number) => {
+  const updateMatchScore = async (match: Fixture, home: number, away: number) => {
+    // Create a match record in the global matches collection
+    const { addMatch } = await import('../../lib/store');
+    
+    const p1 = players.find(p => p.id === match.homeId);
+    const p2 = players.find(p => p.id === match.awayId);
+    
+    if (p1 && p2) {
+      try {
+        await addMatch(p1, home, away, p2, [], tournament.name);
+      } catch (e) {
+        console.error('Failed to add match to global history:', e);
+      }
+    }
+    
     const updated = {
       ...tournament,
       fixtures: tournament.fixtures.map(f => 
@@ -779,8 +793,26 @@ function MatchManager({ tournament, onUpdate, players }: MatchManagerProps) {
     setDeleteConfirm(match);
   };
 
-  const confirmDeleteMatch = () => {
+  const confirmDeleteMatch = async () => {
     if (!deleteConfirm) return;
+    
+    // Try to delete from global matches collection
+    try {
+      const { deleteMatchFromHistory, fetchMatchesOnce } = await import('../../lib/store');
+      const allMatches = await fetchMatchesOnce(200);
+      // Find the match with same players and tournament
+      const globalMatch = allMatches.find(m => 
+        m.p1Id === deleteConfirm.homeId && 
+        m.p2Id === deleteConfirm.awayId &&
+        m.tournament === tournament.name
+      );
+      if (globalMatch) {
+        await deleteMatchFromHistory(globalMatch, players as any, allMatches);
+      }
+    } catch (e) {
+      console.error('Failed to delete from global history:', e);
+    }
+    
     const updated = {
       ...tournament,
       fixtures: tournament.fixtures.filter(f => f.id !== deleteConfirm.id),

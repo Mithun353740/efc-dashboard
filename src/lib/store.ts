@@ -929,9 +929,16 @@ export async function addMatch(
 
   try {
     await batch.commit();
-    // Bust precomputed snapshot caches so next user load gets fresh leaderboard.
-    // Full snapshot refresh happens on next recalculateAllStats or admin data view.
+    // Bust all relevant caches so next user load gets fresh data
+    invalidateCacheByPrefix('players_');
+    invalidateCacheByPrefix('matches_');
+    invalidateCacheByPrefix('tournaments_');
+    invalidateCacheByPrefix('leaders_');
     invalidateCache(APP_SNAPSHOT_CACHE_KEY);
+    invalidateStorage('players');
+    invalidateStorage('matches');
+    invalidateStorage('tournaments');
+    invalidateStorage('leaders');
     invalidateStorage(APP_SNAPSHOT_CACHE_KEY);
     return matchRef.id;
   } catch (error) {
@@ -1038,12 +1045,17 @@ export async function editMatch(
 
   try {
     await batch.commit();
-    // Invalidate caches so users see updated data
+    // Invalidate all relevant caches so users see updated data
     invalidateCacheByPrefix('matches_');
     invalidateCacheByPrefix('players_');
+    invalidateCacheByPrefix('tournaments_');
+    invalidateCacheByPrefix('leaders_');
     invalidateCache(APP_SNAPSHOT_CACHE_KEY);
     invalidateStorage('matches');
     invalidateStorage('players');
+    invalidateStorage('tournaments');
+    invalidateStorage('leaders');
+    invalidateStorage(APP_SNAPSHOT_CACHE_KEY);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-edit');
   }
@@ -1189,12 +1201,17 @@ export async function deleteMatchFromHistory(
 
   try {
     await batch.commit();
-    // Invalidate caches so users see updated data
+    // Invalidate all relevant caches so users see updated data
     invalidateCacheByPrefix('matches_');
     invalidateCacheByPrefix('players_');
+    invalidateCacheByPrefix('tournaments_');
+    invalidateCacheByPrefix('leaders_');
     invalidateCache(APP_SNAPSHOT_CACHE_KEY);
     invalidateStorage('matches');
     invalidateStorage('players');
+    invalidateStorage('tournaments');
+    invalidateStorage('leaders');
+    invalidateStorage(APP_SNAPSHOT_CACHE_KEY);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, 'batch-match-delete');
   }
