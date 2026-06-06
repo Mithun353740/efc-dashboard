@@ -737,7 +737,7 @@ export default function Admin() {
                         </div>
                         {!match.isExternal ? (
                           <>
-                            <input value={p2Search} onChange={e => { setP2Search(e.target.value); setMatch({...match, p2Id: ''}); }} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Search club player..." />
+                            <input id="p2-search" name="p2-search" value={p2Search} onChange={e => { setP2Search(e.target.value); setMatch({...match, p2Id: ''}); }} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Search club player..." />
                             <AnimatePresence>
                               {p2Search && !match.p2Id && (
                                 <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute z-50 w-full mt-2 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
@@ -765,9 +765,11 @@ export default function Admin() {
                   </div>
 
                   <div className="w-full space-y-2">
-                    <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">MATCH TYPE / TOURNAMENT</label>
+                    <label htmlFor="match-tournament" className="text-[9px] font-black tracking-widest text-slate-500 uppercase">MATCH TYPE / TOURNAMENT</label>
                     <div className="relative">
                       <select 
+                        id="match-tournament"
+                        name="match-tournament"
                         value={match.tournament}
                         onChange={e => setMatch({...match, tournament: e.target.value})}
                         className={cn(
@@ -936,6 +938,8 @@ export default function Admin() {
                     <div className="flex items-center gap-3">
                       <Filter size={14} className="text-slate-500" />
                       <select 
+                        id="history-filter"
+                        name="history-filter"
                         value={historyFilter}
                         onChange={e => setHistoryFilter(e.target.value)}
                         className="bg-white/5 border border-white/10 p-2 rounded-xl text-[10px] font-black text-white focus:border-brand-purple outline-none transition-all"
@@ -964,11 +968,13 @@ export default function Admin() {
                             {editingMatch?.id === m.id ? (
                               <div className="flex flex-col md:flex-row items-center gap-2 bg-[#0f172a] p-2 rounded-xl">
                                 <div className="flex items-center gap-2">
-                                  <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-purple outline-none" value={editMatchScore1} onChange={e => setEditMatchScore1(e.target.value)} placeholder="Score 1" />
+                                  <input id="edit-score-1" name="edit-score-1" type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-purple outline-none" value={editMatchScore1} onChange={e => setEditMatchScore1(e.target.value)} placeholder="Score 1" />
                                   <span className="text-slate-500 font-bold text-xs">-</span>
-                                  <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-purple outline-none" value={editMatchScore2} onChange={e => setEditMatchScore2(e.target.value)} placeholder="Score 2" />
+                                  <input id="edit-score-2" name="edit-score-2" type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-purple outline-none" value={editMatchScore2} onChange={e => setEditMatchScore2(e.target.value)} placeholder="Score 2" />
                                 </div>
                                 <select 
+                                  id="edit-tournament"
+                                  name="edit-tournament"
                                   value={editMatchTournament}
                                   onChange={e => setEditMatchTournament(e.target.value)}
                                   className="bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-brand-purple outline-none mt-2 md:mt-0 w-full md:w-auto text-center"
