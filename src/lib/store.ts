@@ -185,6 +185,16 @@ interface FirestoreErrorInfo {
 
 export let isQuotaExceeded = false;
 
+/** Get current quota exceeded status - use this to check before operations */
+export function getQuotaExceededStatus(): boolean {
+  return isQuotaExceeded;
+}
+
+/** Reset quota exceeded flag (for recovery after quota resets) */
+export function resetQuotaExceeded(): void {
+  isQuotaExceeded = false;
+}
+
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errStrRaw = error instanceof Error ? error.message : (typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error));
   const errInfo: FirestoreErrorInfo = {

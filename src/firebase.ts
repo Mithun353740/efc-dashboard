@@ -6,10 +6,13 @@ import firebaseConfig from '../firebase-applet-config.json';
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Modern persistent multi-tab IndexedDB cache (replaces deprecated enableMultiTabIndexedDbPersistence).
-// When quota is exceeded, the app falls back to the local on-device IndexedDB cache automatically.
+// Bounded persistent cache to prevent excessive reads from cache sync
+// Limit: 10MB max cache size to reduce background reads
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  localCache: persistentLocalCache({ 
+    tabManager: persistentMultipleTabManager(),
+    cacheSizeBytes: 10 * 1024 * 1024, // 10MB limit - reduces background sync reads
+  }),
 }, firebaseConfig.firestoreDatabaseId);
 
 export const googleProvider = new GoogleAuthProvider();

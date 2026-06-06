@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Edit3, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, fetchAuctionPolling, startClubSeason, endClubSeason, endClubZoneSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad } from '../lib/store';
+import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, fetchAuctionPolling, startClubSeason, endClubSeason, endClubZoneSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad, getQuotaExceededStatus, resetQuotaExceeded } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
@@ -21,7 +21,18 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<'players' | 'matches' | 'leadership' | 'history' | 'tournaments' | 'locks' | 'credentials' | 'clubs' | 'auction'>('players');
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   const [isResyncing, setIsResyncing] = useState(false);
-  
+  const [quotaExceeded, setQuotaExceeded] = useState(getQuotaExceededStatus());
+
+  // Check quota status periodically
+  React.useEffect(() => {
+    const checkQuota = () => {
+      setQuotaExceeded(getQuotaExceededStatus());
+    };
+    checkQuota();
+    const interval = setInterval(checkQuota, 5000); // Check every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
+
   React.useEffect(() => {
     const checkAuth = async () => {
       const isAdminLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
@@ -200,6 +211,10 @@ export default function Admin() {
   
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (quotaExceeded) {
+      setPlayerMsg({ text: '❌ QUOTA EXCEEDED: Cannot save. Wait for quota reset.', type: 'error' });
+      return;
+    }
     setIsSubmitting(true);
     setPlayerMsg({ text: '', type: '' });
 
@@ -244,6 +259,10 @@ export default function Admin() {
 
   const handleAddLeader = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (quotaExceeded) {
+      setLeaderMsg({ text: '❌ QUOTA EXCEEDED: Cannot save. Wait for quota reset.', type: 'error' });
+      return;
+    }
     if (authStatus !== 'authenticated') {
       setLeaderMsg({ text: '❌ Not authenticated with Firebase.', type: 'error' });
       return;
@@ -312,6 +331,11 @@ export default function Admin() {
   const handleAddMatch = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (quotaExceeded) {
+      setMatchMsg({ text: '❌ QUOTA EXCEEDED: Cannot record match. Wait for quota reset.', type: 'error' });
+      return;
+    }
+
     const p1 = players.find(p => p.id === match.p1Id || p.name.toLowerCase() === p1Search.trim().toLowerCase());
     if (!p1) {
       setMatchMsg({ text: '❌ Invalid Club Player (P1).', type: 'error' });
@@ -375,6 +399,41 @@ export default function Admin() {
   return (
     <>
     <div className="min-h-screen bg-[#020617] text-white p-8">
+      {/* QUOTA EXCEEDED WARNING BANNER - BLOCKS ALL OPERATIONS */}
+      {quotaExceeded && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+          <div className="bg-rose-950 border-2 border-rose-500 rounded-2xl p-8 max-w-lg text-center shadow-2xl shadow-rose-500/50">
+            <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-rose-500/20 flex items-center justify-center">
+              <AlertCircle className="w-16 h-16 text-rose-500" />
+            </div>
+            <h2 className="text-3xl font-black text-rose-500 mb-4">🚫 QUOTA EXCEEDED</h2>
+            <p className="text-rose-200 mb-6">
+              Firestore quota has been exceeded. <br />
+              <strong>All data entry is BLOCKED</strong> to prevent false data.<br />
+              Wait for daily quota reset (midnight PST) or upgrade to Blaze plan.
+            </p>
+            <div className="space-y-4">
+              <button
+                onClick={() => {
+                  if (window.confirm('Reset quota flag? Only do this after confirming quota has been reset.')) {
+                    resetQuotaExceeded();
+                    setQuotaExceeded(false);
+                    window.location.reload();
+                  }
+                }}
+                className="w-full px-6 py-3 bg-rose-500 hover:bg-rose-400 text-white font-black rounded-xl transition-all"
+              >
+                RESET QUOTA FLAG (Admin Only)
+              </button>
+              <p className="text-xs text-rose-300/60">
+                Quota resets automatically at midnight PST (Spark Plan).<br />
+                Or upgrade to Blaze for unlimited usage.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="max-w-6xl mx-auto flex justify-between items-center mb-12">
         <div className="flex items-center gap-4 md:gap-6">
@@ -403,8 +462,8 @@ export default function Admin() {
               AUTH REQUIRED
             </div>
           )}
-          {dbError === 'QUOTA_EXCEEDED' ? (
-            <div className="px-3 py-1 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full text-[7px] md:text-[8px] font-black tracking-widest flex items-center gap-2">
+          {quotaExceeded || dbError === 'QUOTA_EXCEEDED' ? (
+            <div className="px-3 py-1 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full text-[7px] md:text-[8px] font-black tracking-widest flex items-center gap-2 animate-pulse">
               <div className="w-1 h-1 rounded-full bg-rose-500" />
               QUOTA EXCEEDED
             </div>
