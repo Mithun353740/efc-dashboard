@@ -802,7 +802,9 @@ export async function savePlayer(player: Player) {
     await setDoc(doc(db, 'players', player.id), player);
     console.log('Player saved successfully');
     // Signal all public users their cache is now stale
-    
+    invalidateCacheByPrefix('players_');
+    invalidateCache(APP_SNAPSHOT_CACHE_KEY);
+    invalidateStorage('players');
   } catch (error) {
     console.error('Error in savePlayer:', error);
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -1028,7 +1030,12 @@ export async function editMatch(
 
   try {
     await batch.commit();
-    
+    // Invalidate caches so users see updated data
+    invalidateCacheByPrefix('matches_');
+    invalidateCacheByPrefix('players_');
+    invalidateCache(APP_SNAPSHOT_CACHE_KEY);
+    invalidateStorage('matches');
+    invalidateStorage('players');
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-edit');
   }
@@ -1174,7 +1181,12 @@ export async function deleteMatchFromHistory(
 
   try {
     await batch.commit();
-    
+    // Invalidate caches so users see updated data
+    invalidateCacheByPrefix('matches_');
+    invalidateCacheByPrefix('players_');
+    invalidateCache(APP_SNAPSHOT_CACHE_KEY);
+    invalidateStorage('matches');
+    invalidateStorage('players');
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, 'batch-match-delete');
   }
@@ -1187,7 +1199,10 @@ export async function deletePlayer(id: string) {
   const path = `players/${id}`;
   try {
     await deleteDoc(doc(db, 'players', id));
-    
+    // Invalidate cache so users see updated player list
+    invalidateCacheByPrefix('players_');
+    invalidateCache(APP_SNAPSHOT_CACHE_KEY);
+    invalidateStorage('players');
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
@@ -1199,7 +1214,9 @@ export async function saveLeader(leader: Leader) {
   const path = `leaders/${leader.id}`;
   try {
     await setDoc(doc(db, 'leaders', leader.id), leader);
-    
+    // Invalidate leader cache
+    invalidateCacheByPrefix('leaders_');
+    invalidateStorage('leaders');
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -1211,7 +1228,9 @@ export async function deleteLeader(id: string) {
   const path = `leaders/${id}`;
   try {
     await deleteDoc(doc(db, 'leaders', id));
-    
+    // Invalidate leader cache
+    invalidateCacheByPrefix('leaders_');
+    invalidateStorage('leaders');
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
@@ -1227,7 +1246,10 @@ export async function saveTournament(tournament: Tournament) {
   try {
     await setDoc(doc(db, 'tournaments', tournament.id), tournament);
     // Bust caches so self-registration + admin changes are immediately visible.
+    // Invalidate both old and new cache key patterns
     invalidateCache('tournaments_active');
+    invalidateCacheByPrefix('tournaments_once_');
+    invalidateCache(APP_SNAPSHOT_CACHE_KEY);
     invalidateStorage('tournaments');
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -1242,7 +1264,10 @@ export async function deleteTournament(id: string) {
   const path = `tournaments/${id}`;
   try {
     await deleteDoc(doc(db, 'tournaments', id));
-    
+    // Invalidate cache keys
+    invalidateCache('tournaments_active');
+    invalidateCacheByPrefix('tournaments_once_');
+    invalidateStorage('tournaments');
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
