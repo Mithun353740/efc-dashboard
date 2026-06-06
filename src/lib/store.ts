@@ -1227,7 +1227,10 @@ export async function saveTournament(tournament: Tournament) {
   try {
     await setDoc(doc(db, 'tournaments', tournament.id), tournament);
     // Bust caches so self-registration + admin changes are immediately visible.
+    // Invalidate both old and new cache key patterns
     invalidateCache('tournaments_active');
+    invalidateCacheByPrefix('tournaments_once_');
+    invalidateCache(APP_SNAPSHOT_CACHE_KEY);
     invalidateStorage('tournaments');
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -1242,7 +1245,10 @@ export async function deleteTournament(id: string) {
   const path = `tournaments/${id}`;
   try {
     await deleteDoc(doc(db, 'tournaments', id));
-    
+    // Invalidate cache keys
+    invalidateCache('tournaments_active');
+    invalidateCacheByPrefix('tournaments_once_');
+    invalidateStorage('tournaments');
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
