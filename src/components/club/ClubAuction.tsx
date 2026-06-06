@@ -103,9 +103,19 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval>;
     let mounted = true;
+    let lastFetchTime = 0;
+    const MIN_POLL_INTERVAL = 30000; // 30 seconds minimum between fetches
 
     const poll = async () => {
       if (!mounted) return;
+      
+      // Respect minimum interval to prevent rapid fetches
+      const now = Date.now();
+      if (now - lastFetchTime < MIN_POLL_INTERVAL) {
+        return;
+      }
+      lastFetchTime = now;
+      
       try {
         const state = await fetchAuctionPolling();
         if (!mounted) return;
@@ -123,29 +133,16 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
       }
     };
 
-    // Poll immediately on mount
-    poll();
+    // Poll once on mount (after initial delay)
+    const initialTimeout = setTimeout(poll, 5000); // Wait 5s before first poll
 
-    // Smart polling: adjust interval based on auction status
-    const updateInterval = () => {
-      const isActive = auctionState?.status === 'bidding' || auctionState?.status === 'idle';
-      const interval = isActive ? 3000 : 60000; // 3s when active, 60s when idle
-      intervalId = setInterval(poll, interval);
-    };
-
-    // Start with 60s interval, will update based on status
+    // Poll every 60 seconds - auction updates are not time-critical
     intervalId = setInterval(poll, 60000);
-
-    // Update interval when auction status changes
-    const checkInterval = setInterval(() => {
-      clearInterval(intervalId);
-      updateInterval();
-    }, 10000); // Check every 10s
 
     return () => {
       mounted = false;
+      clearTimeout(initialTimeout);
       clearInterval(intervalId);
-      clearInterval(checkInterval);
     };
   }, []);
 

@@ -1684,9 +1684,16 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     if (subTab !== 'auction') return;
     let mounted = true;
     let intervalId: ReturnType<typeof setInterval>;
+    let lastFetchTime = 0;
+    const MIN_POLL_INTERVAL = 30000; // 30 seconds minimum
 
     const poll = async () => {
       if (!mounted) return;
+      // Respect minimum interval
+      const now = Date.now();
+      if (now - lastFetchTime < MIN_POLL_INTERVAL) return;
+      lastFetchTime = now;
+      
       try {
         const state = await fetchAuctionPolling();
         if (mounted) setAuctionState(state);
@@ -1695,11 +1702,13 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       }
     };
 
-    poll();
-    intervalId = setInterval(poll, 5000); // Poll every 5s for admin (needs more real-time)
+    // Wait 5s before first poll
+    const initialTimeout = setTimeout(poll, 5000);
+    intervalId = setInterval(poll, 60000); // Poll every 60s, not 5s
 
     return () => {
       mounted = false;
+      clearTimeout(initialTimeout);
       clearInterval(intervalId);
     };
   }, [subTab]);
