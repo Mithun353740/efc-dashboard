@@ -1,4 +1,4 @@
-export type TournamentFormat = 'league' | 'knockout' | 'groups' | 'round_robin';
+export type TournamentFormat = 'league' | 'knockout' | 'groups' | 'groups+knockout';
 export type MatchStatus = 'upcoming' | 'live' | 'completed';
 
 export interface TeamStats {
@@ -84,4 +84,8 @@ export interface Tournament {
    * Match day window ends — countdown shows "Match Day Over".
    */
   matchDayEnd?: string;
+  /** Registration deadline - ISO date string */
+  registrationDeadline?: string;
+  /** Phase: 'registration' | 'groups' | 'knockout' | 'completed' */
+  phase?: 'registration' | 'groups' | 'knockout' | 'completed';
 }
