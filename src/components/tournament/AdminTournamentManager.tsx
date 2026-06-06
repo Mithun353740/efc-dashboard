@@ -24,6 +24,54 @@ import { ensureAdminSession } from '../../lib/store';
 const generateId = () => crypto.randomUUID?.() || Math.random().toString(36).substring(2, 15);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Delete Confirmation Modal Component
+// ─────────────────────────────────────────────────────────────────────────────
+interface DeleteConfirmModalProps {
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function DeleteConfirmModal({ title, message, onConfirm, onCancel }: DeleteConfirmModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onCancel}
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="relative bg-[#0f172a] border border-rose-500/30 rounded-2xl p-6 w-full max-w-md"
+      >
+        <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-8 h-8 text-rose-500" />
+        </div>
+        <h3 className="font-black text-xl text-center mb-2">{title}</h3>
+        <p className="text-slate-400 text-sm text-center mb-6">{message}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-slate-400 font-bold rounded-xl"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-3 bg-rose-500 hover:bg-rose-400 text-white font-black rounded-xl"
+          >
+            Delete
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Group Management Component
 // ─────────────────────────────────────────────────────────────────────────────
 interface GroupManagerProps {
@@ -37,7 +85,8 @@ function GroupManager({ tournament, onUpdate, players }: GroupManagerProps) {
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [mode, setMode] = useState<'manual' | 'random'>('manual');
-  const [groupsPerTeam, setGroupsPerTeam] = useState(2); // For random: how many groups to create
+  const [groupsPerTeam, setGroupsPerTeam] = useState(2);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'group' | 'fixture' | 'all'; id?: number } | null>(null);
 
   const registeredPlayers = useMemo(() => {
     return (tournament.registeredPlayerIds || [])
@@ -95,11 +144,37 @@ function GroupManager({ tournament, onUpdate, players }: GroupManagerProps) {
   };
 
   const handleDeleteGroup = (groupId: number) => {
+    setDeleteConfirm({ type: 'group', id: groupId });
+  };
+
+  const confirmDeleteGroup = () => {
+    if (!deleteConfirm || deleteConfirm.type !== 'group' || deleteConfirm.id === undefined) return;
+    
+    const groupToDelete = tournament.groups?.find(g => g.id === deleteConfirm.id);
     const updated = {
       ...tournament,
-      groups: (tournament.groups || []).filter(g => g.id !== groupId),
+      // Remove the group
+      groups: (tournament.groups || []).filter(g => g.id !== deleteConfirm.id),
+      // Also remove all fixtures for this group
+      fixtures: tournament.fixtures.filter(f => f.groupId !== deleteConfirm.id),
     };
     onUpdate(updated);
+    setDeleteConfirm(null);
+  };
+
+  const handleDeleteAllGroups = () => {
+    setDeleteConfirm({ type: 'all' });
+  };
+
+  const confirmDeleteAllGroups = () => {
+    const updated: Tournament = {
+      ...tournament,
+      groups: [],
+      fixtures: tournament.fixtures.filter(f => f.stage !== 'groups'),
+      phase: 'registration',
+    };
+    onUpdate(updated);
+    setDeleteConfirm(null);
   };
 
   const handleRemoveTeamFromGroup = (groupId: number, teamId: string) => {
@@ -136,12 +211,22 @@ function GroupManager({ tournament, onUpdate, players }: GroupManagerProps) {
             <p className="text-xs text-slate-500">Create and manage tournament groups</p>
           </div>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black text-xs flex items-center gap-2"
-        >
-          <Plus size={14} /> CREATE GROUPS
-        </button>
+        <div className="flex items-center gap-2">
+          {tournament.groups && tournament.groups.length > 0 && (
+            <button
+              onClick={handleDeleteAllGroups}
+              className="px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-500 rounded-xl font-black text-xs flex items-center gap-2"
+            >
+              <Trash2 size={14} /> DELETE ALL
+            </button>
+          )}
+          <button
+            onClick={() => setShowCreate(true)}
+            className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black text-xs flex items-center gap-2"
+          >
+            <Plus size={14} /> CREATE GROUPS
+          </button>
+        </div>
       </div>
 
       {/* Existing Groups */}
@@ -311,6 +396,19 @@ function GroupManager({ tournament, onUpdate, players }: GroupManagerProps) {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <DeleteConfirmModal
+          title={deleteConfirm.type === 'group' ? 'Delete Group?' : 'Delete All Groups?'}
+          message={deleteConfirm.type === 'group' 
+            ? 'This will delete the group and remove all its fixtures. This action cannot be undone.'
+            : 'This will delete ALL groups and their fixtures. Players will need to be re-assigned. This action cannot be undone.'
+          }
+          onConfirm={deleteConfirm.type === 'group' ? confirmDeleteGroup : confirmDeleteAllGroups}
+          onCancel={() => setDeleteConfirm(null)}
+        />
+      )}
     </div>
   );
 }
@@ -327,10 +425,50 @@ interface FixtureGeneratorProps {
 function FixtureGenerator({ tournament, onUpdate, players }: FixtureGeneratorProps) {
   const [generating, setGenerating] = useState(false);
   const [stage, setStage] = useState<'groups' | 'knockout'>('groups');
+  const [deleteConfirm, setDeleteConfirm] = useState<'groups' | 'knockout' | 'all' | null>(null);
 
   const hasGroups = tournament.groups && tournament.groups.length > 0;
   const hasGroupFixtures = tournament.fixtures.some(f => f.stage === 'groups');
   const hasKnockoutFixtures = tournament.fixtures.some(f => f.stage === 'knockout');
+
+  const handleDeleteGroupFixtures = () => {
+    setDeleteConfirm('groups');
+  };
+
+  const handleDeleteKnockoutFixtures = () => {
+    setDeleteConfirm('knockout');
+  };
+
+  const handleDeleteAllFixtures = () => {
+    setDeleteConfirm('all');
+  };
+
+  const confirmDelete = () => {
+    if (!deleteConfirm) return;
+    
+    let updated: Tournament;
+    if (deleteConfirm === 'groups') {
+      updated = {
+        ...tournament,
+        fixtures: tournament.fixtures.filter(f => f.stage !== 'groups'),
+        phase: 'groups',
+      };
+    } else if (deleteConfirm === 'knockout') {
+      updated = {
+        ...tournament,
+        fixtures: tournament.fixtures.filter(f => f.stage !== 'knockout'),
+      };
+    } else {
+      updated = {
+        ...tournament,
+        fixtures: [],
+        groups: [],
+        phase: 'registration',
+      };
+    }
+    onUpdate(updated);
+    setDeleteConfirm(null);
+  };
 
   // Generate group stage fixtures (round-robin within each group)
   const generateGroupFixtures = () => {
@@ -487,7 +625,14 @@ function FixtureGenerator({ tournament, onUpdate, players }: FixtureGeneratorPro
                 <Layers size={16} className="text-emerald-500" />
                 <span className="font-black">Group Stage</span>
               </div>
-              {hasGroupFixtures && <Check size={16} className="text-emerald-500" />}
+              {hasGroupFixtures && (
+                <button
+                  onClick={handleDeleteGroupFixtures}
+                  className="p-1 hover:bg-rose-500/20 rounded text-rose-500"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
             </div>
             <p className="text-xs text-slate-500 mb-3">
               {hasGroupFixtures 
@@ -515,7 +660,14 @@ function FixtureGenerator({ tournament, onUpdate, players }: FixtureGeneratorPro
                 <TrophyIcon size={16} className="text-amber-500" />
                 <span className="font-black">Knockout Stage</span>
               </div>
-              {hasKnockoutFixtures && <Check size={16} className="text-amber-500" />}
+              {hasKnockoutFixtures && (
+                <button
+                  onClick={handleDeleteKnockoutFixtures}
+                  className="p-1 hover:bg-rose-500/20 rounded text-rose-500"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
             </div>
             <p className="text-xs text-slate-500 mb-3">
               {hasKnockoutFixtures 
@@ -538,7 +690,15 @@ function FixtureGenerator({ tournament, onUpdate, players }: FixtureGeneratorPro
       {/* Existing Fixtures Summary */}
       {tournament.fixtures.length > 0 && (
         <div className="bg-white/5 rounded-xl p-4">
-          <h4 className="font-bold text-sm mb-3">Generated Fixtures</h4>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-bold text-sm">Generated Fixtures</h4>
+            <button
+              onClick={handleDeleteAllFixtures}
+              className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-500 rounded-lg text-xs font-bold flex items-center gap-1"
+            >
+              <Trash2 size={12} /> DELETE ALL
+            </button>
+          </div>
           <div className="flex gap-4 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -550,6 +710,21 @@ function FixtureGenerator({ tournament, onUpdate, players }: FixtureGeneratorPro
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <DeleteConfirmModal
+          title={deleteConfirm === 'groups' ? 'Delete Group Fixtures?' : deleteConfirm === 'knockout' ? 'Delete Knockout Fixtures?' : 'Delete All Fixtures?'}
+          message={deleteConfirm === 'groups' 
+            ? 'This will delete all group stage fixtures. This action cannot be undone.'
+            : deleteConfirm === 'knockout'
+            ? 'This will delete all knockout stage fixtures. This action cannot be undone.'
+            : 'This will delete ALL fixtures and groups. Players will need to be re-assigned. This action cannot be undone.'
+          }
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteConfirm(null)}
+        />
       )}
     </div>
   );
@@ -568,6 +743,7 @@ function MatchManager({ tournament, onUpdate, players }: MatchManagerProps) {
   const [editingMatch, setEditingMatch] = useState<Fixture | null>(null);
   const [homeScore, setHomeScore] = useState('');
   const [awayScore, setAwayScore] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<Fixture | null>(null);
 
   const getPlayerName = (id: string | null) => {
     if (!id) return 'TBD';
@@ -585,6 +761,32 @@ function MatchManager({ tournament, onUpdate, players }: MatchManagerProps) {
     };
     onUpdate(updated);
     setEditingMatch(null);
+  };
+
+  const resetMatchScore = (match: Fixture) => {
+    const updated = {
+      ...tournament,
+      fixtures: tournament.fixtures.map(f => 
+        f.id === match.id 
+          ? { ...f, homeScore: null, awayScore: null, status: 'upcoming' as const, updatedAt: Date.now() }
+          : f
+      ),
+    };
+    onUpdate(updated);
+  };
+
+  const deleteMatch = (match: Fixture) => {
+    setDeleteConfirm(match);
+  };
+
+  const confirmDeleteMatch = () => {
+    if (!deleteConfirm) return;
+    const updated = {
+      ...tournament,
+      fixtures: tournament.fixtures.filter(f => f.id !== deleteConfirm.id),
+    };
+    onUpdate(updated);
+    setDeleteConfirm(null);
   };
 
   const groupFixtures = tournament.fixtures.filter(f => f.stage === 'groups');
@@ -631,6 +833,8 @@ function MatchManager({ tournament, onUpdate, players }: MatchManagerProps) {
                     setHomeScore(match.homeScore?.toString() || '');
                     setAwayScore(match.awayScore?.toString() || '');
                   }}
+                  onReset={() => resetMatchScore(match)}
+                  onDelete={() => deleteMatch(match)}
                 />
               </div>
             ))}
@@ -655,6 +859,8 @@ function MatchManager({ tournament, onUpdate, players }: MatchManagerProps) {
                     setHomeScore(match.homeScore?.toString() || '');
                     setAwayScore(match.awayScore?.toString() || '');
                   }}
+                  onReset={() => resetMatchScore(match)}
+                  onDelete={() => deleteMatch(match)}
                 />
               </div>
             ))}
@@ -721,6 +927,16 @@ function MatchManager({ tournament, onUpdate, players }: MatchManagerProps) {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Delete Match Confirmation Modal */}
+      {deleteConfirm && (
+        <DeleteConfirmModal
+          title="Delete Match?"
+          message={`This will permanently delete the match between ${getPlayerName(deleteConfirm.homeId)} and ${getPlayerName(deleteConfirm.awayId)}. This action cannot be undone.`}
+          onConfirm={confirmDeleteMatch}
+          onCancel={() => setDeleteConfirm(null)}
+        />
+      )}
     </div>
   );
 }
@@ -730,9 +946,11 @@ interface MatchCardProps {
   match: Fixture;
   getPlayerName: (id: string | null) => string;
   onEdit: () => void;
+  onReset: () => void;
+  onDelete: () => void;
 }
 
-function MatchCard({ match, getPlayerName, onEdit }: MatchCardProps) {
+function MatchCard({ match, getPlayerName, onEdit, onReset, onDelete }: MatchCardProps) {
   return (
     <div className="bg-[#0f172a] rounded-xl border border-white/10 p-4 flex items-center justify-between">
       <div className="flex items-center gap-4">
@@ -749,11 +967,27 @@ function MatchCard({ match, getPlayerName, onEdit }: MatchCardProps) {
           )}
         </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {match.status === 'completed' ? (
-          <span className="font-black text-lg">
-            {match.homeScore} - {match.awayScore}
-          </span>
+          <>
+            <span className="font-black text-lg">
+              {match.homeScore} - {match.awayScore}
+            </span>
+            <button
+              onClick={onReset}
+              className="p-2 hover:bg-amber-500/20 rounded-lg text-amber-500"
+              title="Reset score"
+            >
+              <RotateCcw size={14} />
+            </button>
+            <button
+              onClick={onEdit}
+              className="p-2 hover:bg-brand-primary/20 rounded-lg text-brand-primary"
+              title="Edit score"
+            >
+              <Edit3 size={14} />
+            </button>
+          </>
         ) : (
           <button
             onClick={onEdit}
@@ -762,6 +996,13 @@ function MatchCard({ match, getPlayerName, onEdit }: MatchCardProps) {
             Record
           </button>
         )}
+        <button
+          onClick={onDelete}
+          className="p-2 hover:bg-rose-500/20 rounded-lg text-rose-500"
+          title="Delete match"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
     </div>
   );
