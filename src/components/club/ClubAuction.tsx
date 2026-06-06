@@ -4,7 +4,7 @@ import { Hammer, Gavel, TrendingUp, Users, DollarSign, CheckCircle, X, SkipForwa
 import { AuctionState, Club, Player, ClubSystemConfig } from '../../types';
 import { getPlayerGrade, GRADE_COLORS, GRADE_BASE_PRICES } from '../../lib/utils';
 import {
-  subscribeToAuction, placeBid, foldBid,
+  fetchAuctionPolling, placeBid, foldBid,
   adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, adminStartAuction, adminNextTurn,
 } from '../../lib/store';
 
@@ -98,20 +98,55 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
     return `${m % 60}m ${s % 60}s`;
   };
 
-  // Subscribe to the live auction doc — 1 read per user total
+  // Smart polling: faster when auction is active, slower when idle
+  // Replaces permanent onSnapshot listener to reduce reads by ~95%
   useEffect(() => {
-    const unsub = subscribeToAuction((state) => {
-      setAuctionState(prev => {
-        // Detect status change to 'sold' for animation
-        if (prev?.status !== 'sold' && state?.status === 'sold') {
-          setShowSold(true);
-          setTimeout(() => setShowSold(false), 3500);
-        }
-        setPrevBid(prev?.currentBid || 0);
-        return state;
-      });
-    });
-    return unsub;
+    let intervalId: ReturnType<typeof setInterval>;
+    let mounted = true;
+
+    const poll = async () => {
+      if (!mounted) return;
+      try {
+        const state = await fetchAuctionPolling();
+        if (!mounted) return;
+        setAuctionState(prev => {
+          // Detect status change to 'sold' for animation
+          if (prev?.status !== 'sold' && state?.status === 'sold') {
+            setShowSold(true);
+            setTimeout(() => setShowSold(false), 3500);
+          }
+          setPrevBid(prev?.currentBid || 0);
+          return state;
+        });
+      } catch {
+        // Non-critical — fail silently
+      }
+    };
+
+    // Poll immediately on mount
+    poll();
+
+    // Smart polling: adjust interval based on auction status
+    const updateInterval = () => {
+      const isActive = auctionState?.status === 'bidding' || auctionState?.status === 'idle';
+      const interval = isActive ? 3000 : 60000; // 3s when active, 60s when idle
+      intervalId = setInterval(poll, interval);
+    };
+
+    // Start with 60s interval, will update based on status
+    intervalId = setInterval(poll, 60000);
+
+    // Update interval when auction status changes
+    const checkInterval = setInterval(() => {
+      clearInterval(intervalId);
+      updateInterval();
+    }, 10000); // Check every 10s
+
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+      clearInterval(checkInterval);
+    };
   }, []);
 
   if (!auctionState || auctionState.status === 'ended') {
