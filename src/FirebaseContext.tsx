@@ -340,6 +340,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     } else {
       // ── PLAYER / GUEST: ONE-TIME FETCH + controlled polling ───────────────
       // NO persistent WebSocket connections for regular users.
+      // ONLY poll when tab is visible (Page Visibility API)
 
       // Check if in-memory cache is still fresh
       const cacheAge = _globalCache ? Date.now() - (_globalCache.fetchedAt || 0) : Infinity;
@@ -374,11 +375,14 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         loadOnce(true);
       }
 
-      // ── systemLocks: one-time fetch + 60s poll ───────────────────────────
+      // ── systemLocks: one-time fetch + 60s poll (ONLY when visible) ─────────
       // Replaces the permanent onSnapshot that all 50+ users previously held.
-      // Cost: 1 read on load + 1 read per minute per user (vs. permanent WebSocket).
+      // Uses Page Visibility API to prevent reads when tab is in background.
+      let locksIntervalId: ReturnType<typeof setInterval> | null = null;
+      
       const pollLocks = async () => {
-        if (!mountedRef.current) return;
+        // Only poll if tab is visible and mounted
+        if (!mountedRef.current || document.hidden) return;
         try {
           const locks = await fetchSystemLocks();
           trackRead(1);
@@ -389,9 +393,40 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           // Non-critical — fail silently
         }
       };
-      pollLocks(); // immediate fetch on mount
-      const locksInterval = setInterval(pollLocks, LOCKS_POLL_INTERVAL_MS);
-      unsubscribers.push(() => clearInterval(locksInterval));
+
+      // Start polling only when tab becomes visible
+      const startPolling = () => {
+        if (locksIntervalId) return; // Already polling
+        pollLocks(); // Fetch immediately
+        locksIntervalId = setInterval(pollLocks, LOCKS_POLL_INTERVAL_MS);
+      };
+
+      const stopPolling = () => {
+        if (locksIntervalId) {
+          clearInterval(locksIntervalId);
+          locksIntervalId = null;
+        }
+      };
+
+      // Handle visibility changes
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          stopPolling();
+        } else {
+          startPolling();
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      unsubscribers.push(() => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        stopPolling();
+      });
+
+      // Start polling if tab is currently visible
+      if (!document.hidden) {
+        startPolling();
+      }
 
       // ── appVersion: fetch once on load ───────────────────────────────────
       // Version changes are infrequent; no need for a permanent WebSocket.

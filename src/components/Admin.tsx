@@ -404,7 +404,7 @@ export default function Admin() {
             </div>
           )}
           {dbError === 'QUOTA_EXCEEDED' ? (
-            <div className="px-3 py-1 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full text-[7px] md:text-[8px] font-black tracking-widest flex items-center gap-2">
+            <div className="px-3 py-1 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full text-[7px] md:text-[8px] font-black tracking-widest flex items-center gap-2 animate-pulse">
               <div className="w-1 h-1 rounded-full bg-rose-500" />
               QUOTA EXCEEDED
             </div>
