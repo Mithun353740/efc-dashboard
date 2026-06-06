@@ -331,7 +331,7 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const CACHE_TTL = 30 * 60 * 1000; // 30 minutes — matches FirebaseContext/localStorage session TTL
+const CACHE_TTL = 60 * 60 * 1000; // 60 minutes — matches FirebaseContext/localStorage session TTL (reduced from 30 min to cut reads by ~50%)
 const _cache = new Map<string, CacheEntry<any>>();
 const _pendingRequests = new Map<string, Promise<any>>();
 
@@ -866,6 +866,7 @@ export async function addMatch(
     // Full snapshot refresh happens on next recalculateAllStats or admin data view.
     invalidateCache(APP_SNAPSHOT_CACHE_KEY);
     invalidateStorage(APP_SNAPSHOT_CACHE_KEY);
+    return matchRef.id;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'batch-match-update');
     throw error;
