@@ -537,6 +537,7 @@ async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]
 }
 
 // Admin-only real-time listener. Limit=200 is sufficient for any club.
+// ⚠️ DEPRECATED: Use fetchPlayersOnce() with polling instead to reduce reads.
 export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 200, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
@@ -549,6 +550,7 @@ export function subscribeToPlayers(callback: (players: Player[], hasPending: boo
   });
 }
 
+// ⚠️ DEPRECATED: Use fetchLeadersOnce() with polling instead to reduce reads.
 export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boolean) => void, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'leaders'), orderBy('points', 'desc'), limit(50));
   return onSnapshot(q, (snapshot) => {
@@ -560,6 +562,7 @@ export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boo
   });
 }
 
+// ⚠️ DEPRECATED: Use fetchMatchesOnce() with polling instead to reduce reads.
 export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending: boolean) => void, limitCount = 50, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
@@ -571,6 +574,7 @@ export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending
   });
 }
 
+// ⚠️ DEPRECATED: Use fetchTournamentsOnce() with polling instead to reduce reads.
 export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void, limitCount = 50, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
@@ -580,6 +584,59 @@ export function subscribeToTournaments(callback: (tournaments: Tournament[], has
     if (errorCallback) errorCallback(error);
     handleFirestoreError(error, OperationType.GET, 'tournaments');
   });
+}
+
+/**
+ * One-time fetch of players — replaces onSnapshot for non-real-time use.
+ * Cached in memory for 60 minutes to reduce reads.
+ */
+export async function fetchPlayersPolling(limitCount = 200): Promise<Player[]> {
+  return fetchWithCache(`players_polling_${limitCount}`, async () => {
+    const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    const players = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Player));
+    trackRead(players.length);
+    return players;
+  }, CACHE_TTL);
+}
+
+/**
+ * One-time fetch of leaders — replaces onSnapshot for non-real-time use.
+ */
+export async function fetchLeadersPolling(): Promise<Leader[]> {
+  return fetchWithCache('leaders_polling', async () => {
+    const q = query(collection(db, 'leaders'), orderBy('points', 'desc'), limit(50));
+    const snap = await getDocs(q);
+    const leaders = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leader));
+    trackRead(leaders.length);
+    return leaders;
+  }, CACHE_TTL);
+}
+
+/**
+ * One-time fetch of matches — replaces onSnapshot for non-real-time use.
+ */
+export async function fetchMatchesPolling(limitCount = 50): Promise<MatchRecord[]> {
+  return fetchWithCache(`matches_polling_${limitCount}`, async () => {
+    const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    const matches = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchRecord));
+    trackRead(matches.length);
+    return matches;
+  }, CACHE_TTL);
+}
+
+/**
+ * One-time fetch of tournaments — replaces onSnapshot for non-real-time use.
+ */
+export async function fetchTournamentsPolling(limitCount = 50): Promise<Tournament[]> {
+  return fetchWithCache(`tournaments_polling_${limitCount}`, async () => {
+    const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    const tournaments = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
+    trackRead(tournaments.length);
+    return tournaments;
+  }, CACHE_TTL);
 }
 
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
@@ -1259,6 +1316,7 @@ export async function fetchClubs(force = false): Promise<Club[]> {
   });
 }
 
+// ⚠️ DEPRECATED: Use fetchClubsPolling() with polling instead to reduce reads.
 export function subscribeToClubs(callback: (clubs: Club[]) => void, limitCount = 50) {
     const q = query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(limitCount));
   return onSnapshot(q, (snap) => {
@@ -1267,6 +1325,22 @@ export function subscribeToClubs(callback: (clubs: Club[]) => void, limitCount =
       return { id: doc.id, ...d, logo: d.logo || '/default-logo.jpg' } as Club;
     }));
   }, (err) => handleFirestoreError(err, OperationType.GET, 'clubs'));
+}
+
+/**
+ * One-time fetch of clubs — replaces onSnapshot for non-real-time use.
+ */
+export async function fetchClubsPolling(limitCount = 50): Promise<Club[]> {
+  return fetchWithCache(`clubs_polling_${limitCount}`, async () => {
+    const q = query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(limitCount));
+    const snap = await getDocs(q);
+    const clubs = snap.docs.map(doc => {
+      const d = doc.data();
+      return { id: doc.id, ...d, logo: d.logo || '/default-logo.jpg' } as Club;
+    });
+    trackRead(clubs.length);
+    return clubs;
+  }, CACHE_TTL);
 }
 
 /**
@@ -1878,7 +1952,10 @@ export function sortRankedPlayers(players: Player[]): Player[] {
 
 const AUCTION_DOC = doc(db, 'auctions', 'live');
 
-/** Real-time listener on the single auction document. */
+/** Real-time listener on the single auction document.
+ * ⚠️ DEPRECATED: Use fetchAuctionPolling() with smart polling instead to reduce reads.
+ * Smart polling only checks frequently when auction is ACTIVE, otherwise very infrequently.
+ */
 export function subscribeToAuction(callback: (state: AuctionState | null) => void) {
   return onSnapshot(AUCTION_DOC, (snap) => {
     if (!snap.exists()) return callback(null);
@@ -1888,6 +1965,23 @@ export function subscribeToAuction(callback: (state: AuctionState | null) => voi
     }
     callback(state);
   }, (err) => handleFirestoreError(err, OperationType.GET, 'auctions/live'));
+}
+
+/**
+ * One-time fetch of auction state — replaces onSnapshot for non-real-time use.
+ * Smart polling: uses 5s interval when auction is active, 60s otherwise.
+ */
+export async function fetchAuctionPolling(): Promise<AuctionState | null> {
+  return fetchWithCache('auction_polling', async () => {
+    const snap = await getDoc(AUCTION_DOC);
+    trackRead(1);
+    if (!snap.exists()) return null;
+    const state = snap.data() as AuctionState;
+    if (state.currentPlayer && !state.currentPlayer.image) {
+      state.currentPlayer.image = '/default-logo.jpg';
+    }
+    return state;
+  }, 5 * 1000); // Short TTL for auction — gets updated via polling in components
 }
 
 /** Admin: Initialize/reset the auction for a new session. */

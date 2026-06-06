@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Edit3, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, endClubZoneSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad } from '../lib/store';
+import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, fetchAuctionPolling, startClubSeason, endClubSeason, endClubZoneSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
@@ -1675,10 +1675,26 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
   React.useEffect(() => {
     if (subTab !== 'auction') return;
-    const unsub = subscribeToAuction((state) => {
-      setAuctionState(state);
-    });
-    return unsub;
+    let mounted = true;
+    let intervalId: ReturnType<typeof setInterval>;
+
+    const poll = async () => {
+      if (!mounted) return;
+      try {
+        const state = await fetchAuctionPolling();
+        if (mounted) setAuctionState(state);
+      } catch {
+        // Non-critical
+      }
+    };
+
+    poll();
+    intervalId = setInterval(poll, 5000); // Poll every 5s for admin (needs more real-time)
+
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+    };
   }, [subTab]);
 
   const groupedHistory = useMemo(() => {
