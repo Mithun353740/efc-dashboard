@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import {
-  fetchClubs, fetchClubConfig, fetchMarketListings,
+  fetchClubs, fetchClubConfig, fetchMarketListings, fetchClubSnapshot,
   subscribeToInbox, subscribeToAuction, subscribeToPlayerInbox,
   sendTransferProposal, setReleaseClause, removeReleaseClause,
   getFormGrade, sendPlayerInboxMessage, applyDirectContract, fetchClubFixtures,
@@ -380,13 +380,25 @@ export default function ClubManager() {
 
   // ── Club Zone snapshot-first load ────────────────────────────────────────
   // Priority 1: In-memory cache (already in fetchWithCache) → 0 reads
-  // Priority 2: localStorage clubSnapshot → 0 reads
-  // Priority 3: settings/clubSnapshot Firestore doc → 1 read (replaces ~201)
-  // Priority 4: Individual collection fetches → fallback only
+  // Priority 2: settings/clubSnapshot Firestore doc → 1 read (replaces ~201)
+  // Priority 3: Individual collection fetches → fallback only
   const load = async (force = false) => {
     setLoading(true);
     try {
-      // Try to load in parallel — fetchWithCache handles in-memory dedup automatically
+      // Try clubSnapshot first - 1 read replaces ~201 individual reads
+      if (!force) {
+        const snapshot = await fetchClubSnapshot();
+        if (snapshot) {
+          console.log('[ClubManager] Using clubSnapshot (1 read instead of ~201)');
+          if (snapshot.config) setConfig(snapshot.config);
+          setListings(snapshot.marketListings || []);
+          setClubs(snapshot.clubs || []);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fallback: load in parallel — fetchWithCache handles in-memory dedup
       const [cfg, ls, cs] = await Promise.all([
         fetchClubConfig(force),
         fetchMarketListings(force),
@@ -397,8 +409,6 @@ export default function ClubManager() {
       setListings(ls);
       setClubs(cs || []);
       // ⚡ Fixtures are now LAZY — only loaded when Matches tab is clicked.
-      // This alone removes up to 100 reads from every Club Zone mount.
-      // setFixtures is called in handleMatchesTabOpen() below.
     } catch (err) {
       console.error('[ClubManager] Load error:', err);
     } finally {

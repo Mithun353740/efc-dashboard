@@ -13,6 +13,15 @@ async function startServer() {
   // Disable ETag to completely prevent 304 Not Modified browser caching for HTML routes
   app.set('etag', false);
 
+  // Security headers middleware for all responses
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
+
   // Expose an auto-update ping endpoint to forcibly sync client caches
   app.get('/api/version-ping', (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -43,6 +52,9 @@ async function startServer() {
           res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
           res.setHeader('Pragma', 'no-cache');
           res.setHeader('Expires', '0');
+        } else if (filePath.match(/\.(js|css)$/)) {
+          // Cache immutable assets (with content hashing in filenames)
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
       }
     }));
