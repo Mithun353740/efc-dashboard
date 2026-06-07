@@ -239,6 +239,7 @@ export default function Login() {
               id="login-username"
               name="username"
               type={loginType === 'admin' ? 'text' : 'email'}
+              autoComplete={loginType === 'admin' ? 'username' : 'email'}
               value={user}
               onChange={e => setUser(e.target.value)}
               className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white text-xs font-bold focus:border-brand-purple outline-none transition-all"
@@ -254,6 +255,7 @@ export default function Login() {
                 id="login-password"
                 name="password"
                 type="password"
+                autoComplete="current-password"
                 value={pass}
                 onChange={e => setPass(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white text-xs font-bold focus:border-brand-purple outline-none transition-all"

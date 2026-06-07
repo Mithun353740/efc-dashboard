@@ -171,6 +171,7 @@ export default function Navbar() {
             {isPlayer && (
               <Link 
                 to="/inbox" 
+                aria-label="Notifications inbox"
                 className="p-1.5 md:p-2 text-slate-400 hover:text-brand-purple transition-all relative group"
               >
                 <Bell size={18} className="md:w-5 md:h-5 group-hover:rotate-12 transition-transform" />

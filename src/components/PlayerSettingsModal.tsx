@@ -206,11 +206,14 @@ export default function PlayerSettingsModal({ isOpen, onClose }: PlayerSettingsM
               {/* ─── Profile Form ─── */}
               <form onSubmit={handleProfileUpdate} className="space-y-5 mb-6">
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
+                  <label htmlFor="player-photo-url" className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
                     <Camera size={11} className="text-brand-purple" /> Photo URL (or upload above)
                   </label>
                   <input
+                    id="player-photo-url"
+                    name="photoUrl"
                     type="text"
+                    autoComplete="photo"
                     value={image && !image.startsWith('data:') ? image : ''}
                     onChange={e => { setImage(e.target.value); setImagePreview(e.target.value); }}
                     className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-4 rounded-2xl text-slate-900 dark:text-white text-xs font-bold focus:border-brand-purple outline-none transition-all"
@@ -220,11 +223,14 @@ export default function PlayerSettingsModal({ isOpen, onClose }: PlayerSettingsM
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
+                    <label htmlFor="player-game-uid" className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
                       <Hash size={11} className="text-brand-purple" /> Game UID
                     </label>
                     <input
+                      id="player-game-uid"
+                      name="gameUid"
                       type="text"
+                      autoComplete="username"
                       value={uid}
                       onChange={e => setUid(e.target.value)}
                       className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-4 rounded-2xl text-slate-900 dark:text-white text-xs font-bold focus:border-brand-purple outline-none transition-all"
@@ -233,11 +239,14 @@ export default function PlayerSettingsModal({ isOpen, onClose }: PlayerSettingsM
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
+                    <label htmlFor="player-device" className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
                       <Cpu size={11} className="text-brand-purple" /> Device
                     </label>
                     <input
+                      id="player-device"
+                      name="device"
                       type="text"
+                      autoComplete="organization-title"
                       value={device}
                       onChange={e => setDevice(e.target.value)}
                       className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-4 rounded-2xl text-slate-900 dark:text-white text-xs font-bold focus:border-brand-purple outline-none transition-all"
@@ -287,11 +296,14 @@ export default function PlayerSettingsModal({ isOpen, onClose }: PlayerSettingsM
                       className="space-y-4 overflow-hidden"
                     >
                       <div className="space-y-1.5">
-                        <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
+                        <label htmlFor="player-email" className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
                           <Mail size={11} className="text-brand-purple" /> Email Address
                         </label>
                         <input
+                          id="player-email"
+                          name="email"
                           type="email"
+                          autoComplete="email"
                           value={email}
                           onChange={e => setEmail(e.target.value)}
                           className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-4 rounded-2xl text-slate-900 dark:text-white text-xs font-bold focus:border-brand-purple outline-none transition-all"
@@ -299,11 +311,14 @@ export default function PlayerSettingsModal({ isOpen, onClose }: PlayerSettingsM
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
+                        <label htmlFor="player-password" className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2">
                           <Lock size={11} className="text-brand-purple" /> Password
                         </label>
                         <input
+                          id="player-password"
+                          name="password"
                           type="text"
+                          autoComplete="new-password"
                           value={password}
                           onChange={e => setPassword(e.target.value)}
                           className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-4 rounded-2xl text-slate-900 dark:text-white text-xs font-bold focus:border-brand-purple outline-none transition-all"

@@ -111,6 +111,40 @@ export default function Admin() {
   const [globalSeason, setGlobalSeason] = useState(() => getSeasonInfo(new Date()).name);
   const [seasonMsg, setSeasonMsg] = useState('');
 
+  // ── Admin Data Cache (prevents re-fetching on tab switches) ───────────────
+  // Cache expires after 5 minutes to ensure data freshness while reducing reads
+  const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  const adminCacheRef = React.useRef<Record<string, { data: any; timestamp: number } | null>>({});
+
+  // Helper to get cached data or fetch if expired
+  const getCachedOrFetch = async (
+    cacheKey: string,
+    fetchFn: () => Promise<any>
+  ): Promise<any> => {
+    const cached = adminCacheRef.current[cacheKey];
+    if (cached && Date.now() - cached.timestamp < ADMIN_CACHE_TTL) {
+      console.log(`[AdminCache] Using cached ${cacheKey} (age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s)`);
+      return cached.data;
+    }
+    const data = await fetchFn();
+    adminCacheRef.current[cacheKey] = {
+      data,
+      timestamp: Date.now()
+    };
+    return data;
+  };
+
+  // Helper to invalidate specific cache
+  const invalidateAdminCache = (key?: string) => {
+    if (key) {
+      delete adminCacheRef.current[key];
+    } else {
+      Object.keys(adminCacheRef.current).forEach(k => {
+        delete adminCacheRef.current[k];
+      });
+    }
+  };
+
 
 
   const compressImage = (base64Str: string, maxWidth = 1600, maxHeight = 1600): Promise<string> => {
@@ -1560,7 +1594,8 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
   const loadGlobalSeasons = async () => {
     try {
-      const gs = await fetchGlobalSeasons();
+      // Use admin-level cache for global seasons
+      const gs = await getCachedOrFetch('globalSeasons', () => fetchGlobalSeasons());
       setGSeasons(gs);
       if (gs.length > 0 && !selectedGlobalId) {
         const active = gs.find(g => g.status === 'active');
@@ -1571,9 +1606,8 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
   const loadRegistry = async () => {
     try {
-      // Don't use force=true here - we want to use cache to avoid excessive reads
-      // Admin can manually refresh if needed
-      const cs = await fetchClubs(false);
+      // Use admin-level cache to prevent re-fetches on tab switches
+      const cs = await getCachedOrFetch('clubs', () => fetchClubs(false));
       setFClubs(cs);
     } catch (e) { console.error(e); }
   };
@@ -1692,7 +1726,7 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     let mounted = true;
     let intervalId: ReturnType<typeof setInterval>;
     let lastFetchTime = 0;
-    const MIN_POLL_INTERVAL = 30000; // 30 seconds minimum
+    const MIN_POLL_INTERVAL = 60000; // 60 seconds minimum (reduced from 30s)
 
     const poll = async () => {
       if (!mounted) return;
@@ -1702,16 +1736,17 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       lastFetchTime = now;
       
       try {
-        const state = await fetchAuctionPolling();
+        // Use admin cache to reduce reads
+        const state = await getCachedOrFetch('auctionState', () => fetchAuctionPolling());
         if (mounted) setAuctionState(state);
       } catch {
         // Non-critical
       }
     };
 
-    // Wait 5s before first poll
-    const initialTimeout = setTimeout(poll, 5000);
-    intervalId = setInterval(poll, 60000); // Poll every 60s, not 5s
+    // Wait 10s before first poll (reduced from 5s)
+    const initialTimeout = setTimeout(poll, 10000);
+    intervalId = setInterval(poll, 120000); // Poll every 2 minutes, not 60s
 
     return () => {
       mounted = false;
@@ -1738,7 +1773,8 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     setHLoading(true);
     try {
       const globalName = gSeasons.find(g => g.id === selectedGlobalId)?.name || newSeasonForm.globalSeason;
-      const ss = await fetchClubSeasons(globalName);
+      // Use admin-level cache for club seasons
+      const ss = await getCachedOrFetch('clubSeasons', () => fetchClubSeasons(globalName));
       setHSeasons(ss);
       
       // Auto-select first season if current selection is not in the new list
@@ -1760,7 +1796,8 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     if (!hSelectedSeasonId) return;
     setHLoading(true);
     try {
-      const ms = await fetchClubSeasonMatches(hSelectedSeasonId);
+      // Use admin-level cache for history matches
+      const ms = await getCachedOrFetch('historyMatches', () => fetchClubSeasonMatches(hSelectedSeasonId));
       setHMatches(ms);
     } catch (e) { console.error(e); }
     finally { setHLoading(false); }
@@ -1880,7 +1917,11 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const reload = async () => {
     setLoading(true);
     try {
-      const [cs, cfg] = await Promise.all([fetchClubs(), fetchClubConfig()]);
+      // Use admin-level cache to prevent re-fetches on every render
+      const [cs, cfg] = await Promise.all([
+        getCachedOrFetch('clubs', () => fetchClubs(false)),
+        getCachedOrFetch('clubConfig', () => fetchClubConfig(false))
+      ]);
       setClubs(cs);
       if (cfg) setConfig(cfg);
     } catch (e) {
