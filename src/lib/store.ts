@@ -3254,3 +3254,52 @@ export function invalidateAndRefreshSnapshots(
     writeClubSnapshot(clubs, config, listings).catch(() => {});
   }
 }
+
+/**
+ * Creates or refreshes appSnapshot and clubSnapshot documents.
+ * Call this from Admin on load to ensure snapshots exist.
+ * This reduces subsequent reads from ~100-300 to just 2 per user session.
+ */
+export async function ensureSnapshotsExist(): Promise<{ appSnapshot: boolean; clubSnapshot: boolean }> {
+  const results = { appSnapshot: false, clubSnapshot: false };
+  
+  try {
+    // Check if appSnapshot exists
+    const appSnap = await getDoc(doc(db, 'settings', 'appSnapshot'));
+    if (!appSnap.exists()) {
+      console.log('[Snapshot] appSnapshot missing, creating...');
+      // Fetch all data needed for appSnapshot
+      const [playersSnap, tournamentsSnap] = await Promise.all([
+        getDocs(query(collection(db, 'players'), limit(200))),
+        getDocs(query(collection(db, 'tournaments'), where('status', '==', 'active'), limit(10)))
+      ]);
+      const players = playersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Player));
+      const tournaments = tournamentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Tournament));
+      await writeAppSnapshot(players, tournaments, playersSnap.size);
+      results.appSnapshot = true;
+      console.log('[Snapshot] appSnapshot created with', players.length, 'players');
+    }
+
+    // Check if clubSnapshot exists
+    const clubSnap = await getDoc(doc(db, 'settings', 'clubSnapshot'));
+    if (!clubSnap.exists()) {
+      console.log('[Snapshot] clubSnapshot missing, creating...');
+      // Fetch all data needed for clubSnapshot
+      const [clubsSnap, configSnap, listingsSnap] = await Promise.all([
+        getDocs(query(collection(db, 'clubs'), limit(100))),
+        getDoc(doc(db, 'settings', 'clubConfig')),
+        getDocs(query(collection(db, 'marketListings'), limit(50)))
+      ]);
+      const clubs = clubsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Club));
+      const config = configSnap.exists() ? configSnap.data() as ClubSystemConfig : null;
+      const listings = listingsSnap.docs.map(d => ({ id: d.id, ...d.data() } as MarketListing));
+      await writeClubSnapshot(clubs, config, listings);
+      results.clubSnapshot = true;
+      console.log('[Snapshot] clubSnapshot created with', clubs.length, 'clubs');
+    }
+  } catch (err) {
+    console.warn('[Snapshot] Error ensuring snapshots exist:', err);
+  }
+  
+  return results;
+}

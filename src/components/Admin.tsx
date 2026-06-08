@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Edit3, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, fetchAuctionPolling, startClubSeason, endClubSeason, endClubZoneSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad } from '../lib/store';
+import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, fetchClubSnapshot, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, fetchAuctionPolling, startClubSeason, endClubSeason, endClubZoneSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad, ensureSnapshotsExist } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
@@ -75,6 +75,14 @@ export default function Admin() {
       }
 
       setAuthStatus('authenticated');
+      
+      // Ensure appSnapshot and clubSnapshot exist to optimize reads for all users
+      // This is a one-time cost (~300 reads) that saves thousands of reads for all subsequent users
+      ensureSnapshotsExist().then(({ appSnapshot, clubSnapshot }) => {
+        if (appSnapshot || clubSnapshot) {
+          console.log('[Admin] Snapshots created/refreshed - subsequent users will see 1-3 reads instead of 100-300');
+        }
+      }).catch(() => {});
     };
     checkAuth();
   }, [appVersion]);
@@ -1605,9 +1613,16 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
   const loadRegistry = async () => {
     try {
-      // Use admin-level cache to prevent re-fetches on tab switches
-      const cs = await getCachedOrFetch('clubs', () => fetchClubs(false));
-      setFClubs(cs);
+      // Use clubSnapshot fast path - 1 read instead of ~201 individual reads
+      const snapshot = await getCachedOrFetch('clubSnapshot', () => fetchClubSnapshot());
+      if (snapshot) {
+        console.log('[ClubsAdminTab] Using clubSnapshot (1 read instead of ~201)');
+        setFClubs(snapshot.clubs || []);
+      } else {
+        // Fallback to individual fetch if snapshot doesn't exist
+        const cs = await getCachedOrFetch('clubs', () => fetchClubs(false));
+        setFClubs(cs);
+      }
     } catch (e) { console.error(e); }
   };
 
@@ -1916,13 +1931,21 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const reload = async () => {
     setLoading(true);
     try {
-      // Use admin-level cache to prevent re-fetches on every render
-      const [cs, cfg] = await Promise.all([
-        getCachedOrFetch('clubs', () => fetchClubs(false)),
-        getCachedOrFetch('clubConfig', () => fetchClubConfig(false))
-      ]);
-      setClubs(cs);
-      if (cfg) setConfig(cfg);
+      // Use clubSnapshot fast path - 1 read instead of ~201 individual reads
+      const snapshot = await getCachedOrFetch('clubSnapshot', () => fetchClubSnapshot());
+      if (snapshot) {
+        console.log('[ClubsAdminTab] reload using clubSnapshot (1 read)');
+        setClubs(snapshot.clubs || []);
+        if (snapshot.config) setConfig(snapshot.config);
+      } else {
+        // Fallback to individual fetches
+        const [cs, cfg] = await Promise.all([
+          getCachedOrFetch('clubs', () => fetchClubs(false)),
+          getCachedOrFetch('clubConfig', () => fetchClubConfig(false))
+        ]);
+        setClubs(cs);
+        if (cfg) setConfig(cfg);
+      }
     } catch (e) {
       console.error('Failed to load clubs:', e);
     } finally {
