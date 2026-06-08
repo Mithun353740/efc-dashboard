@@ -15,6 +15,40 @@ import { auth, loginAnonymously, db } from '../firebase';
 import { CLUB_LOGO, CLUB_NAME, VERSION } from '../constants';
 import { bergerRoundRobin } from '../lib/fixtureGen';
 
+// ── Admin Data Cache (shared across Admin and ClubsAdminTab) ──────────────────
+// Cache expires after 5 minutes to ensure data freshness while reducing reads
+const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const adminCache: Record<string, { data: any; timestamp: number } | null> = {};
+
+// Helper to get cached data or fetch if expired
+const getCachedOrFetch = async (
+  cacheKey: string,
+  fetchFn: () => Promise<any>
+): Promise<any> => {
+  const cached = adminCache[cacheKey];
+  if (cached && Date.now() - cached.timestamp < ADMIN_CACHE_TTL) {
+    console.log(`[AdminCache] Using cached ${cacheKey} (age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s)`);
+    return cached.data;
+  }
+  const data = await fetchFn();
+  adminCache[cacheKey] = {
+    data,
+    timestamp: Date.now()
+  };
+  return data;
+};
+
+// Helper to invalidate specific cache
+const invalidateAdminCache = (key?: string) => {
+  if (key) {
+    delete adminCache[key];
+  } else {
+    Object.keys(adminCache).forEach(k => {
+      delete adminCache[k];
+    });
+  }
+};
+
 
 export default function Admin() {
   const { players, leaders, matches, tournaments, systemLocks, dbError, hasPendingWrites, appVersion } = useFirebase();
@@ -110,41 +144,6 @@ export default function Admin() {
   const [clubSeasons, setClubSeasons] = useState<ClubSeason[]>([]);
   const [globalSeason, setGlobalSeason] = useState(() => getSeasonInfo(new Date()).name);
   const [seasonMsg, setSeasonMsg] = useState('');
-
-  // ── Admin Data Cache (prevents re-fetching on tab switches) ───────────────
-  // Cache expires after 5 minutes to ensure data freshness while reducing reads
-  const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-  const adminCacheRef = React.useRef<Record<string, { data: any; timestamp: number } | null>>({});
-
-  // Helper to get cached data or fetch if expired
-  const getCachedOrFetch = async (
-    cacheKey: string,
-    fetchFn: () => Promise<any>
-  ): Promise<any> => {
-    const cached = adminCacheRef.current[cacheKey];
-    if (cached && Date.now() - cached.timestamp < ADMIN_CACHE_TTL) {
-      console.log(`[AdminCache] Using cached ${cacheKey} (age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s)`);
-      return cached.data;
-    }
-    const data = await fetchFn();
-    adminCacheRef.current[cacheKey] = {
-      data,
-      timestamp: Date.now()
-    };
-    return data;
-  };
-
-  // Helper to invalidate specific cache
-  const invalidateAdminCache = (key?: string) => {
-    if (key) {
-      delete adminCacheRef.current[key];
-    } else {
-      Object.keys(adminCacheRef.current).forEach(k => {
-        delete adminCacheRef.current[k];
-      });
-    }
-  };
-
 
 
   const compressImage = (base64Str: string, maxWidth = 1600, maxHeight = 1600): Promise<string> => {
