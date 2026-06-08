@@ -1740,10 +1740,10 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     let mounted = true;
     let intervalId: ReturnType<typeof setInterval>;
     let lastFetchTime = 0;
-    const MIN_POLL_INTERVAL = 60000; // 60 seconds minimum (reduced from 30s)
+    const MIN_POLL_INTERVAL = 60000; // 60 seconds minimum
 
     const poll = async () => {
-      if (!mounted) return;
+      if (!mounted || document.hidden) return; // Skip if tab is hidden
       // Respect minimum interval
       const now = Date.now();
       if (now - lastFetchTime < MIN_POLL_INTERVAL) return;
@@ -1758,14 +1758,28 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
       }
     };
 
-    // Wait 10s before first poll (reduced from 5s)
+    const handleVisibility = () => {
+      if (!document.hidden && mounted && subTab === 'auction') {
+        poll(); // Immediate check when tab becomes visible
+        intervalId = setInterval(poll, 120000); // Poll every 2 minutes
+      } else {
+        if (intervalId) clearInterval(intervalId);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Wait 10s before first poll
     const initialTimeout = setTimeout(poll, 10000);
-    intervalId = setInterval(poll, 120000); // Poll every 2 minutes, not 60s
+    if (!document.hidden) {
+      intervalId = setInterval(poll, 120000); // Poll every 2 minutes
+    }
 
     return () => {
       mounted = false;
       clearTimeout(initialTimeout);
-      clearInterval(intervalId);
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [subTab]);
 

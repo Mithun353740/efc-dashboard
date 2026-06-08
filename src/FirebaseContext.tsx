@@ -260,16 +260,41 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const isAdmin = isAdminUser();
 
     if (isAdmin) {
-      // ── ADMIN: ONE-TIME FETCH + polling ─────────────────────────────────
+      // ── ADMIN: ONE-TIME FETCH + visibility-aware polling ──────────────────
       // Replaced persistent onSnapshot listeners with polling to reduce reads.
       // onSnapshot fires on EVERY write to the collection, causing ~350 reads per match entry.
       // Polling only reads once per interval, cutting listener-related reads by ~95%.
+      // Visibility API ensures NO reads when tab is in background.
       // Register admin session (1 write — needed for Firestore security rules)
       ensureAdminSession();
 
-      // systemLocks — polling instead of real-time listener (saves ~1440 reads/day)
+      let adminPollTimers: ReturnType<typeof setInterval>[] = [];
+
+      const stopAdminPolling = () => {
+        adminPollTimers.forEach(t => clearInterval(t));
+        adminPollTimers = [];
+      };
+
+      const handleAdminVisibilityChange = () => {
+        if (document.hidden) {
+          stopAdminPolling();
+          console.log('[Admin] Tab hidden - stopped all polling');
+        } else {
+          // Restart polling when tab becomes visible
+          startAdminPolling();
+          console.log('[Admin] Tab visible - resumed polling');
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleAdminVisibilityChange);
+      unsubscribers.push(() => {
+        document.removeEventListener('visibilitychange', handleAdminVisibilityChange);
+        stopAdminPolling();
+      });
+
+      // systemLocks — polling only when visible
       const pollSystemLocks = async () => {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || document.hidden) return;
         try {
           const locks = await fetchSystemLocks();
           trackRead(1);
@@ -279,13 +304,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           // Non-critical — fail silently
         }
       };
-      pollSystemLocks(); // immediate fetch on mount
-      const locksPollInterval = setInterval(pollSystemLocks, LOCKS_POLL_INTERVAL_MS);
-      unsubscribers.push(() => clearInterval(locksPollInterval));
 
-      // appVersion — polling instead of real-time listener (saves ~1440 reads/day)
+      // appVersion — polling only when visible
       const pollAppVersion = async () => {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || document.hidden) return;
         try {
           const { db } = await import('./firebase');
           const { getDoc, doc } = await import('firebase/firestore');
@@ -298,16 +320,15 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           // Non-critical — fail silently
         }
       };
-      pollAppVersion(); // immediate fetch on mount
-      const versionPollInterval = setInterval(pollAppVersion, LOCKS_POLL_INTERVAL_MS);
-      unsubscribers.push(() => clearInterval(versionPollInterval));
 
-      // ── ADMIN: One-time fetch on mount + 5-min auto-refresh ───────────────
-      // Previously used 4 persistent onSnapshot listeners that re-fired on
-      // every write — causing ~350 reads per match entry. Now uses one-time
-      // fetches with a timed refresh, cutting admin reads by ~90%.
+      // Main admin data fetch — polling only when visible
       const doFetch = async () => {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || document.hidden) return;
+        // Skip if cache is still fresh (within TTL)
+        if (_globalCache && Date.now() - _globalCache.fetchedAt < CACHE_TTL_MS) {
+          console.log('[Admin] Cache fresh, skipping fetch');
+          return;
+        }
         try {
           const [p, l, m, t] = await Promise.all([
             fetchPlayersOnce(50),          // reduced from 200 — sufficient for admin UI
@@ -341,10 +362,24 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      // Run immediately on mount, then every 5 minutes
-      doFetch();
-      const adminRefreshTimer = setInterval(doFetch, ADMIN_REFRESH_INTERVAL_MS);
-      unsubscribers.push(() => clearInterval(adminRefreshTimer));
+      // Start all polling (only runs when tab is visible)
+      const startAdminPolling = () => {
+        stopAdminPolling(); // Clear any existing timers
+        
+        // Immediate fetches on visibility change
+        pollSystemLocks();
+        pollAppVersion();
+        
+        // Set up polling intervals
+        adminPollTimers.push(setInterval(pollSystemLocks, LOCKS_POLL_INTERVAL_MS));
+        adminPollTimers.push(setInterval(pollAppVersion, LOCKS_POLL_INTERVAL_MS));
+        adminPollTimers.push(setInterval(doFetch, ADMIN_REFRESH_INTERVAL_MS));
+      };
+
+      // Start polling if tab is currently visible
+      if (!document.hidden) {
+        startAdminPolling();
+      }
 
       // Expose doFetch so refreshData can trigger it manually
       _adminFetchRef = doFetch;

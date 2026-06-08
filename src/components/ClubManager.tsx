@@ -443,9 +443,14 @@ export default function ClubManager() {
   // ── Inbox unread badge: lightweight poll when NOT on inbox tab ─────────────────
   // ONE read every 10 minutes (was 20 reads every 2 min = 14,400 reads/day/user).
   // Reads a single counter doc instead of scanning the playerInbox collection.
+  // Visibility API ensures NO reads when tab is in background.
   useEffect(() => {
     if (!playerId || !isPlayer || activeTab === 'inbox') return;
+    
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    
     const checkUnread = async () => {
+      if (document.hidden) return; // Skip if tab is hidden
       try {
         // Player inbox: read single doc (1 read) not collection scan (was 20 reads)
         const { db } = await import('../firebase');
@@ -467,37 +472,74 @@ export default function ClubManager() {
         }
       } catch {}
     };
-    checkUnread();
-    const interval = setInterval(checkUnread, 10 * 60 * 1000); // 10 min (was 2 min)
-    return () => clearInterval(interval);
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (intervalId) clearInterval(intervalId);
+      } else {
+        checkUnread(); // Immediate check on visibility
+        intervalId = setInterval(checkUnread, 10 * 60 * 1000); // 10 min
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    checkUnread(); // Initial check
+    if (!document.hidden) {
+      intervalId = setInterval(checkUnread, 10 * 60 * 1000); // 10 min
+    }
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [playerId, isPlayer, activeTab, isOwner]);
 
   // ── Auction: real-time only when Auction tab active; poll otherwise ────────
+  // Visibility API ensures NO reads when tab is in background.
   useEffect(() => {
     if (!isPlayer) return;
     if (activeTab === 'auction') {
       // ClubAuction component handles the real-time subscription when active.
       // We don't need a duplicate listener here.
       return;
-    } else {
-      // Lightweight 5-minute poll for badge — no persistent WebSocket
-      const checkAuction = async () => {
-        try {
-          const { db } = await import('../firebase');
-          const { getDoc, doc } = await import('firebase/firestore');
-          const snap = await getDoc(doc(db, 'auctions', 'live'));
-          if (snap.exists()) {
-            const s = snap.data();
-            setAuctionLive(!!s && s.status !== 'ended' && s.status !== 'idle');
-          } else {
-            setAuctionLive(false);
-          }
-        } catch {}
-      };
-      checkAuction();
-      const interval = setInterval(checkAuction, 300_000); // 5-min poll for badge (was 2m)
-      return () => clearInterval(interval);
     }
+    
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    
+    const checkAuction = async () => {
+      if (document.hidden) return; // Skip if tab is hidden
+      try {
+        const { db } = await import('../firebase');
+        const { getDoc, doc } = await import('firebase/firestore');
+        const snap = await getDoc(doc(db, 'auctions', 'live'));
+        if (snap.exists()) {
+          const s = snap.data();
+          setAuctionLive(!!s && s.status !== 'ended' && s.status !== 'idle');
+        } else {
+          setAuctionLive(false);
+        }
+      } catch {}
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (intervalId) clearInterval(intervalId);
+      } else {
+        checkAuction(); // Immediate check on visibility
+        intervalId = setInterval(checkAuction, 300_000); // 5 min
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    checkAuction(); // Initial check
+    if (!document.hidden) {
+      intervalId = setInterval(checkAuction, 300_000); // 5 min
+    }
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [isPlayer, activeTab]);
 
   useEffect(() => {
