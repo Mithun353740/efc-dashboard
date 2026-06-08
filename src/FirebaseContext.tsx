@@ -84,9 +84,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>(
     _globalCache?.systemLocks || {}
   );
-  const [isLoading, setIsLoading] = useState(
-    storedPlayers.length === 0 && (!_globalCache || _globalCache.players.length === 0)
-  );
+  // Only show spinner on a true cold start with zero cached data
+  const hasCachedData =
+    storedPlayers.length > 0 ||
+    (_globalCache !== null && _globalCache.players.length > 0);
+  const [isLoading, setIsLoading] = useState(!hasCachedData);
   const [dbError, setDbError] = useState<string | null>(null);
   const [hasPendingWrites, setHasPendingWrites] = useState(false);
   const [appVersion, setAppVersion] = useState<string>(VERSION);
@@ -107,43 +109,47 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
     const playerLimit = isPlayer ? 200 : 50;
 
+    // Hard timeout: never show spinner for more than 3 seconds
+    const loadingTimeout = setTimeout(() => {
+      if (mountedRef.current) setIsLoading(false);
+    }, 3000);
+
     try {
-      const [p, l, m, t] = await Promise.all([
-        fetchPlayersOnce(playerLimit),
+      // Fetch players first — as soon as they arrive, hide the spinner
+      const p = await fetchPlayersOnce(playerLimit);
+      if (!mountedRef.current) { clearTimeout(loadingTimeout); return; }
+      setPlayers(p);
+      setIsLoading(false);
+      clearTimeout(loadingTimeout);
+
+      // Fetch the rest in the background (non-blocking)
+      Promise.all([
         fetchLeadersOnce(),
         isPlayer ? fetchMatchesOnce(50) : Promise.resolve([] as MatchRecord[]),
         fetchTournamentsOnce(20),
-      ]);
-
-      // Track reads
-      trackRead(p.length + l.length + m.length + t.length);
-
-      if (!mountedRef.current) return;
-
-      setPlayers(p);
-      setLeaders(l);
-      setMatches(m);
-      setTournaments(t);
-      lastFetchedAt.current = Date.now();
-
-      // Persist to localStorage for next page load
-      persistToStorage('players', p);
-      persistToStorage('leaders', l);
-      persistToStorage('matches', m);
-      persistToStorage('tournaments', t);
-
-      // Update in-memory global cache
-      _globalCache = {
-        players: p,
-        leaders: l,
-        matches: m,
-        tournaments: t,
-        systemLocks: _globalCache?.systemLocks || {},
-        fetchedAt: Date.now(),
-      };
+      ]).then(([l, m, t]) => {
+        trackRead(p.length + l.length + m.length + t.length);
+        if (!mountedRef.current) return;
+        setLeaders(l);
+        setMatches(m);
+        setTournaments(t);
+        lastFetchedAt.current = Date.now();
+        persistToStorage('players', p);
+        persistToStorage('leaders', l);
+        persistToStorage('matches', m);
+        persistToStorage('tournaments', t);
+        _globalCache = {
+          players: p,
+          leaders: l,
+          matches: m,
+          tournaments: t,
+          systemLocks: _globalCache?.systemLocks || {},
+          fetchedAt: Date.now(),
+        };
+      }).catch(err => console.warn('[FirebaseContext] Background fetch failed:', err));
     } catch (err) {
       console.warn('[FirebaseContext] One-time fetch failed:', err);
-    } finally {
+      clearTimeout(loadingTimeout);
       if (mountedRef.current) setIsLoading(false);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -217,11 +223,14 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     if (isAdmin) {
       // ── ADMIN: REAL-TIME LISTENERS ──────────────────────────────────────────
-      // Restored onSnapshot listeners for admins. This drastically reduces quota usage
-      // because it only fetches documents that changed, rather than forcing 370+ reads
-      // every 5 minutes.
       ensureAdminSession();
       testFirestoreConnection();
+
+      // Hard timeout: never show spinner for more than 3s even if Firestore is slow
+      const adminTimeout = setTimeout(() => {
+        if (mountedRef.current) setIsLoading(false);
+      }, 3000);
+      unsubscribers.push(() => clearTimeout(adminTimeout));
 
       // systemLocks — real-time for admin (tiny single doc, needed for instant lock control)
       unsubscribers.push(subscribeToSystemLocks((locks) => {
@@ -242,8 +251,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (_globalCache) _globalCache.players = p;
         import('./lib/cache').then(({ persistToStorage }) => persistToStorage('players', p));
         setHasPendingWrites(pending);
+        clearTimeout(adminTimeout);
         setIsLoading(false); // Stop loading once players arrive
-      }, 200, () => setIsLoading(false)));
+      }, 200, () => { clearTimeout(adminTimeout); setIsLoading(false); }));
 
       unsubscribers.push(subscribeToLeaders((l, pending) => {
         if (!mountedRef.current) return;
