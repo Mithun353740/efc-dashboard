@@ -2265,6 +2265,77 @@ export async function markInboxRead(ownerId: string, messages: ClubInboxMessage[
   }
 }
 
+/**
+ * POLLING version of subscribeToInbox — replaces persistent onSnapshot.
+ * Reads once per interval instead of keeping a permanent WebSocket open.
+ * Returns unsubscribe function.
+ */
+export function pollInbox(ownerId: string, callback: (messages: ClubInboxMessage[], unreadCount: number) => void, intervalMs = 60000) {
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+  let mounted = true;
+
+  const fetchInbox = async () => {
+    if (!mounted || document.hidden) return;
+    try {
+      const snap = await getDoc(doc(db, 'clubInbox', ownerId));
+      if (!mounted) return;
+      if (snap.exists()) {
+        const data = snap.data();
+        callback(data.messages || [], data.unreadCount || 0);
+      } else {
+        callback([], 0);
+      }
+    } catch {
+      // Non-critical — fail silently
+    }
+  };
+
+  // Initial fetch
+  fetchInbox();
+  // Poll every interval (default 60s)
+  intervalId = setInterval(fetchInbox, intervalMs);
+
+  return () => {
+    mounted = false;
+    if (intervalId) clearInterval(intervalId);
+  };
+}
+
+/**
+ * POLLING version of subscribeToPlayerInbox — replaces persistent onSnapshot.
+ * Reads once per interval instead of keeping a permanent WebSocket open.
+ * Returns unsubscribe function.
+ */
+export function pollPlayerInbox(recipientId: string, callback: (messages: PlayerInboxMessage[]) => void, intervalMs = 60000) {
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+  let mounted = true;
+
+  const fetchPlayerInbox = async () => {
+    if (!mounted || document.hidden) return;
+    try {
+      const snap = await getDoc(doc(db, 'playerInbox', recipientId));
+      if (!mounted) return;
+      if (snap.exists()) {
+        callback(snap.data().messages || []);
+      } else {
+        callback([]);
+      }
+    } catch {
+      // Non-critical — fail silently
+    }
+  };
+
+  // Initial fetch
+  fetchPlayerInbox();
+  // Poll every interval (default 60s)
+  intervalId = setInterval(fetchPlayerInbox, intervalMs);
+
+  return () => {
+    mounted = false;
+    if (intervalId) clearInterval(intervalId);
+  };
+}
+
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // TRANSFER NEGOTIATION SYSTEM
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
@@ -3150,7 +3221,7 @@ export async function fetchAppSnapshot(): Promise<AppSnapshot | null> {
       console.warn('[Snapshot] Could not fetch appSnapshot:', err);
       return null;
     }
-  }, 30 * 60 * 1000); // 30 min in-memory TTL
+  }, 60 * 60 * 1000); // 60 min in-memory TTL (increased from 30 min to reduce reads)
 }
 
 /**
@@ -3168,7 +3239,7 @@ export async function fetchClubSnapshot(): Promise<ClubSnapshot | null> {
       console.warn('[Snapshot] Could not fetch clubSnapshot:', err);
       return null;
     }
-  }, 30 * 60 * 1000);
+  }, 60 * 60 * 1000); // 60 min in-memory TTL (increased from 30 min to reduce reads)
 }
 
 /**

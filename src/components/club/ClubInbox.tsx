@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Bell, Mail, MailOpen, ArrowLeftRight, DollarSign, X, Check, RefreshCw, ChevronRight, Clock } from 'lucide-react';
 import { ClubInboxMessage, TransferThread, Club, Player } from '../../types';
 import {
-  subscribeToInbox, markInboxRead, fetchTransferThreadsForClub,
+  pollInbox, markInboxRead, fetchTransferThreadsForClub,
   respondToProposal,
 } from '../../lib/store';
 
@@ -59,13 +59,14 @@ export default function ClubInbox({ ownerId, myClub, allClubs, allPlayers, onClo
     if (initialUnread !== undefined) setUnreadCount(initialUnread);
   }, [initialMessages, initialUnread]);
 
-  // Fallback real-time inbox subscription (only if not provided by parent)
+  // Fallback polling inbox subscription (only if not provided by parent)
+  // Uses pollInbox instead of onSnapshot to avoid persistent WebSocket.
   useEffect(() => {
     if (initialMessages) return;
-    const unsub = subscribeToInbox(ownerId, (msgs, count) => {
+    const unsub = pollInbox(ownerId, (msgs, count) => {
       setMessages([...msgs].sort((a, b) => b.createdAt - a.createdAt));
       setUnreadCount(count);
-    });
+    }, 30000);
     return unsub;
   }, [ownerId, initialMessages]);
 

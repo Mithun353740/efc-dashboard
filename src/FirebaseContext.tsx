@@ -240,26 +240,43 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Real-time revocation listener for Player Admins
+    // Revocation check for Player Admins — POLLING instead of persistent listener
+    // onSnapshot kept a permanent WebSocket open for every player admin
+    // Polling every 5 min = 288 reads/day vs 24/7 WebSocket (infinite reads)
     const pRole = localStorage.getItem('playerRole');
     const pId = localStorage.getItem('playerId');
     if (pRole === 'admin' && pId) {
-      import('./firebase').then(({ db }) => {
-        import('firebase/firestore').then(({ doc, onSnapshot }) => {
-          const unsub = onSnapshot(doc(db, 'players', pId), (snap) => {
-            if (snap.exists() && snap.data().role !== 'admin') {
-              const realRole = snap.data().role || 'player';
-              localStorage.setItem('playerRole', realRole);
-              localStorage.setItem('userType', 'player');
-              window.dispatchEvent(new StorageEvent('storage', { key: 'playerRole', newValue: realRole }));
-              window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: 'player' }));
-              if (window.location.hash.includes('/admin')) {
-                window.location.hash = '/';
-              }
+      let revocationCheckInterval: ReturnType<typeof setInterval> | null = null;
+      
+      const checkRevocation = async () => {
+        if (document.hidden) return; // Skip when tab is hidden
+        try {
+          const { db } = await import('./firebase');
+          const { getDoc, doc } = await import('firebase/firestore');
+          const snap = await getDoc(doc(db, 'players', pId));
+          if (snap.exists() && snap.data().role !== 'admin') {
+            const realRole = snap.data().role || 'player';
+            localStorage.setItem('playerRole', realRole);
+            localStorage.setItem('userType', 'player');
+            window.dispatchEvent(new StorageEvent('storage', { key: 'playerRole', newValue: realRole }));
+            window.dispatchEvent(new StorageEvent('storage', { key: 'auth', newValue: 'player' }));
+            if (window.location.hash.includes('/admin')) {
+              window.location.hash = '/';
             }
-          });
-          unsubscribers.push(unsub);
-        });
+            // Stop polling once revoked
+            if (revocationCheckInterval) clearInterval(revocationCheckInterval);
+          }
+        } catch {
+          // Fail silently — non-critical check
+        }
+      };
+
+      // Poll every 5 minutes instead of persistent listener
+      revocationCheckInterval = setInterval(checkRevocation, 5 * 60 * 1000);
+      checkRevocation(); // Check once immediately
+      
+      unsubscribers.push(() => {
+        if (revocationCheckInterval) clearInterval(revocationCheckInterval);
       });
     }
 
