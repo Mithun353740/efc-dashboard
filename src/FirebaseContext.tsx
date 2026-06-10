@@ -91,9 +91,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>(
     _globalCache?.systemLocks || {}
   );
-  const [isLoading, setIsLoading] = useState(
-    storedPlayers.length === 0 && (!_globalCache || _globalCache.players.length === 0)
-  );
+  // Only show spinner on a true cold start with zero cached data
+  const hasCachedData =
+    storedPlayers.length > 0 ||
+    (_globalCache !== null && _globalCache.players.length > 0);
+  const [isLoading, setIsLoading] = useState(!hasCachedData);
   const [dbError, setDbError] = useState<string | null>(null);
   const [hasPendingWrites, setHasPendingWrites] = useState(false);
   const [appVersion, setAppVersion] = useState<string>(VERSION);
@@ -117,16 +119,28 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     console.log('[FirebaseContext] Starting loadOnce', { force, cacheAge, storedPlayers: storedPlayers.length });
     const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
 
+    // Hard timeout: never show spinner for more than 3 seconds
+    const loadingTimeout = setTimeout(() => {
+      if (mountedRef.current) setIsLoading(false);
+    }, 3000);
+
     try {
       // ── SNAPSHOT FAST PATH (1 read instead of 70-120) ────────────────────
       // Try the precomputed appSnapshot document first.
       // Falls back to individual fetches if snapshot doesn't exist yet.
       const snapshot = await fetchAppSnapshot();
       if (snapshot && snapshot.leaderboard && snapshot.leaderboard.length > 0) {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current) { clearTimeout(loadingTimeout); return; }
         console.log('[FirebaseContext] Using appSnapshot fast path');
         const p = snapshot.leaderboard;
         const t = snapshot.activeTournaments || [];
+        
+        // Show data immediately to hide the loading screen
+        setPlayers(p);
+        setTournaments(t);
+        setIsLoading(false);
+        clearTimeout(loadingTimeout);
+
         // Leaders and matches still need separate fetches (not in appSnapshot)
         // but only if we're a logged-in player (guests see minimal data)
         const [l, m] = await Promise.all([
@@ -134,17 +148,14 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           isPlayer ? fetchMatchesOnce(50) : Promise.resolve([] as MatchRecord[]),
         ]);
         if (!mountedRef.current) return;
-        setPlayers(p);
         setLeaders(l);
         setMatches(m);
-        setTournaments(t);
         persistToStorage('players', p);
         persistToStorage('leaders', l);
         if (m.length) persistToStorage('matches', m);
         if (t.length) persistToStorage('tournaments', t);
         _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: _globalCache?.systemLocks || {}, fetchedAt: Date.now() };
         lastFetchedAt.current = Date.now();
-        setIsLoading(false);
         console.log('[FirebaseContext] loadOnce complete via appSnapshot - players:', p.length, 'matches:', m.length);
         return; // ← done in 2-3 reads instead of 70-120
       }
@@ -152,49 +163,47 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       // ── FALLBACK: Individual fetches (first run, no snapshot yet) ─────────
       console.log('[FirebaseContext] Using fallback individual fetches');
       const playerLimit = isPlayer ? 50 : 30;
-      const [p, l, m, t] = await Promise.all([
-        fetchPlayersOnce(playerLimit),
+
+      // Fetch players first — as soon as they arrive, hide the spinner
+      const p = await fetchPlayersOnce(playerLimit);
+      if (!mountedRef.current) { clearTimeout(loadingTimeout); return; }
+      setPlayers(p);
+      setIsLoading(false);
+      clearTimeout(loadingTimeout);
+
+      // Fetch the rest in the background (non-blocking)
+      Promise.all([
         fetchLeadersOnce(),
         isPlayer ? fetchMatchesOnce(50) : Promise.resolve([] as MatchRecord[]),
         fetchTournamentsOnce(20),
-      ]);
+      ]).then(([l, m, t]) => {
+        trackRead(p.length + l.length + m.length + t.length);
+        if (!mountedRef.current) return;
+        setLeaders(l);
+        setMatches(m);
+        setTournaments(t);
+        lastFetchedAt.current = Date.now();
+        persistToStorage('players', p);
+        persistToStorage('leaders', l);
+        persistToStorage('matches', m);
+        persistToStorage('tournaments', t);
+        _globalCache = {
+          players: p,
+          leaders: l,
+          matches: m,
+          tournaments: t,
+          systemLocks: _globalCache?.systemLocks || {},
+          fetchedAt: Date.now(),
+        };
 
-      // Track reads
-      trackRead(p.length + l.length + m.length + t.length);
-      console.log('[FirebaseContext] Individual fetches complete - players:', p.length, 'leaders:', l.length, 'matches:', m.length, 'tournaments:', t.length);
-
-      if (!mountedRef.current) return;
-
-      setPlayers(p);
-      setLeaders(l);
-      setMatches(m);
-      setTournaments(t);
-      lastFetchedAt.current = Date.now();
-
-      // Persist to localStorage for next page load
-      persistToStorage('players', p);
-      persistToStorage('leaders', l);
-      persistToStorage('matches', m);
-      persistToStorage('tournaments', t);
-
-      // Update in-memory global cache
-      _globalCache = {
-        players: p,
-        leaders: l,
-        matches: m,
-        tournaments: t,
-        systemLocks: _globalCache?.systemLocks || {},
-        fetchedAt: Date.now(),
-      };
-
-      // Create appSnapshot for future users (fire-and-forget)
-      // This is a one-time cost that saves hundreds of reads for all subsequent users
-      if (p.length > 0) {
-        writeAppSnapshot(p, t, m.length).catch(() => {});
-      }
+        // Create appSnapshot for future users (fire-and-forget)
+        if (p.length > 0) {
+          writeAppSnapshot(p, t, m.length).catch(() => {});
+        }
+      }).catch(err => console.warn('[FirebaseContext] Background fetch failed:', err));
     } catch (err) {
       console.warn('[FirebaseContext] One-time fetch failed:', err);
-    } finally {
+      clearTimeout(loadingTimeout);
       if (mountedRef.current) setIsLoading(false);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -336,35 +345,46 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           console.log('[Admin] Cache fresh, skipping fetch');
           return;
         }
+        // Hard timeout: never show spinner for more than 3s even if Firestore is slow
+        const adminTimeout = setTimeout(() => {
+          if (mountedRef.current) setIsLoading(false);
+        }, 3000);
+
         try {
-          const [p, l, m, t] = await Promise.all([
-            fetchPlayersOnce(50),          // reduced from 200 — sufficient for admin UI
+          // Fetch players first
+          const p = await fetchPlayersOnce(50); // reduced from 200 — sufficient for admin UI
+          if (!mountedRef.current) { clearTimeout(adminTimeout); return; }
+          setPlayers(p);
+          setIsLoading(false);
+          clearTimeout(adminTimeout);
+
+          Promise.all([
             fetchLeadersOnce(),
             fetchMatchesOnce(50),          // reduced from 100
             fetchTournamentsOnce(20),      // reduced from 50
-          ]);
-          if (!mountedRef.current) return;
-          setPlayers(p);
-          setLeaders(l);
-          setMatches(m);
-          setTournaments(t);
-          setIsLoading(false);
-          if (_globalCache) {
-            _globalCache.players = p;
-            _globalCache.leaders = l;
-            _globalCache.matches = m;
-            _globalCache.tournaments = t;
-            _globalCache.fetchedAt = Date.now();
-          } else {
-            _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: {}, fetchedAt: Date.now() };
-          }
-          // Persist for fast reloads
-          persistToStorage('players', p);
-          persistToStorage('leaders', l);
-          persistToStorage('matches', m);
-          persistToStorage('tournaments', t);
+          ]).then(([l, m, t]) => {
+            if (!mountedRef.current) return;
+            setLeaders(l);
+            setMatches(m);
+            setTournaments(t);
+            if (_globalCache) {
+              _globalCache.players = p;
+              _globalCache.leaders = l;
+              _globalCache.matches = m;
+              _globalCache.tournaments = t;
+              _globalCache.fetchedAt = Date.now();
+            } else {
+              _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: {}, fetchedAt: Date.now() };
+            }
+            // Persist for fast reloads
+            persistToStorage('players', p);
+            persistToStorage('leaders', l);
+            persistToStorage('matches', m);
+            persistToStorage('tournaments', t);
+          }).catch(err => console.warn('[FirebaseContext] Admin background fetch failed:', err));
         } catch (err) {
           console.warn('[FirebaseContext] Admin fetch failed:', err);
+          clearTimeout(adminTimeout);
           if (mountedRef.current) setIsLoading(false);
         }
       };
