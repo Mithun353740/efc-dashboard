@@ -2,17 +2,52 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Edit3, Trophy, Users, LayoutDashboard, LogOut, X, ShieldCheck, ChevronDown, Key, Mail, Lock, History, Filter, Hammer, AlertCircle, Gavel, Bell, Calendar, DollarSign, Settings, Pencil, Upload, Check, Play, Shield, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, subscribeToAuction, startClubSeason, endClubSeason, endClubZoneSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad } from '../lib/store';
+import { invalidateCache, ensureAdminSession, savePlayer, deletePlayer, addMatch, editMatch, deleteMatchFromHistory, saveLeader, deleteLeader, computeGlobalElo, calculateOvrHybrid, recalculateAllStats, seedDatabase, toggleSystemLock, fetchClubs, fetchClubSnapshot, saveClub, deleteClub, fetchClubConfig, saveClubConfig, fetchClubSeasonMatches, fetchClubTournaments, saveClubTournament, deleteClubTournament, fetchClubFixtures, saveClubFixture, deleteClubFixture, updateFixtureSubMatch, adminStartAuction, adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, fetchAuctionPolling, startClubSeason, endClubSeason, endClubZoneSeason, fetchClubSeasons, fetchAllActiveClubSeasons, broadcastToAllOwners, deleteClubSeason, unassignClubOwner, assignClubOwner, fetchGlobalSeasons, startGlobalSeason, subscribeToActiveClubSeasons, removePlayerFromSquad, ensureSnapshotsExist } from '../lib/store';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
 import { NativeTournamentPage } from './tournament/NativeTournamentPage';
 import ClubTournamentsTab from './club/ClubTournamentsTab';
+import { AdminTournamentManager } from './tournament/AdminTournamentManager';
 import { Player, Leader, MatchRecord, Club, ClubSystemConfig, ClubTournament, ClubFixture, AuctionState, ClubSeason, GlobalSeason } from '../types';
 import { getSeasonInfo, cn, getPlayerGrade, isAdminUser } from '../lib/utils';
 import { useFirebase } from '../FirebaseContext';
 import { auth, loginAnonymously, db } from '../firebase';
 import { CLUB_LOGO, CLUB_NAME, VERSION } from '../constants';
 import { bergerRoundRobin } from '../lib/fixtureGen';
+
+// ── Admin Data Cache (shared across Admin and ClubsAdminTab) ──────────────────
+// Cache expires after 5 minutes to ensure data freshness while reducing reads
+const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const adminCache: Record<string, { data: any; timestamp: number } | null> = {};
+
+// Helper to get cached data or fetch if expired
+const getCachedOrFetch = async (
+  cacheKey: string,
+  fetchFn: () => Promise<any>
+): Promise<any> => {
+  const cached = adminCache[cacheKey];
+  if (cached && Date.now() - cached.timestamp < ADMIN_CACHE_TTL) {
+    console.log(`[AdminCache] Using cached ${cacheKey} (age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s)`);
+    return cached.data;
+  }
+  const data = await fetchFn();
+  adminCache[cacheKey] = {
+    data,
+    timestamp: Date.now()
+  };
+  return data;
+};
+
+// Helper to invalidate specific cache
+const invalidateAdminCache = (key?: string) => {
+  if (key) {
+    delete adminCache[key];
+  } else {
+    Object.keys(adminCache).forEach(k => {
+      delete adminCache[k];
+    });
+  }
+};
 
 
 export default function Admin() {
@@ -40,6 +75,14 @@ export default function Admin() {
       }
 
       setAuthStatus('authenticated');
+      
+      // Ensure appSnapshot and clubSnapshot exist to optimize reads for all users
+      // This is a one-time cost (~300 reads) that saves thousands of reads for all subsequent users
+      ensureSnapshotsExist().then(({ appSnapshot, clubSnapshot }) => {
+        if (appSnapshot || clubSnapshot) {
+          console.log('[Admin] Snapshots created/refreshed - subsequent users will see 1-3 reads instead of 100-300');
+        }
+      }).catch(() => {});
     };
     checkAuth();
   }, [appVersion]);
@@ -109,7 +152,6 @@ export default function Admin() {
   const [clubSeasons, setClubSeasons] = useState<ClubSeason[]>([]);
   const [globalSeason, setGlobalSeason] = useState(() => getSeasonInfo(new Date()).name);
   const [seasonMsg, setSeasonMsg] = useState('');
-
 
 
   const compressImage = (base64Str: string, maxWidth = 1600, maxHeight = 1600): Promise<string> => {
@@ -404,7 +446,7 @@ export default function Admin() {
             </div>
           )}
           {dbError === 'QUOTA_EXCEEDED' ? (
-            <div className="px-3 py-1 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full text-[7px] md:text-[8px] font-black tracking-widest flex items-center gap-2">
+            <div className="px-3 py-1 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full text-[7px] md:text-[8px] font-black tracking-widest flex items-center gap-2 animate-pulse">
               <div className="w-1 h-1 rounded-full bg-rose-500" />
               QUOTA EXCEEDED
             </div>
@@ -720,7 +762,7 @@ export default function Admin() {
                           )}
                         </AnimatePresence>
                       </div>
-                      <input type="number" value={match.p1Score} onChange={e => setMatch({...match, p1Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />
+                      <input id="p1-score" name="p1-score" type="number" value={match.p1Score} onChange={e => setMatch({...match, p1Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />
                     </div>
 
                     <div className="text-brand-purple font-black text-2xl italic">VS</div>
@@ -736,7 +778,7 @@ export default function Admin() {
                         </div>
                         {!match.isExternal ? (
                           <>
-                            <input value={p2Search} onChange={e => { setP2Search(e.target.value); setMatch({...match, p2Id: ''}); }} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Search club player..." />
+                            <input id="p2-search" name="p2-search" value={p2Search} onChange={e => { setP2Search(e.target.value); setMatch({...match, p2Id: ''}); }} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Search club player..." />
                             <AnimatePresence>
                               {p2Search && !match.p2Id && (
                                 <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute z-50 w-full mt-2 bg-[#0f172a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
@@ -759,14 +801,16 @@ export default function Admin() {
                           />
                         )}
                       </div>
-                      <input type="number" value={match.p2Score} onChange={e => setMatch({...match, p2Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />
+                      <input id="p2-score" name="p2-score" type="number" value={match.p2Score} onChange={e => setMatch({...match, p2Score: e.target.value})} className="w-full bg-white/5 border border-white/10 p-6 rounded-2xl text-4xl font-black text-center focus:border-brand-purple outline-none transition-all" placeholder="0" />
                     </div>
                   </div>
 
                   <div className="w-full space-y-2">
-                    <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">MATCH TYPE / TOURNAMENT</label>
+                    <label htmlFor="match-tournament" className="text-[9px] font-black tracking-widest text-slate-500 uppercase">MATCH TYPE / TOURNAMENT</label>
                     <div className="relative">
                       <select 
+                        id="match-tournament"
+                        name="match-tournament"
                         value={match.tournament}
                         onChange={e => setMatch({...match, tournament: e.target.value})}
                         className={cn(
@@ -935,6 +979,8 @@ export default function Admin() {
                     <div className="flex items-center gap-3">
                       <Filter size={14} className="text-slate-500" />
                       <select 
+                        id="history-filter"
+                        name="history-filter"
                         value={historyFilter}
                         onChange={e => setHistoryFilter(e.target.value)}
                         className="bg-white/5 border border-white/10 p-2 rounded-xl text-[10px] font-black text-white focus:border-brand-purple outline-none transition-all"
@@ -963,11 +1009,13 @@ export default function Admin() {
                             {editingMatch?.id === m.id ? (
                               <div className="flex flex-col md:flex-row items-center gap-2 bg-[#0f172a] p-2 rounded-xl">
                                 <div className="flex items-center gap-2">
-                                  <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-purple outline-none" value={editMatchScore1} onChange={e => setEditMatchScore1(e.target.value)} placeholder="Score 1" />
+                                  <input id="edit-score-1" name="edit-score-1" type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-purple outline-none" value={editMatchScore1} onChange={e => setEditMatchScore1(e.target.value)} placeholder="Score 1" />
                                   <span className="text-slate-500 font-bold text-xs">-</span>
-                                  <input type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-purple outline-none" value={editMatchScore2} onChange={e => setEditMatchScore2(e.target.value)} placeholder="Score 2" />
+                                  <input id="edit-score-2" name="edit-score-2" type="number" className="w-16 bg-white/5 border border-white/10 p-2 rounded text-center text-xs font-bold focus:border-brand-purple outline-none" value={editMatchScore2} onChange={e => setEditMatchScore2(e.target.value)} placeholder="Score 2" />
                                 </div>
                                 <select 
+                                  id="edit-tournament"
+                                  name="edit-tournament"
                                   value={editMatchTournament}
                                   onChange={e => setEditMatchTournament(e.target.value)}
                                   className="bg-white/5 border border-white/10 p-2 rounded text-xs font-bold focus:border-brand-purple outline-none mt-2 md:mt-0 w-full md:w-auto text-center"
@@ -1012,7 +1060,7 @@ export default function Admin() {
                 key="tournaments"
                 className="fixed inset-0 z-[100] bg-[#050508] overflow-auto"
               >
-                <NativeTournamentPage forcePublic={false} adminOverride={true} />
+                <AdminTournamentManager forcePublic={false} adminOverride={true} onBack={() => setActiveTab('players')} />
                 {/* Overlay back button to return to dashboard */}
                 <button 
                   onClick={() => setActiveTab('players')}
@@ -1186,11 +1234,12 @@ function NavBtn({ active, onClick, icon, label }: { active: boolean; onClick: ()
   );
 }
 
-function Input({ label, value, onChange, placeholder, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; type?: string }) {
+function Input({ label, value, onChange, placeholder, type = 'text', id }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; type?: string; id?: string }) {
+  const inputId = id || label.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="space-y-1">
-      <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase">{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder={placeholder} />
+      <label htmlFor={inputId} className="text-[9px] font-black tracking-widest text-slate-500 uppercase">{label}</label>
+      <input id={inputId} name={inputId} type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder={placeholder} />
     </div>
   );
 }
@@ -1320,12 +1369,12 @@ function CredentialsTab({ players }: { players: import('../types').Player[] }) {
 
             <div className="space-y-1">
               <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2"><Mail size={10} className="text-brand-purple" />EMAIL ADDRESS</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="player@email.com" />
+              <input id="player-email" name="player-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="player@email.com" />
             </div>
             <div className="space-y-1">
               <label className="text-[9px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-2"><Lock size={10} className="text-brand-purple" />PASSWORD</label>
               <div className="relative">
-                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 pr-12 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Set login password" />
+                <input id="player-password" name="player-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 pr-12 rounded-xl text-xs font-bold focus:border-brand-purple outline-none transition-all" placeholder="Set login password" />
                 <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
                   {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -1547,9 +1596,13 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     finally { setHLoading(false); }
   };
 
+  // Cache for initial load state - prevents duplicate fetches
+  const hasInitialLoadCompleted = React.useRef(false);
+
   const loadGlobalSeasons = async () => {
     try {
-      const gs = await fetchGlobalSeasons();
+      // Use admin-level cache for global seasons
+      const gs = await getCachedOrFetch('globalSeasons', () => fetchGlobalSeasons());
       setGSeasons(gs);
       if (gs.length > 0 && !selectedGlobalId) {
         const active = gs.find(g => g.status === 'active');
@@ -1560,14 +1613,23 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
   const loadRegistry = async () => {
     try {
-      // force=true bypasses the module-level cache so we always get fresh
-      // owner data after assign / unassign operations
-      const cs = await fetchClubs(true);
-      setFClubs(cs);
+      // Use clubSnapshot fast path - 1 read instead of ~201 individual reads
+      const snapshot = await getCachedOrFetch('clubSnapshot', () => fetchClubSnapshot());
+      if (snapshot) {
+        console.log('[ClubsAdminTab] Using clubSnapshot (1 read instead of ~201)');
+        setFClubs(snapshot.clubs || []);
+      } else {
+        // Fallback to individual fetch if snapshot doesn't exist
+        const cs = await getCachedOrFetch('clubs', () => fetchClubs(false));
+        setFClubs(cs);
+      }
     } catch (e) { console.error(e); }
   };
 
   React.useEffect(() => {
+    // Only run once - use ref to prevent StrictMode double-execution
+    if (hasInitialLoadCompleted.current) return;
+    hasInitialLoadCompleted.current = true;
     loadGlobalSeasons();
     loadRegistry();
   }, []);
@@ -1675,10 +1737,50 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
 
   React.useEffect(() => {
     if (subTab !== 'auction') return;
-    const unsub = subscribeToAuction((state) => {
-      setAuctionState(state);
-    });
-    return unsub;
+    let mounted = true;
+    let intervalId: ReturnType<typeof setInterval>;
+    let lastFetchTime = 0;
+    const MIN_POLL_INTERVAL = 60000; // 60 seconds minimum
+
+    const poll = async () => {
+      if (!mounted || document.hidden) return; // Skip if tab is hidden
+      // Respect minimum interval
+      const now = Date.now();
+      if (now - lastFetchTime < MIN_POLL_INTERVAL) return;
+      lastFetchTime = now;
+      
+      try {
+        // Use admin cache to reduce reads
+        const state = await getCachedOrFetch('auctionState', () => fetchAuctionPolling());
+        if (mounted) setAuctionState(state);
+      } catch {
+        // Non-critical
+      }
+    };
+
+    const handleVisibility = () => {
+      if (!document.hidden && mounted && subTab === 'auction') {
+        poll(); // Immediate check when tab becomes visible
+        intervalId = setInterval(poll, 120000); // Poll every 2 minutes
+      } else {
+        if (intervalId) clearInterval(intervalId);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Wait 10s before first poll
+    const initialTimeout = setTimeout(poll, 10000);
+    if (!document.hidden) {
+      intervalId = setInterval(poll, 120000); // Poll every 2 minutes
+    }
+
+    return () => {
+      mounted = false;
+      clearTimeout(initialTimeout);
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [subTab]);
 
   const groupedHistory = useMemo(() => {
@@ -1699,7 +1801,8 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     setHLoading(true);
     try {
       const globalName = gSeasons.find(g => g.id === selectedGlobalId)?.name || newSeasonForm.globalSeason;
-      const ss = await fetchClubSeasons(globalName);
+      // Use admin-level cache for club seasons
+      const ss = await getCachedOrFetch('clubSeasons', () => fetchClubSeasons(globalName));
       setHSeasons(ss);
       
       // Auto-select first season if current selection is not in the new list
@@ -1721,7 +1824,8 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
     if (!hSelectedSeasonId) return;
     setHLoading(true);
     try {
-      const ms = await fetchClubSeasonMatches(hSelectedSeasonId);
+      // Use admin-level cache for history matches
+      const ms = await getCachedOrFetch('historyMatches', () => fetchClubSeasonMatches(hSelectedSeasonId));
       setHMatches(ms);
     } catch (e) { console.error(e); }
     finally { setHLoading(false); }
@@ -1841,9 +1945,21 @@ function ClubsAdminTab({ players, forceAuctionSubtab = false }: { players: Playe
   const reload = async () => {
     setLoading(true);
     try {
-      const [cs, cfg] = await Promise.all([fetchClubs(), fetchClubConfig()]);
-      setClubs(cs);
-      if (cfg) setConfig(cfg);
+      // Use clubSnapshot fast path - 1 read instead of ~201 individual reads
+      const snapshot = await getCachedOrFetch('clubSnapshot', () => fetchClubSnapshot());
+      if (snapshot) {
+        console.log('[ClubsAdminTab] reload using clubSnapshot (1 read)');
+        setClubs(snapshot.clubs || []);
+        if (snapshot.config) setConfig(snapshot.config);
+      } else {
+        // Fallback to individual fetches
+        const [cs, cfg] = await Promise.all([
+          getCachedOrFetch('clubs', () => fetchClubs(false)),
+          getCachedOrFetch('clubConfig', () => fetchClubConfig(false))
+        ]);
+        setClubs(cs);
+        if (cfg) setConfig(cfg);
+      }
     } catch (e) {
       console.error('Failed to load clubs:', e);
     } finally {

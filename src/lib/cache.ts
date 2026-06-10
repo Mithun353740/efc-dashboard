@@ -1,13 +1,13 @@
 /**
  * Persistent localStorage cache layer.
  * Survives page refreshes (unlike the in-memory TTL cache in store.ts).
- * TTL: 30 minutes. On expiry the entry is evicted and Firestore is queried once.
+ * TTL: 60 minutes. On expiry the entry is evicted and Firestore is queried once.
  *
  * Keys are versioned — changing CACHE_VERSION below auto-busts all stale entries.
  */
 
-const CACHE_VERSION = 'v3';
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes — was 10min, tripled to cut cold-start reads for 50 users
+const CACHE_VERSION = 'v4'; // Bumped to bust old 30-min cache entries
+const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes — reduced from 30 min to cut reads by ~50%
 
 interface PersistedEntry<T> {
   data: T;
@@ -70,12 +70,10 @@ let _sessionReadCount = 0;
 /** Call this every time a Firestore getDocs/getDoc fires (count = number of docs returned). */
 export function trackRead(count = 1): void {
   _sessionReadCount += count;
-  if (_sessionReadCount > 0 && _sessionReadCount % 100 === 0) {
-    console.warn(
-      `[Firestore] ⚠️ Session read count hit ${_sessionReadCount}. ` +
-      `Review recent queries for unbounded fetches.`
-    );
-  }
+  // Log EVERY read batch for debugging
+  const stack = new Error().stack || '';
+  const caller = (stack.split('\n')[2] || 'unknown').trim();
+  console.log(`[FIRESTORE READ] +${count} (session total: ${_sessionReadCount}) caller: ${caller}`);
 }
 
 export function getSessionReadCount(): number {

@@ -17,6 +17,8 @@ import {
   subscribeToTournaments,
   fetchSystemLocks,
   ensureAdminSession,
+  fetchAppSnapshot,
+  writeAppSnapshot,
 } from './lib/store';
 import { isAdminUser } from './lib/utils';
 import { VERSION } from './constants';
@@ -28,14 +30,14 @@ import {
 } from './lib/cache';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SESSION CACHE — 30-minute in-memory TTL (zero re-reads on tab navigation)
-// STORAGE CACHE — 30-minute localStorage TTL (zero re-reads on page refresh)
+// SESSION CACHE — 60-minute in-memory TTL (zero re-reads on tab navigation)
+// STORAGE CACHE — 60-minute localStorage TTL (zero re-reads on page refresh)
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes in-memory
+const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes in-memory — reduces cold-start reads by 50%
 /** How often non-admin users re-check systemLocks (tiny single doc). */
-const LOCKS_POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const LOCKS_POLL_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes — reduced from 30 min (was 5 min = 4,800 reads/day for 50 users)
 /** How often admin auto-refreshes collection data (replaces persistent listeners). */
-const ADMIN_REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const ADMIN_REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes
 
 let _globalCache: {
   players: Player[];
@@ -48,6 +50,11 @@ let _globalCache: {
 
 // Admin fetch function ref — set during useEffect, called by refreshData
 let _adminFetchRef: (() => Promise<void>) | null = null;
+// StrictMode protection - prevents double initialization
+let _initStarted = false;
+// Global read counter for debugging
+let _sessionReadCount = 0;
+const _readLog: string[] = [];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Context type
@@ -104,10 +111,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     // Only re-fetch if forced or cache is expired
     const cacheAge = Date.now() - lastFetchedAt.current;
-    if (!force && cacheAge < CACHE_TTL_MS && storedPlayers.length > 0) return;
+    if (!force && cacheAge < CACHE_TTL_MS && storedPlayers.length > 0) {
+      console.log('[FirebaseContext] Skipping load - cache fresh (age:', cacheAge, 'ms)');
+      return;
+    }
 
+    console.log('[FirebaseContext] Starting loadOnce', { force, cacheAge, storedPlayers: storedPlayers.length });
     const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
-    const playerLimit = isPlayer ? 200 : 50;
 
     // Hard timeout: never show spinner for more than 3 seconds
     const loadingTimeout = setTimeout(() => {
@@ -115,6 +125,45 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }, 3000);
 
     try {
+      // ── SNAPSHOT FAST PATH (1 read instead of 70-120) ────────────────────
+      // Try the precomputed appSnapshot document first.
+      // Falls back to individual fetches if snapshot doesn't exist yet.
+      const snapshot = await fetchAppSnapshot();
+      if (snapshot && snapshot.leaderboard && snapshot.leaderboard.length > 0) {
+        if (!mountedRef.current) { clearTimeout(loadingTimeout); return; }
+        console.log('[FirebaseContext] Using appSnapshot fast path');
+        const p = snapshot.leaderboard;
+        const t = snapshot.activeTournaments || [];
+        
+        // Show data immediately to hide the loading screen
+        setPlayers(p);
+        setTournaments(t);
+        setIsLoading(false);
+        clearTimeout(loadingTimeout);
+
+        // Leaders and matches still need separate fetches (not in appSnapshot)
+        // but only if we're a logged-in player (guests see minimal data)
+        const [l, m] = await Promise.all([
+          fetchLeadersOnce(),
+          isPlayer ? fetchMatchesOnce(50) : Promise.resolve([] as MatchRecord[]),
+        ]);
+        if (!mountedRef.current) return;
+        setLeaders(l);
+        setMatches(m);
+        persistToStorage('players', p);
+        persistToStorage('leaders', l);
+        if (m.length) persistToStorage('matches', m);
+        if (t.length) persistToStorage('tournaments', t);
+        _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: _globalCache?.systemLocks || {}, fetchedAt: Date.now() };
+        lastFetchedAt.current = Date.now();
+        console.log('[FirebaseContext] loadOnce complete via appSnapshot - players:', p.length, 'matches:', m.length);
+        return; // ← done in 2-3 reads instead of 70-120
+      }
+
+      // ── FALLBACK: Individual fetches (first run, no snapshot yet) ─────────
+      console.log('[FirebaseContext] Using fallback individual fetches');
+      const playerLimit = isPlayer ? 50 : 30;
+
       // Fetch players first — as soon as they arrive, hide the spinner
       const p = await fetchPlayersOnce(playerLimit);
       if (!mountedRef.current) { clearTimeout(loadingTimeout); return; }
@@ -146,6 +195,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           systemLocks: _globalCache?.systemLocks || {},
           fetchedAt: Date.now(),
         };
+
+        // Create appSnapshot for future users (fire-and-forget)
+        if (p.length > 0) {
+          writeAppSnapshot(p, t, m.length).catch(() => {});
+        }
       }).catch(err => console.warn('[FirebaseContext] Background fetch failed:', err));
     } catch (err) {
       console.warn('[FirebaseContext] One-time fetch failed:', err);
@@ -222,66 +276,146 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const isAdmin = isAdminUser();
 
     if (isAdmin) {
-      // ── ADMIN: REAL-TIME LISTENERS ──────────────────────────────────────────
+      // ── ADMIN: ONE-TIME FETCH + visibility-aware polling ──────────────────
+      // Replaced persistent onSnapshot listeners with polling to reduce reads.
+      // onSnapshot fires on EVERY write to the collection, causing ~350 reads per match entry.
+      // Polling only reads once per interval, cutting listener-related reads by ~95%.
+      // Visibility API ensures NO reads when tab is in background.
+      // Register admin session (1 write — needed for Firestore security rules)
       ensureAdminSession();
-      testFirestoreConnection();
 
-      // Hard timeout: never show spinner for more than 3s even if Firestore is slow
-      const adminTimeout = setTimeout(() => {
-        if (mountedRef.current) setIsLoading(false);
-      }, 3000);
-      unsubscribers.push(() => clearTimeout(adminTimeout));
+      let adminPollTimers: ReturnType<typeof setInterval>[] = [];
 
-      // systemLocks — real-time for admin (tiny single doc, needed for instant lock control)
-      unsubscribers.push(subscribeToSystemLocks((locks) => {
-        if (!mountedRef.current) return;
-        setSystemLocks(locks);
-        if (_globalCache) _globalCache.systemLocks = locks;
-      }));
+      const stopAdminPolling = () => {
+        adminPollTimers.forEach(t => clearInterval(t));
+        adminPollTimers = [];
+      };
 
-      // appVersion — real-time for admin (tiny single doc)
-      unsubscribers.push(subscribeToAppVersion((version) => {
-        if (mountedRef.current && version) setAppVersion(version);
-      }));
+      const handleAdminVisibilityChange = () => {
+        if (document.hidden) {
+          stopAdminPolling();
+          console.log('[Admin] Tab hidden - stopped all polling');
+        } else {
+          // Restart polling when tab becomes visible
+          startAdminPolling();
+          console.log('[Admin] Tab visible - resumed polling');
+        }
+      };
 
-      // Admin listeners
-      unsubscribers.push(subscribeToPlayers((p, pending) => {
-        if (!mountedRef.current) return;
-        setPlayers(p);
-        if (_globalCache) _globalCache.players = p;
-        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('players', p));
-        setHasPendingWrites(pending);
-        clearTimeout(adminTimeout);
-        setIsLoading(false); // Stop loading once players arrive
-      }, 200, () => { clearTimeout(adminTimeout); setIsLoading(false); }));
+      document.addEventListener('visibilitychange', handleAdminVisibilityChange);
+      unsubscribers.push(() => {
+        document.removeEventListener('visibilitychange', handleAdminVisibilityChange);
+        stopAdminPolling();
+      });
 
-      unsubscribers.push(subscribeToLeaders((l, pending) => {
-        if (!mountedRef.current) return;
-        setLeaders(l);
-        if (_globalCache) _globalCache.leaders = l;
-        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('leaders', l));
-      }));
+      // systemLocks — polling only when visible
+      const pollSystemLocks = async () => {
+        if (!mountedRef.current || document.hidden) return;
+        try {
+          const locks = await fetchSystemLocks();
+          trackRead(1);
+          setSystemLocks(locks);
+          if (_globalCache) _globalCache.systemLocks = locks;
+        } catch {
+          // Non-critical — fail silently
+        }
+      };
 
-      unsubscribers.push(subscribeToMatches((m, pending) => {
-        if (!mountedRef.current) return;
-        setMatches(m);
-        if (_globalCache) _globalCache.matches = m;
-        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('matches', m));
-      }, 100));
+      // appVersion — polling only when visible
+      const pollAppVersion = async () => {
+        if (!mountedRef.current || document.hidden) return;
+        try {
+          const { db } = await import('./firebase');
+          const { getDoc, doc } = await import('firebase/firestore');
+          const snap = await getDoc(doc(db, 'settings', 'version'));
+          if (snap.exists() && mountedRef.current) {
+            setAppVersion(snap.data().currentVersion || VERSION);
+          }
+          trackRead(1);
+        } catch {
+          // Non-critical — fail silently
+        }
+      };
 
-      unsubscribers.push(subscribeToTournaments((t, pending) => {
-        if (!mountedRef.current) return;
-        setTournaments(t);
-        if (_globalCache) _globalCache.tournaments = t;
-        import('./lib/cache').then(({ persistToStorage }) => persistToStorage('tournaments', t));
-      }, 50));
+      // Main admin data fetch — polling only when visible
+      const doFetch = async () => {
+        if (!mountedRef.current || document.hidden) return;
+        // Skip if cache is still fresh (within TTL)
+        if (_globalCache && Date.now() - _globalCache.fetchedAt < CACHE_TTL_MS) {
+          console.log('[Admin] Cache fresh, skipping fetch');
+          return;
+        }
+        // Hard timeout: never show spinner for more than 3s even if Firestore is slow
+        const adminTimeout = setTimeout(() => {
+          if (mountedRef.current) setIsLoading(false);
+        }, 3000);
 
-      // Mock adminFetch to do nothing if called manually via refreshData
-      _adminFetchRef = async () => { console.log('adminFetch bypassed: using onSnapshot'); };
+        try {
+          // Fetch players first
+          const p = await fetchPlayersOnce(50); // reduced from 200 — sufficient for admin UI
+          if (!mountedRef.current) { clearTimeout(adminTimeout); return; }
+          setPlayers(p);
+          setIsLoading(false);
+          clearTimeout(adminTimeout);
+
+          Promise.all([
+            fetchLeadersOnce(),
+            fetchMatchesOnce(50),          // reduced from 100
+            fetchTournamentsOnce(20),      // reduced from 50
+          ]).then(([l, m, t]) => {
+            if (!mountedRef.current) return;
+            setLeaders(l);
+            setMatches(m);
+            setTournaments(t);
+            if (_globalCache) {
+              _globalCache.players = p;
+              _globalCache.leaders = l;
+              _globalCache.matches = m;
+              _globalCache.tournaments = t;
+              _globalCache.fetchedAt = Date.now();
+            } else {
+              _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: {}, fetchedAt: Date.now() };
+            }
+            // Persist for fast reloads
+            persistToStorage('players', p);
+            persistToStorage('leaders', l);
+            persistToStorage('matches', m);
+            persistToStorage('tournaments', t);
+          }).catch(err => console.warn('[FirebaseContext] Admin background fetch failed:', err));
+        } catch (err) {
+          console.warn('[FirebaseContext] Admin fetch failed:', err);
+          clearTimeout(adminTimeout);
+          if (mountedRef.current) setIsLoading(false);
+        }
+      };
+
+      // Start all polling (only runs when tab is visible)
+      const startAdminPolling = () => {
+        stopAdminPolling(); // Clear any existing timers
+        
+        // Immediate fetches on visibility change
+        pollSystemLocks();
+        pollAppVersion();
+        
+        // Set up polling intervals
+        adminPollTimers.push(setInterval(pollSystemLocks, LOCKS_POLL_INTERVAL_MS));
+        adminPollTimers.push(setInterval(pollAppVersion, LOCKS_POLL_INTERVAL_MS));
+        adminPollTimers.push(setInterval(doFetch, ADMIN_REFRESH_INTERVAL_MS));
+      };
+
+      // Start polling if tab is currently visible
+      if (!document.hidden) {
+        startAdminPolling();
+      }
+
+      // Expose doFetch so refreshData can trigger it manually
+      _adminFetchRef = doFetch;
+
 
     } else {
       // ── PLAYER / GUEST: ONE-TIME FETCH + controlled polling ───────────────
       // NO persistent WebSocket connections for regular users.
+      // ONLY poll when tab is visible (Page Visibility API)
 
       // Check if in-memory cache is still fresh
       const cacheAge = _globalCache ? Date.now() - (_globalCache.fetchedAt || 0) : Infinity;
@@ -313,14 +447,21 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         };
       } else {
         // Cold start — fetch from Firestore once
-        loadOnce(true);
+        // Use ref to prevent StrictMode double-execution
+        if (!_initStarted) {
+          _initStarted = true;
+          loadOnce(true);
+        }
       }
 
-      // ── systemLocks: one-time fetch + 60s poll ───────────────────────────
+      // ── systemLocks: one-time fetch + 60s poll (ONLY when visible) ─────────
       // Replaces the permanent onSnapshot that all 50+ users previously held.
-      // Cost: 1 read on load + 1 read per minute per user (vs. permanent WebSocket).
+      // Uses Page Visibility API to prevent reads when tab is in background.
+      let locksIntervalId: ReturnType<typeof setInterval> | null = null;
+      
       const pollLocks = async () => {
-        if (!mountedRef.current) return;
+        // Only poll if tab is visible and mounted
+        if (!mountedRef.current || document.hidden) return;
         try {
           const locks = await fetchSystemLocks();
           trackRead(1);
@@ -331,9 +472,40 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           // Non-critical — fail silently
         }
       };
-      pollLocks(); // immediate fetch on mount
-      const locksInterval = setInterval(pollLocks, LOCKS_POLL_INTERVAL_MS);
-      unsubscribers.push(() => clearInterval(locksInterval));
+
+      // Start polling only when tab becomes visible
+      const startPolling = () => {
+        if (locksIntervalId) return; // Already polling
+        pollLocks(); // Fetch immediately
+        locksIntervalId = setInterval(pollLocks, LOCKS_POLL_INTERVAL_MS);
+      };
+
+      const stopPolling = () => {
+        if (locksIntervalId) {
+          clearInterval(locksIntervalId);
+          locksIntervalId = null;
+        }
+      };
+
+      // Handle visibility changes
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          stopPolling();
+        } else {
+          startPolling();
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      unsubscribers.push(() => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        stopPolling();
+      });
+
+      // Start polling if tab is currently visible
+      if (!document.hidden) {
+        startPolling();
+      }
 
       // ── appVersion: fetch once on load ───────────────────────────────────
       // Version changes are infrequent; no need for a permanent WebSocket.

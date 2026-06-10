@@ -77,8 +77,6 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
 
       if (tournament.type === 'league') {
         generatedFixtures = bergerRoundRobin(orderedTeams, 2, 'league', 0);
-      } else if (tournament.type === 'round_robin') {
-        generatedFixtures = bergerRoundRobin(orderedTeams, 1, 'round_robin', 0);
       } else if (tournament.type === 'knockout') {
         // Pad to next power of 2 with BYEs
         let size = 2;
@@ -90,7 +88,7 @@ export function FixturesTab({ tournament, isAdmin, onUpdate }: FixturesTabProps)
           byeCounter++;
         }
         generatedFixtures = seededKnockout(paddedTeams, 1, 1);
-      } else if (tournament.type === 'groups') {
+      } else if (tournament.type === 'groups' || tournament.type === 'groups+knockout') {
         const { generateGroupStage } = await import('../../lib/fixtureGen');
         const result = generateGroupStage(orderedTeams, 4);
         generatedFixtures = result.fixtures;

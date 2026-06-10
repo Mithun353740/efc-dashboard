@@ -25,7 +25,7 @@ interface TournamentDashboardProps {
   onDeleted: () => void;
 }
 
-type Tab = 'dashboard' | 'fixtures' | 'standings' | 'fantasy' | 'scorers' | 'teams' | 'bracket' | 'history' | 'settings';
+type Tab = 'dashboard' | 'fixtures' | 'standings' | 'fantasy' | 'scorers' | 'teams' | 'bracket' | 'history' | 'settings' | 'groups';
 
 export function TournamentDashboard({ tournament: initialTournament, isAdmin, onBack, onDeleted }: TournamentDashboardProps) {
   const [tournament, setTournament] = useState<Tournament>(initialTournament);
@@ -40,6 +40,9 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
   const [editName, setEditName] = useState(initialTournament.name);
   const [editLogo, setEditLogo] = useState(initialTournament.logo || '');
   const [dateSaveMsg, setDateSaveMsg] = useState('');
+
+  // Check if tournament has groups
+  const hasGroups = tournament.groups && tournament.groups.length > 0;
 
   const handleUpdate = (updated: Tournament) => setTournament(updated);
 
@@ -82,7 +85,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
     }
   };
 
-  const isKnockout = tournament.type === 'knockout' || tournament.type === 'groups';
+  const isKnockout = tournament.type === 'knockout' || tournament.type === 'groups' || tournament.type === 'groups+knockout';
 
   const menuItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -92,6 +95,7 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
     { id: 'scorers', label: 'Top Scorers', icon: <Goal size={18} /> },
     { id: 'teams', label: 'Teams', icon: <Users size={18} /> },
     ...(isKnockout ? [{ id: 'bracket' as Tab, label: 'Bracket', icon: <GitBranch size={18} /> }] : []),
+    ...(hasGroups ? [{ id: 'groups' as Tab, label: 'Groups', icon: <Users size={18} /> }] : []),
     { id: 'history', label: 'League History', icon: <History size={18} /> },
     ...(isAdmin ? [{ id: 'settings' as Tab, label: 'Account Settings', icon: <Settings size={18} /> }] : []),
   ];
@@ -245,6 +249,43 @@ export function TournamentDashboard({ tournament: initialTournament, isAdmin, on
                 {activeTab === 'teams' && <TeamsTab tournament={tournament} isAdmin={isAdmin} onUpdate={handleUpdate} />}
                 {activeTab === 'scorers' && <StatsTab tournament={tournament} />}
                 {activeTab === 'bracket' && <BracketView tournament={tournament} />}
+                {activeTab === 'groups' && hasGroups && (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Users size={20} className="text-emerald-500" />
+                      <h2 className="text-xl font-black uppercase tracking-tight">Tournament Groups</h2>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {tournament.groups?.map(group => (
+                        <div key={group.id} className="bg-[#0a0a12] border border-white/10 rounded-2xl p-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-black text-lg">{group.name}</h3>
+                            <span className="text-xs text-slate-500">{group.teamIds.length} teams</span>
+                          </div>
+                          <div className="space-y-2">
+                            {group.teamIds.map((teamId, idx) => (
+                              <div key={teamId} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
+                                <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center text-xs font-black">
+                                  {idx + 1}
+                                </span>
+                                <span className="font-bold text-sm">
+                                  {tournament.teams.find(t => t.id === teamId)?.name || 'Team'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {activeTab === 'groups' && !hasGroups && (
+                  <div className="text-center py-16">
+                    <Users size={48} className="text-slate-600 mx-auto mb-4" />
+                    <p className="text-slate-500 font-bold text-lg">Groups not yet created</p>
+                    <p className="text-slate-600 text-sm mt-2">Groups will be available once the admin creates them</p>
+                  </div>
+                )}
                 {activeTab === 'history' && <TournamentHistory onOpenTournament={(id) => {
                   if(id !== tournament.id) {
                     onBack(); // Just return to list for now or we could implement jumping

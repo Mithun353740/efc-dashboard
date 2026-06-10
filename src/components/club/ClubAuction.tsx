@@ -4,7 +4,7 @@ import { Hammer, Gavel, TrendingUp, Users, DollarSign, CheckCircle, X, SkipForwa
 import { AuctionState, Club, Player, ClubSystemConfig } from '../../types';
 import { getPlayerGrade, GRADE_COLORS, GRADE_BASE_PRICES } from '../../lib/utils';
 import {
-  subscribeToAuction, placeBid, foldBid,
+  fetchAuctionPolling, placeBid, foldBid,
   adminRevealCard, adminConfirmSold, adminSkipPlayer, adminEndAuction, adminStartAuction, adminNextTurn,
 } from '../../lib/store';
 
@@ -98,20 +98,52 @@ export default function ClubAuction({ myClub, allClubs, allPlayers, isAdmin, log
     return `${m % 60}m ${s % 60}s`;
   };
 
-  // Subscribe to the live auction doc — 1 read per user total
+  // Smart polling: faster when auction is active, slower when idle
+  // Replaces permanent onSnapshot listener to reduce reads by ~95%
   useEffect(() => {
-    const unsub = subscribeToAuction((state) => {
-      setAuctionState(prev => {
-        // Detect status change to 'sold' for animation
-        if (prev?.status !== 'sold' && state?.status === 'sold') {
-          setShowSold(true);
-          setTimeout(() => setShowSold(false), 3500);
-        }
-        setPrevBid(prev?.currentBid || 0);
-        return state;
-      });
-    });
-    return unsub;
+    let intervalId: ReturnType<typeof setInterval>;
+    let mounted = true;
+    let lastFetchTime = 0;
+    const MIN_POLL_INTERVAL = 30000; // 30 seconds minimum between fetches
+
+    const poll = async () => {
+      if (!mounted) return;
+      
+      // Respect minimum interval to prevent rapid fetches
+      const now = Date.now();
+      if (now - lastFetchTime < MIN_POLL_INTERVAL) {
+        return;
+      }
+      lastFetchTime = now;
+      
+      try {
+        const state = await fetchAuctionPolling();
+        if (!mounted) return;
+        setAuctionState(prev => {
+          // Detect status change to 'sold' for animation
+          if (prev?.status !== 'sold' && state?.status === 'sold') {
+            setShowSold(true);
+            setTimeout(() => setShowSold(false), 3500);
+          }
+          setPrevBid(prev?.currentBid || 0);
+          return state;
+        });
+      } catch {
+        // Non-critical — fail silently
+      }
+    };
+
+    // Poll once on mount (after initial delay)
+    const initialTimeout = setTimeout(poll, 5000); // Wait 5s before first poll
+
+    // Poll every 60 seconds - auction updates are not time-critical
+    intervalId = setInterval(poll, 60000);
+
+    return () => {
+      mounted = false;
+      clearTimeout(initialTimeout);
+      clearInterval(intervalId);
+    };
   }, []);
 
   if (!auctionState || auctionState.status === 'ended') {

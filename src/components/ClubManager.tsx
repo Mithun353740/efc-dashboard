@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import {
-  fetchClubs, fetchClubConfig, fetchMarketListings,
+  fetchClubs, fetchClubConfig, fetchMarketListings, fetchClubSnapshot,
   subscribeToInbox, subscribeToAuction, subscribeToPlayerInbox,
   sendTransferProposal, setReleaseClause, removeReleaseClause,
   getFormGrade, sendPlayerInboxMessage, applyDirectContract, fetchClubFixtures,
@@ -378,27 +378,52 @@ export default function ClubManager() {
   const isOwner = myClub?.ownerId === playerId;
   const isAdmin = isAdminUser();
 
+  // ── Club Zone snapshot-first load ────────────────────────────────────────
+  // Priority 1: In-memory cache (already in fetchWithCache) → 0 reads
+  // Priority 2: settings/clubSnapshot Firestore doc → 1 read (replaces ~201)
+  // Priority 3: Individual collection fetches → fallback only
   const load = async (force = false) => {
     setLoading(true);
     try {
+      // Try clubSnapshot first - 1 read replaces ~201 individual reads
+      if (!force) {
+        const snapshot = await fetchClubSnapshot();
+        if (snapshot) {
+          console.log('[ClubManager] Using clubSnapshot (1 read instead of ~201)');
+          if (snapshot.config) setConfig(snapshot.config);
+          setListings(snapshot.marketListings || []);
+          setClubs(snapshot.clubs || []);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fallback: load in parallel — fetchWithCache handles in-memory dedup
       const [cfg, ls, cs] = await Promise.all([
         fetchClubConfig(force),
         fetchMarketListings(force),
         fetchClubs(force)
       ]).catch(() => [null, [], []]) as [any, any, any];
-      
+
       if (cfg) setConfig(cfg);
       setListings(ls);
       setClubs(cs || []);
-      if (cfg?.season) {
-        const fs = await fetchClubFixtures(cfg.season).catch(() => []);
-        setFixtures(fs);
-      }
+      // ⚡ Fixtures are now LAZY — only loaded when Matches tab is clicked.
     } catch (err) {
       console.error('[ClubManager] Load error:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Lazy fixture loader — called only when user clicks the Matches/Tournaments tab
+  const handleMatchesTabOpen = async () => {
+    if (fixtures.length > 0) return; // already loaded
+    if (!config?.season) return;
+    try {
+      const fs = await fetchClubFixtures(config.season).catch(() => []);
+      setFixtures(fs);
+    } catch {}
   };
 
   useEffect(() => { load(); }, []);
@@ -415,57 +440,106 @@ export default function ClubManager() {
     return () => { u1(); u2(); };
   }, [playerId, isPlayer, activeTab]);
 
-  // ── Inbox unread badge: lightweight poll when NOT on inbox tab ─────────────
-  // Fetches inbox once on mount + every 2 minutes to show the badge dot.
-  // Cost: 1 read per 2 min vs. a permanent always-on WebSocket listener.
+  // ── Inbox unread badge: lightweight poll when NOT on inbox tab ─────────────────
+  // ONE read every 10 minutes (was 20 reads every 2 min = 14,400 reads/day/user).
+  // Reads a single counter doc instead of scanning the playerInbox collection.
+  // Visibility API ensures NO reads when tab is in background.
   useEffect(() => {
     if (!playerId || !isPlayer || activeTab === 'inbox') return;
+    
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    
     const checkUnread = async () => {
+      if (document.hidden) return; // Skip if tab is hidden
       try {
-        const msgs = await fetchPlayerInboxMessages(playerId, 20);
-        setPlayerUnread(msgs.filter(m => m.status === 'unread').length);
-        // Also check club inbox unread count if owner (stored on inbox doc itself — 1 read)
+        // Player inbox: read single doc (1 read) not collection scan (was 20 reads)
+        const { db } = await import('../firebase');
+        const { getDoc, doc: fsDoc } = await import('firebase/firestore');
+        const pSnap = await getDoc(fsDoc(db, 'playerInbox', `${playerId}_summary`));
+        if (pSnap.exists()) {
+           setPlayerUnread(pSnap.data().unreadCount || 0);
+        } else {
+           // Fallback: if summary doc doesn't exist yet, do a bounded count-only fetch
+           const fallback = await fetchPlayerInboxMessages(playerId, 5);
+           setPlayerUnread(fallback.filter(m => m.status === 'unread').length);
+        }
+        // Club inbox unread count (owner only) — 1 read from existing clubInbox doc
         if (isOwner) {
           try {
-            const { db } = await import('../firebase');
-            const { getDoc, doc: fsDoc } = await import('firebase/firestore');
             const snap = await getDoc(fsDoc(db, 'clubInbox', playerId));
             if (snap.exists()) setInboxUnread(snap.data().unreadCount || 0);
           } catch {}
         }
       } catch {}
     };
-    checkUnread();
-    const interval = setInterval(checkUnread, 5 * 60 * 1000); // Poll every 5 min for badge
-    return () => clearInterval(interval);
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (intervalId) clearInterval(intervalId);
+      } else {
+        checkUnread(); // Immediate check on visibility
+        intervalId = setInterval(checkUnread, 10 * 60 * 1000); // 10 min
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    checkUnread(); // Initial check
+    if (!document.hidden) {
+      intervalId = setInterval(checkUnread, 10 * 60 * 1000); // 10 min
+    }
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [playerId, isPlayer, activeTab, isOwner]);
 
   // ── Auction: real-time only when Auction tab active; poll otherwise ────────
+  // Visibility API ensures NO reads when tab is in background.
   useEffect(() => {
     if (!isPlayer) return;
     if (activeTab === 'auction') {
       // ClubAuction component handles the real-time subscription when active.
       // We don't need a duplicate listener here.
       return;
-    } else {
-      // Lightweight 5-minute poll for badge — no persistent WebSocket
-      const checkAuction = async () => {
-        try {
-          const { db } = await import('../firebase');
-          const { getDoc, doc } = await import('firebase/firestore');
-          const snap = await getDoc(doc(db, 'auctions', 'live'));
-          if (snap.exists()) {
-            const s = snap.data();
-            setAuctionLive(!!s && s.status !== 'ended' && s.status !== 'idle');
-          } else {
-            setAuctionLive(false);
-          }
-        } catch {}
-      };
-      checkAuction();
-      const interval = setInterval(checkAuction, 300_000); // 5-min poll for badge (was 2m)
-      return () => clearInterval(interval);
     }
+    
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    
+    const checkAuction = async () => {
+      if (document.hidden) return; // Skip if tab is hidden
+      try {
+        const { db } = await import('../firebase');
+        const { getDoc, doc } = await import('firebase/firestore');
+        const snap = await getDoc(doc(db, 'auctions', 'live'));
+        if (snap.exists()) {
+          const s = snap.data();
+          setAuctionLive(!!s && s.status !== 'ended' && s.status !== 'idle');
+        } else {
+          setAuctionLive(false);
+        }
+      } catch {}
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (intervalId) clearInterval(intervalId);
+      } else {
+        checkAuction(); // Immediate check on visibility
+        intervalId = setInterval(checkAuction, 300_000); // 5 min
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    checkAuction(); // Initial check
+    if (!document.hidden) {
+      intervalId = setInterval(checkAuction, 300_000); // 5 min
+    }
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [isPlayer, activeTab]);
 
   useEffect(() => {
@@ -512,8 +586,12 @@ export default function ClubManager() {
         <div className="overflow-x-auto no-scrollbar">
           <div className="flex items-stretch min-w-max">
             {tabs.map(t => (
-              <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={cn('relative flex items-center gap-1.5 px-5 py-3 text-[10px] font-black tracking-widest uppercase transition-all border-b-2', activeTab === t.id ? 'text-white border-current' : 'text-slate-500 border-transparent hover:text-white')} style={activeTab === t.id ? { borderColor: myClub?.primaryColor || '#f59e0b', color: myClub?.primaryColor || '#f59e0b' } : {}}>
-                {t.icon} <span>{t.label}</span> {t.badge && <span className="w-4 h-4 rounded-full bg-violet-500 text-white text-[8px] flex items-center justify-center">{t.badge}</span>}
+              <button key={t.id} onClick={() => {
+                setActiveTab(t.id as any);
+                // Lazy-load fixtures only when Matches tab is opened
+                if (t.id === 'tournaments') handleMatchesTabOpen();
+              }} className={cn('relative flex items-center gap-1.5 px-5 py-3 text-[10px] font-black tracking-widest uppercase transition-all border-b-2', activeTab === t.id ? 'text-white border-current' : 'text-slate-500 border-transparent hover:text-white')} style={activeTab === t.id ? { borderColor: myClub?.primaryColor || '#f59e0b', color: myClub?.primaryColor || '#f59e0b' } : {}}>
+                {t.icon} <span>{t.label}</span> {(t as any).badge && <span className="w-4 h-4 rounded-full bg-violet-500 text-white text-[8px] flex items-center justify-center">{(t as any).badge}</span>}
               </button>
             ))}
           </div>
