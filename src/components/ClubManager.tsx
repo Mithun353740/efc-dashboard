@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import {
   fetchClubs, fetchClubConfig, fetchMarketListings, fetchClubSnapshot,
-  subscribeToInbox, subscribeToAuction, subscribeToPlayerInbox,
+  pollInbox, subscribeToAuction, pollPlayerInbox,
   sendTransferProposal, setReleaseClause, removeReleaseClause,
   getFormGrade, sendPlayerInboxMessage, applyDirectContract, fetchClubFixtures,
   fetchPlayerInboxMessages, purchasePlayer,
@@ -429,14 +429,14 @@ export default function ClubManager() {
   useEffect(() => { load(); }, []);
 
   // ── Inbox: lazy-mount only when Inbox tab is active ──────────────────────
-  // Replaces always-on subscription that ran from mount even when user never opened inbox.
-  // Saves 2 persistent Firestore WebSocket connections per player.
+  // Uses POLLING instead of onSnapshot to avoid persistent WebSocket connections.
+  // Poll every 30s when inbox is open = 120 reads/hour vs infinite onSnapshot reads.
   useEffect(() => {
     if (!playerId || !isPlayer || activeTab !== 'inbox') return;
-    const u1 = subscribeToInbox(playerId, (_, count) => { setInboxUnread(count); });
-    const u2 = subscribeToPlayerInbox(playerId, (msgs) => {
+    const u1 = pollInbox(playerId, (_, count) => { setInboxUnread(count); }, 30000);
+    const u2 = pollPlayerInbox(playerId, (msgs) => {
       setPlayerUnread(msgs.filter(m => m.status === 'unread').length);
-    });
+    }, 30000);
     return () => { u1(); u2(); };
   }, [playerId, isPlayer, activeTab]);
 
