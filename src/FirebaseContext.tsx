@@ -127,6 +127,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     const freshPlayers = hydrateFromStorage<Player[]>('players');
     const cacheAge = Date.now() - lastFetchedAt.current;
     
+    // Debug: Log localStorage state
+    const localStorageKeys = Object.keys(localStorage).filter(k => k.startsWith('efc_'));
+    console.log('[FirebaseContext DEBUG] loadOnce called', { 
+      force, 
+      cacheAge, 
+      hasLocalStorage: !!freshPlayers, 
+      playerCount: freshPlayers?.length || 0,
+      localStorageEfcKeys: localStorageKeys,
+      lastFetchedAt: lastFetchedAt.current
+    });
+    
     // Only skip if NOT forced, cache is fresh, AND we have players in localStorage
     if (!force && cacheAge < CACHE_TTL_MS && freshPlayers && freshPlayers.length > 0) {
       console.log('[FirebaseContext] Skipping load - cache fresh (age:', cacheAge, 'ms)');
