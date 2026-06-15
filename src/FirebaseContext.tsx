@@ -18,7 +18,6 @@ import {
   fetchSystemLocks,
   ensureAdminSession,
   fetchAppSnapshot,
-  writeAppSnapshot,
   AppSnapshot,
 } from './lib/store';
 import { isAdminUser } from './lib/utils';
@@ -258,11 +257,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           systemLocks: _globalCache?.systemLocks || {},
           fetchedAt: Date.now(),
         };
-
-        // Create appSnapshot for future users (fire-and-forget)
-        if (p.length > 0) {
-          writeAppSnapshot(p, t, m.length).catch(() => {});
-        }
       }).catch(err => console.warn('[FirebaseContext] Background fetch failed:', err));
     } catch (err) {
       console.warn('[FirebaseContext] One-time fetch failed:', err);
