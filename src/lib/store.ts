@@ -6,7 +6,7 @@ import {
 
 import { db, auth } from '../firebase';
 import { resolveCanonicalTournamentName, getSeasonInfo } from './utils';
-import { trackRead, invalidateStorage } from './cache';
+import { trackRead, invalidateStorage, hydrateFromStorage } from './cache';
 import { 
   collection, 
   doc, 
@@ -345,6 +345,16 @@ async function fetchWithCache<T>(key: string, queryFn: () => Promise<T>, ttl = C
   if (cached && (now - cached.timestamp < ttl)) {
     console.log(`[CACHE HIT] ${key} - 0 reads`);
     return cached.data;
+  }
+
+  // Check localStorage for persistent cache
+  // Extract base key: "players_once_30" -> "players", "matches_once_50" -> "matches"
+  const baseKey = key.split('_')[0];
+  const localCached = hydrateFromStorage<T>(baseKey);
+  if (localCached) {
+    console.log(`[CACHE HIT] ${key} (from localStorage)`);
+    _cache.set(key, { data: localCached, timestamp: now });
+    return localCached;
   }
 
   if (_pendingRequests.has(key)) {
