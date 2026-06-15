@@ -27,6 +27,7 @@ import {
   hydrateFromStorage,
   invalidateStorage,
   trackRead,
+  getSessionReadCount,
 } from './lib/cache';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -83,14 +84,27 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const storedLeaders = hydrateFromStorage<Leader[]>('leaders') ?? _globalCache?.leaders ?? [];
   const storedMatches = hydrateFromStorage<MatchRecord[]>('matches') ?? _globalCache?.matches ?? [];
   const storedTournaments = hydrateFromStorage<Tournament[]>('tournaments') ?? _globalCache?.tournaments ?? [];
+  const storedSystemLocks = hydrateFromStorage<Record<string, boolean>>('systemLocks') ?? _globalCache?.systemLocks ?? {};
+  // Note: appVersion uses a simple string key, not the JSON cache format
+  const storedAppVersion = (() => {
+    try {
+      const raw = localStorage.getItem('efc_appVersion');
+      if (raw) {
+        const entry = JSON.parse(raw);
+        // Check if version cache is still valid (60 min TTL)
+        if (Date.now() - entry.savedAt < CACHE_TTL_MS) {
+          return entry.version;
+        }
+      }
+    } catch { /* ignore */ }
+    return VERSION;
+  })();
 
   const [players, setPlayers] = useState<Player[]>(storedPlayers);
   const [leaders, setLeaders] = useState<Leader[]>(storedLeaders);
   const [matches, setMatches] = useState<MatchRecord[]>(storedMatches);
   const [tournaments, setTournaments] = useState<Tournament[]>(storedTournaments);
-  const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>(
-    _globalCache?.systemLocks || {}
-  );
+  const [systemLocks, setSystemLocks] = useState<Record<string, boolean>>(storedSystemLocks);
   // Only show spinner on a true cold start with zero cached data
   const hasCachedData =
     storedPlayers.length > 0 ||
@@ -98,7 +112,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(!hasCachedData);
   const [dbError, setDbError] = useState<string | null>(null);
   const [hasPendingWrites, setHasPendingWrites] = useState(false);
-  const [appVersion, setAppVersion] = useState<string>(VERSION);
+  const [appVersion, setAppVersion] = useState<string>(storedAppVersion);
 
   // Ref to avoid stale-closure issues in the poll callback
   const mountedRef = useRef(true);
@@ -251,7 +265,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     // Revocation check for Player Admins — POLLING instead of persistent listener
     // onSnapshot kept a permanent WebSocket open for every player admin
-    // Polling every 5 min = 288 reads/day vs 24/7 WebSocket (infinite reads)
+    // Polling every 30 min with cache = ~48 reads/day vs 24/7 WebSocket
     const pRole = localStorage.getItem('playerRole');
     const pId = localStorage.getItem('playerId');
     if (pRole === 'admin' && pId) {
@@ -259,10 +273,16 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       
       const checkRevocation = async () => {
         if (document.hidden) return; // Skip when tab is hidden
+        // Check if we recently verified (within 30 min)
+        const lastCheck = localStorage.getItem('efc_revocationLastCheck_v1');
+        if (lastCheck && Date.now() - parseInt(lastCheck) < 30 * 60 * 1000) return;
+        
         try {
           const { db } = await import('./firebase');
           const { getDoc, doc } = await import('firebase/firestore');
           const snap = await getDoc(doc(db, 'players', pId));
+          trackRead(1);
+          localStorage.setItem('efc_revocationLastCheck_v1', Date.now().toString());
           if (snap.exists() && snap.data().role !== 'admin') {
             const realRole = snap.data().role || 'player';
             localStorage.setItem('playerRole', realRole);
@@ -280,8 +300,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      // Poll every 5 minutes instead of persistent listener
-      revocationCheckInterval = setInterval(checkRevocation, 5 * 60 * 1000);
+      // Poll every 30 minutes instead of persistent listener
+      revocationCheckInterval = setInterval(checkRevocation, 30 * 60 * 1000);
       checkRevocation(); // Check once immediately
       
       unsubscribers.push(() => {
@@ -325,30 +345,52 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         stopAdminPolling();
       });
 
-      // systemLocks — polling only when visible
+      // systemLocks — polling with cache check (only when visible)
       const pollSystemLocks = async () => {
         if (!mountedRef.current || document.hidden) return;
+        // Check if systemLocks cache is still fresh using the stored timestamp
+        const storedLocksRaw = localStorage.getItem('efc_systemLocks_v4');
+        if (storedLocksRaw) {
+          try {
+            const entry = JSON.parse(storedLocksRaw);
+            if (Date.now() - entry.savedAt < CACHE_TTL_MS) return; // Cache fresh, skip
+          } catch { /* ignore */ }
+        }
+        
         try {
           const locks = await fetchSystemLocks();
           trackRead(1);
           setSystemLocks(locks);
           if (_globalCache) _globalCache.systemLocks = locks;
+          persistToStorage('systemLocks', locks);
         } catch {
           // Non-critical — fail silently
         }
       };
 
-      // appVersion — polling only when visible
+      // appVersion — polling with cache check (only when visible)
       const pollAppVersion = async () => {
         if (!mountedRef.current || document.hidden) return;
+        // Check if appVersion cache is still fresh
+        const storedVersionRaw = localStorage.getItem('efc_appVersion');
+        if (storedVersionRaw) {
+          try {
+            const entry = JSON.parse(storedVersionRaw);
+            if (Date.now() - entry.savedAt < CACHE_TTL_MS) return; // Cache fresh, skip
+          } catch { /* ignore */ }
+        }
+        
         try {
           const { db } = await import('./firebase');
           const { getDoc, doc } = await import('firebase/firestore');
           const snap = await getDoc(doc(db, 'settings', 'version'));
-          if (snap.exists() && mountedRef.current) {
-            setAppVersion(snap.data().currentVersion || VERSION);
-          }
           trackRead(1);
+          if (snap.exists() && mountedRef.current) {
+            const newVersion = snap.data().currentVersion || VERSION;
+            setAppVersion(newVersion);
+            // Save to localStorage with timestamp for cache check
+            localStorage.setItem('efc_appVersion', JSON.stringify({ version: newVersion, savedAt: Date.now() }));
+          }
         } catch {
           // Non-critical — fail silently
         }
@@ -410,7 +452,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       const startAdminPolling = () => {
         stopAdminPolling(); // Clear any existing timers
         
-        // Immediate fetches on visibility change
+        // Immediate fetches on visibility change (with cache check)
         pollSystemLocks();
         pollAppVersion();
         
@@ -418,6 +460,28 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         adminPollTimers.push(setInterval(pollSystemLocks, LOCKS_POLL_INTERVAL_MS));
         adminPollTimers.push(setInterval(pollAppVersion, LOCKS_POLL_INTERVAL_MS));
         adminPollTimers.push(setInterval(doFetch, ADMIN_REFRESH_INTERVAL_MS));
+        
+        // Check localStorage cache for main data too
+        const localStorageCacheFresh = storedPlayers.length > 0;
+        if (!localStorageCacheFresh) {
+          doFetch(); // Only fetch if no localStorage cache
+        } else {
+          // Use cached data, just update _globalCache
+          _globalCache = {
+            players: storedPlayers,
+            leaders: storedLeaders,
+            matches: storedMatches,
+            tournaments: storedTournaments,
+            systemLocks: storedSystemLocks,
+            fetchedAt: Date.now(),
+          };
+          setPlayers(storedPlayers);
+          setLeaders(storedLeaders);
+          setMatches(storedMatches);
+          setTournaments(storedTournaments);
+          setSystemLocks(storedSystemLocks);
+          setIsLoading(false);
+        }
       };
 
       // Start polling if tab is currently visible
@@ -471,74 +535,57 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // ── systemLocks: one-time fetch + 60s poll (ONLY when visible) ─────────
-      // Replaces the permanent onSnapshot that all 50+ users previously held.
-      // Uses Page Visibility API to prevent reads when tab is in background.
-      let locksIntervalId: ReturnType<typeof setInterval> | null = null;
-      
-      const pollLocks = async () => {
-        // Only poll if tab is visible and mounted
-        if (!mountedRef.current || document.hidden) return;
-        try {
-          const locks = await fetchSystemLocks();
-          trackRead(1);
-          if (!mountedRef.current) return;
-          setSystemLocks(locks);
-          if (_globalCache) _globalCache.systemLocks = locks;
-        } catch {
-          // Non-critical — fail silently
+      // ── systemLocks: fetch with localStorage cache ────────────────────────
+      // Only poll Firestore if localStorage cache is expired (> 60 min old)
+      const checkAndFetchLocks = () => {
+        const storedLocksRaw = localStorage.getItem('efc_systemLocks_v4');
+        if (storedLocksRaw) {
+          try {
+            const entry = JSON.parse(storedLocksRaw);
+            if (Date.now() - entry.savedAt < CACHE_TTL_MS) return; // Cache fresh, skip
+          } catch { /* ignore */ }
         }
+        // Cache expired or missing — fetch from Firestore
+        fetchSystemLocks()
+          .then(locks => {
+            trackRead(1);
+            if (!mountedRef.current) return;
+            setSystemLocks(locks);
+            if (_globalCache) _globalCache.systemLocks = locks;
+            persistToStorage('systemLocks', locks);
+          })
+          .catch(() => {
+            // Non-critical — fail silently, use cached data
+          });
       };
+      checkAndFetchLocks();
 
-      // Start polling only when tab becomes visible
-      const startPolling = () => {
-        if (locksIntervalId) return; // Already polling
-        pollLocks(); // Fetch immediately
-        locksIntervalId = setInterval(pollLocks, LOCKS_POLL_INTERVAL_MS);
-      };
-
-      const stopPolling = () => {
-        if (locksIntervalId) {
-          clearInterval(locksIntervalId);
-          locksIntervalId = null;
+      // ── appVersion: fetch with localStorage cache ─────────────────────────
+      const checkAndFetchVersion = () => {
+        const storedVersionRaw = localStorage.getItem('efc_appVersion');
+        if (storedVersionRaw) {
+          try {
+            const entry = JSON.parse(storedVersionRaw);
+            if (Date.now() - entry.savedAt < CACHE_TTL_MS) return; // Cache fresh, skip
+          } catch { /* ignore */ }
         }
-      };
-
-      // Handle visibility changes
-      const handleVisibilityChange = () => {
-        if (document.hidden) {
-          stopPolling();
-        } else {
-          startPolling();
-        }
-      };
-
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      unsubscribers.push(() => {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        stopPolling();
-      });
-
-      // Start polling if tab is currently visible
-      if (!document.hidden) {
-        startPolling();
-      }
-
-      // ── appVersion: fetch once on load ───────────────────────────────────
-      // Version changes are infrequent; no need for a permanent WebSocket.
-      // The AutoUpdater component handles forced reloads via a separate mechanism.
-      import('./firebase').then(({ db }) => {
-        import('firebase/firestore').then(({ getDoc, doc }) => {
-          getDoc(doc(db, 'settings', 'version'))
-            .then(snap => {
-              if (snap.exists() && mountedRef.current) {
-                setAppVersion(snap.data().currentVersion || VERSION);
-              }
-              trackRead(1);
-            })
-            .catch(() => {}); // Non-critical
+        // Cache expired or missing — fetch from Firestore
+        import('./firebase').then(({ db }) => {
+          import('firebase/firestore').then(({ getDoc, doc }) => {
+            getDoc(doc(db, 'settings', 'version'))
+              .then(snap => {
+                trackRead(1);
+                if (snap.exists() && mountedRef.current) {
+                  const newVersion = snap.data().currentVersion || VERSION;
+                  setAppVersion(newVersion);
+                  localStorage.setItem('efc_appVersion', JSON.stringify({ version: newVersion, savedAt: Date.now() }));
+                }
+              })
+              .catch(() => {}); // Non-critical
+          });
         });
-      });
+      };
+      checkAndFetchVersion();
     }
 
 
