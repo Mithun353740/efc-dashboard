@@ -123,14 +123,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const loadOnce = useCallback(async (force = false) => {
     if (!mountedRef.current) return;
 
-    // Only re-fetch if forced or cache is expired
+    // Check fresh from localStorage (not the stale closure value)
+    const freshPlayers = hydrateFromStorage<Player[]>('players');
     const cacheAge = Date.now() - lastFetchedAt.current;
-    if (!force && cacheAge < CACHE_TTL_MS && storedPlayers.length > 0) {
+    
+    // Only skip if NOT forced, cache is fresh, AND we have players in localStorage
+    if (!force && cacheAge < CACHE_TTL_MS && freshPlayers && freshPlayers.length > 0) {
       console.log('[FirebaseContext] Skipping load - cache fresh (age:', cacheAge, 'ms)');
       return;
     }
 
-    console.log('[FirebaseContext] Starting loadOnce', { force, cacheAge, storedPlayers: storedPlayers.length });
+    console.log('[FirebaseContext] Starting loadOnce', { force, cacheAge, hasLocalStorage: !!freshPlayers, playerCount: freshPlayers?.length || 0 });
     const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
 
     // Hard timeout: never show spinner for more than 3 seconds
