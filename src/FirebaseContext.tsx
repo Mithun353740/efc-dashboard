@@ -19,6 +19,7 @@ import {
   ensureAdminSession,
   fetchAppSnapshot,
   writeAppSnapshot,
+  AppSnapshot,
 } from './lib/store';
 import { isAdminUser } from './lib/utils';
 import { VERSION } from './constants';
@@ -28,6 +29,7 @@ import {
   invalidateStorage,
   trackRead,
   getSessionReadCount,
+  AppSnapshot,
 } from './lib/cache';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,12 +158,45 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       // ── SNAPSHOT FAST PATH (1 read instead of 70-120) ────────────────────
       // Try the precomputed appSnapshot document first.
       // Falls back to individual fetches if snapshot doesn't exist yet.
+      
+      // First check localStorage cache for appSnapshot
+      const cachedSnapshot = hydrateFromStorage<AppSnapshot>('appSnapshot');
+      if (cachedSnapshot && cachedSnapshot.leaderboard && cachedSnapshot.leaderboard.length > 0) {
+        console.log('[FirebaseContext] Using cached appSnapshot from localStorage');
+        const p = cachedSnapshot.leaderboard;
+        const t = cachedSnapshot.activeTournaments || [];
+        
+        setPlayers(p);
+        setTournaments(t);
+        setIsLoading(false);
+        clearTimeout(loadingTimeout);
+
+        const [l, m] = await Promise.all([
+          fetchLeadersOnce(),
+          isPlayer ? fetchMatchesOnce(50) : Promise.resolve([] as MatchRecord[]),
+        ]);
+        if (!mountedRef.current) return;
+        setLeaders(l);
+        setMatches(m);
+        persistToStorage('players', p);
+        persistToStorage('leaders', l);
+        if (m.length) persistToStorage('matches', m);
+        if (t.length) persistToStorage('tournaments', t);
+        _globalCache = { players: p, leaders: l, matches: m, tournaments: t, systemLocks: _globalCache?.systemLocks || {}, fetchedAt: Date.now() };
+        lastFetchedAt.current = Date.now();
+        console.log('[FirebaseContext] loadOnce complete via cached appSnapshot - players:', p.length);
+        return;
+      }
+      
       const snapshot = await fetchAppSnapshot();
       if (snapshot && snapshot.leaderboard && snapshot.leaderboard.length > 0) {
         if (!mountedRef.current) { clearTimeout(loadingTimeout); return; }
         console.log('[FirebaseContext] Using appSnapshot fast path');
         const p = snapshot.leaderboard;
         const t = snapshot.activeTournaments || [];
+        
+        // Persist appSnapshot to localStorage for fast subsequent loads
+        persistToStorage('appSnapshot', snapshot);
         
         // Show data immediately to hide the loading screen
         setPlayers(p);
