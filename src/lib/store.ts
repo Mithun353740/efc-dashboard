@@ -91,17 +91,19 @@ export function subscribeToSystemLocks(callback: (locks: Record<string, boolean>
  * One-time fetch of system locks for public (non-admin) users.
  * Much cheaper than keeping a permanent onSnapshot listener open.
  */
-export async function fetchSystemLocks(): Promise<Record<string, boolean>> {
-  try {
-    const docSnap = await getDoc(doc(db, 'settings', 'locks'));
-    if (docSnap.exists()) {
-      return docSnap.data() as Record<string, boolean>;
+export async function fetchSystemLocks(force = false): Promise<Record<string, boolean>> {
+  return fetchWithCache('systemLocks', async () => {
+    try {
+      const docSnap = await getDoc(doc(db, 'settings', 'locks'));
+      if (docSnap.exists()) {
+        return docSnap.data() as Record<string, boolean>;
+      }
+    } catch (error) {
+      // Non-critical for public users - fail silently
+      console.warn('[Locks] Could not fetch system locks:', error);
     }
-  } catch (error) {
-    // Non-critical for public users G�� fail silently
-    console.warn('[Locks] Could not fetch system locks:', error);
-  }
-  return { tournaments: false };
+    return { tournaments: false };
+  }, CACHE_TTL, force);
 }
 
 export async function toggleSystemLock(systemId: string, locked: boolean) {
@@ -2351,22 +2353,25 @@ export function pollPlayerInbox(recipientId: string, callback: (messages: Player
 // G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
 /** Fetch all active transfer threads for a club (buyer or seller). ~1 read. */
-export async function fetchTransferThreadsForClub(clubId: string): Promise<TransferThread[]> {
-  try {
-    const [buyerSnap, sellerSnap] = await Promise.all([
-      getDocs(query(collection(db, 'transferThreads'), where('buyerClubId', '==', clubId), where('status', 'in', ['pending', 'negotiating']), limit(50))),
-      getDocs(query(collection(db, 'transferThreads'), where('sellerClubId', '==', clubId), where('status', 'in', ['pending', 'negotiating']), limit(50))),
-    ]);
-    const seen = new Set<string>();
-    const results: TransferThread[] = [];
-    [...buyerSnap.docs, ...sellerSnap.docs].forEach(d => {
-      if (!seen.has(d.id)) { seen.add(d.id); results.push({ id: d.id, ...d.data() } as TransferThread); }
-    });
-    return results;
-  } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, 'transferThreads');
-    return [];
-  }
+export async function fetchTransferThreadsForClub(clubId: string, force = false): Promise<TransferThread[]> {
+  const cacheKey = `transferThreads_${clubId}`;
+  return fetchWithCache(cacheKey, async () => {
+    try {
+      const [buyerSnap, sellerSnap] = await Promise.all([
+        getDocs(query(collection(db, 'transferThreads'), where('buyerClubId', '==', clubId), where('status', 'in', ['pending', 'negotiating']), limit(50))),
+        getDocs(query(collection(db, 'transferThreads'), where('sellerClubId', '==', clubId), where('status', 'in', ['pending', 'negotiating']), limit(50))),
+      ]);
+      const seen = new Set<string>();
+      const results: TransferThread[] = [];
+      [...buyerSnap.docs, ...sellerSnap.docs].forEach(d => {
+        if (!seen.has(d.id)) { seen.add(d.id); results.push({ id: d.id, ...d.data() } as TransferThread); }
+      });
+      return results;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'transferThreads');
+      return [];
+    }
+  }, CACHE_TTL, force);
 }
 
 /** Create a new transfer proposal. Costs 1 write (thread) + 1 write (inbox). */
@@ -2969,17 +2974,21 @@ export function subscribeToPlayerInbox(recipientId: string, callback: (messages:
 /**
  * One-shot fetch for player inbox — no persistent listener.
  * Replaces subscribeToPlayerInbox for normal users.
- * Cost: 1 read per inbox open. Zero ongoing listener overhead.
+ * Cost: 1 read per inbox open (cached for 5 min). Zero ongoing listener overhead.
  */
-export async function fetchPlayerInboxMessages(recipientId: string, limitCount = 50): Promise<PlayerInboxMessage[]> {
-  try {
-    const q = query(collection(db, 'playerInbox'), where('recipientId', '==', recipientId), limit(limitCount));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as PlayerInboxMessage)).sort((a, b) => b.createdAt - a.createdAt);
-  } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, `playerInbox/${recipientId}`);
-    return [];
-  }
+export async function fetchPlayerInboxMessages(recipientId: string, limitCount = 50, force = false): Promise<PlayerInboxMessage[]> {
+  const cacheKey = `playerInbox_${recipientId}_${limitCount}`;
+  // Use shorter TTL (5 min) for inbox as it's more dynamic
+  return fetchWithCache(cacheKey, async () => {
+    try {
+      const q = query(collection(db, 'playerInbox'), where('recipientId', '==', recipientId), limit(limitCount));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as PlayerInboxMessage)).sort((a, b) => b.createdAt - a.createdAt);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, `playerInbox/${recipientId}`);
+      return [];
+    }
+  }, 5 * 60 * 1000, force); // 5 min TTL for inbox
 }
 
 export async function updatePlayerInboxStatus(msgId: string, status: PlayerInboxMessage['status']): Promise<void> {
