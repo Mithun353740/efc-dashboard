@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "public": true,
   "name": "quantumvortexfc",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
