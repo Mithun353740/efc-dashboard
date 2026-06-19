@@ -111,6 +111,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   // Ref to avoid stale-closure issues in the poll callback
   const mountedRef = useRef(true);
+  // Track when data has been loaded - prevents premature "no data" display
+  const dataLoadedRef = useRef(false);
   // Track whether we've done the initial one-time fetch so refreshData can force re-fetch
   const lastFetchedAt = useRef<number>(storedPlayers.length > 0 ? Date.now() : 0);
 
@@ -142,10 +144,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     console.log('[FirebaseContext] Starting loadOnce', { force, cacheAge, hasLocalStorage: !!freshPlayers, playerCount: freshPlayers?.length || 0 });
     const isPlayer = localStorage.getItem('playerLoggedIn') === 'true';
 
-    // Hard timeout: never show spinner for more than 3 seconds
+    // Hard timeout: never show spinner for more than 5 seconds
+    // Only set loading=false if data hasn't been loaded yet
+    // This prevents the "Loading..." -> "NO DATA" -> data arrives issue
     const loadingTimeout = setTimeout(() => {
-      if (mountedRef.current) setIsLoading(false);
-    }, 3000);
+      if (mountedRef.current && !dataLoadedRef.current) setIsLoading(false);
+    }, 5000);
 
     try {
       // ── SNAPSHOT FAST PATH (1 read instead of 70-120) ────────────────────
@@ -161,6 +165,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         
         setPlayers(p);
         setTournaments(t);
+        dataLoadedRef.current = true;
         setIsLoading(false);
         clearTimeout(loadingTimeout);
 
@@ -194,6 +199,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         // Show data immediately to hide the loading screen
         setPlayers(p);
         setTournaments(t);
+        dataLoadedRef.current = true;
         setIsLoading(false);
         clearTimeout(loadingTimeout);
 
@@ -224,6 +230,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       const p = await fetchPlayersOnce(playerLimit);
       if (!mountedRef.current) { clearTimeout(loadingTimeout); return; }
       setPlayers(p);
+      dataLoadedRef.current = true;
       setIsLoading(false);
       clearTimeout(loadingTimeout);
 
