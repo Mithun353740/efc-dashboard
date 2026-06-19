@@ -2,8 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useFirebase } from '../FirebaseContext';
 import {
-  fetchClubs, fetchClubConfig, fetchMarketListings, fetchClubSnapshot,
-  pollInbox, subscribeToAuction, pollPlayerInbox,
+  // CRITICAL: Only use fetchClubSnapshot for club data (1 read vs 100+)
+  fetchClubSnapshot,
+  // Polling for inbox (no onSnapshot)
+  pollInbox, pollPlayerInbox,
+  // Transfer functions
   sendTransferProposal, setReleaseClause, removeReleaseClause,
   getFormGrade, sendPlayerInboxMessage, applyDirectContract, fetchClubFixtures,
   fetchPlayerInboxMessages, purchasePlayer,
@@ -379,39 +382,32 @@ export default function ClubManager() {
   const isAdmin = isAdminUser();
 
   // ── Club Zone snapshot-first load ────────────────────────────────────────
-  // Priority 1: In-memory cache (already in fetchWithCache) → 0 reads
-  // Priority 2: settings/clubSnapshot Firestore doc → 1 read (replaces ~201)
-  // Priority 3: Individual collection fetches → fallback only
+  // CRITICAL FIX: Only use clubSnapshot to avoid 100+ reads per visit
+  // clubSnapshot contains all club data pre-computed by admin (1 read vs 100+)
   const load = async (force = false) => {
     setLoading(true);
     try {
-      // Try clubSnapshot first - 1 read replaces ~201 individual reads
-      if (!force) {
-        const snapshot = await fetchClubSnapshot();
-        if (snapshot) {
-          console.log('[ClubManager] Using clubSnapshot (1 read instead of ~201)');
-          if (snapshot.config) setConfig(snapshot.config);
-          setListings(snapshot.marketListings || []);
-          setClubs(snapshot.clubs || []);
-          setLoading(false);
-          return;
-        }
+      // ALWAYS use clubSnapshot - this is the ONLY authorized data source
+      // 1 read replaces ~201 individual reads (clubs + listings + config)
+      const snapshot = await fetchClubSnapshot();
+      if (snapshot) {
+        console.log('[ClubManager] Using clubSnapshot (1 read instead of ~201)');
+        if (snapshot.config) setConfig(snapshot.config);
+        setListings(snapshot.marketListings || []);
+        setClubs(snapshot.clubs || []);
+        setLoading(false);
+        return;
       }
-
-      // Fallback: load in parallel — fetchWithCache handles in-memory dedup
-      const [cfg, ls, cs] = await Promise.all([
-        fetchClubConfig(force),
-        fetchMarketListings(force),
-        fetchClubs(force)
-      ]).catch(() => [null, [], []]) as [any, any, any];
-
-      if (cfg) setConfig(cfg);
-      setListings(ls);
-      setClubs(cs || []);
-      // ⚡ Fixtures are now LAZY — only loaded when Matches tab is clicked.
+      
+      // SECURITY: If snapshot doesn't exist, do NOT fall back to individual reads
+      // This protects Firestore quota from runaway reads
+      console.error('[ClubManager] ERROR: clubSnapshot not found. Admin must run ensureSnapshotsExist().');
+      setClubs([]);
+      setListings([]);
+      setConfig(null);
+      setLoading(false);
     } catch (err) {
       console.error('[ClubManager] Load error:', err);
-    } finally {
       setLoading(false);
     }
   };

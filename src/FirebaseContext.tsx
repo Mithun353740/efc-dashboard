@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Player, Leader, MatchRecord, Tournament } from './types';
 import {
-  subscribeToAppVersion,
-  subscribeToSystemLocks,
   sortRankedPlayers,
   testFirestoreConnection,
   computeGlobalElo,
@@ -11,10 +9,6 @@ import {
   fetchLeadersOnce,
   fetchMatchesOnce,
   fetchTournamentsOnce,
-  subscribeToPlayers,
-  subscribeToLeaders,
-  subscribeToMatches,
-  subscribeToTournaments,
   fetchSystemLocks,
   ensureAdminSession,
   fetchAppSnapshot,
