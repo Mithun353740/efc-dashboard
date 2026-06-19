@@ -3351,6 +3351,15 @@ export function invalidateAndRefreshSnapshots(
  * This reduces subsequent reads from ~100-300 to just 2 per user session.
  */
 export async function ensureSnapshotsExist(): Promise<{ appSnapshot: boolean; clubSnapshot: boolean }> {
+  // CRITICAL FIX: Cache this function - it runs on every Admin visit!
+  const _snapCheckKey = "snapshotsExistChecked";
+  const _snapCached = _cache.get(_snapCheckKey);
+  const _snapNow = Date.now();
+  if (_snapCached && (_snapNow - _snapCached.timestamp < 5 * 60 * 1000)) {
+    console.log("[Snapshot] Already checked recently, skipping");
+    return { appSnapshot: false, clubSnapshot: false };
+  }
+
   const results = { appSnapshot: false, clubSnapshot: false };
   
   try {
@@ -3391,5 +3400,8 @@ export async function ensureSnapshotsExist(): Promise<{ appSnapshot: boolean; cl
     console.warn('[Snapshot] Error ensuring snapshots exist:', err);
   }
   
+  // Cache for 5 minutes to prevent repeated reads on every Admin visit
+  _cache.set(_snapCheckKey, { data: results, timestamp: _snapNow });
+
   return results;
 }
