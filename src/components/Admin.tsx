@@ -16,35 +16,65 @@ import { CLUB_LOGO, CLUB_NAME, VERSION } from '../constants';
 import { bergerRoundRobin } from '../lib/fixtureGen';
 
 // ── Admin Data Cache (shared across Admin and ClubsAdminTab) ──────────────────
-// Cache expires after 5 minutes to ensure data freshness while reducing reads
-const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// OPTIMIZATION: Increased from 5 min to 30 min to reduce reads by ~83%
+// Added localStorage persistence to survive page refreshes
+const ADMIN_CACHE_TTL = 30 * 60 * 1000; // 30 minutes (was 5 min)
 const adminCache: Record<string, { data: any; timestamp: number } | null> = {};
 
 // Helper to get cached data or fetch if expired
+// Checks localStorage first (survives page refresh), then memory cache
 const getCachedOrFetch = async (
   cacheKey: string,
   fetchFn: () => Promise<any>
 ): Promise<any> => {
+  // Check localStorage first (persists across page refreshes)
+  const localStorageKey = `efc_admin_${cacheKey}_v2`;
+  try {
+    const localRaw = localStorage.getItem(localStorageKey);
+    if (localRaw) {
+      const localCached = JSON.parse(localRaw);
+      if (Date.now() - localCached.timestamp < ADMIN_CACHE_TTL) {
+        console.log(`[AdminCache] Using localStorage ${cacheKey} (age: ${Math.round((Date.now() - localCached.timestamp) / 1000)}s)`);
+        adminCache[cacheKey] = localCached;
+        return localCached.data;
+      }
+    }
+  } catch { /* ignore */ }
+
+  // Check memory cache
   const cached = adminCache[cacheKey];
   if (cached && Date.now() - cached.timestamp < ADMIN_CACHE_TTL) {
-    console.log(`[AdminCache] Using cached ${cacheKey} (age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s)`);
+    console.log(`[AdminCache] Using memory ${cacheKey} (age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s)`);
     return cached.data;
   }
+  
+  // Fetch fresh data
   const data = await fetchFn();
-  adminCache[cacheKey] = {
-    data,
-    timestamp: Date.now()
-  };
+  const entry = { data, timestamp: Date.now() };
+  adminCache[cacheKey] = entry;
+  
+  // Persist to localStorage for page refresh survival
+  try {
+    localStorage.setItem(localStorageKey, JSON.stringify(entry));
+  } catch { /* ignore */ }
+  
   return data;
 };
 
 // Helper to invalidate specific cache
 const invalidateAdminCache = (key?: string) => {
+  const localStorageKey = key ? `efc_admin_${key}_v2` : null;
+  
   if (key) {
     delete adminCache[key];
+    if (localStorageKey) {
+      try { localStorage.removeItem(localStorageKey); } catch { /* ignore */ }
+    }
   } else {
+    // Clear all admin caches
     Object.keys(adminCache).forEach(k => {
       delete adminCache[k];
+      try { localStorage.removeItem(`efc_admin_${k}_v2`); } catch { /* ignore */ }
     });
   }
 };
