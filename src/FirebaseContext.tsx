@@ -31,6 +31,7 @@ const STORAGE_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 interface FirebaseContextType {
   leaderboard: Player[];
   rankedPlayers: Player[];
+  players: Player[]; // Alias for leaderboard (top 50)
   activeTournaments: Tournament[];
   systemLocks: Record<string, boolean>;
   playerCount: number;
@@ -38,6 +39,8 @@ interface FirebaseContextType {
   isLoading: boolean;
   dbError: string | null;
   isAdmin: boolean;
+  // Leaders - static for now (can be added to snapshot later)
+  leaders: { id: string; name: string; role: string; initials: string; quote: string; image: string }[];
 }
 
 // Context
@@ -58,6 +61,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [matchCount, setMatchCount] = useState<number>(storedSnapshot?.matchCount ?? 0);
   const [isLoading, setIsLoading] = useState<boolean>(!storedSnapshot);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [leaders, setLeaders] = useState<{ id: string; name: string; role: string; initials: string; quote: string; image: string }[]>([]);
   
   const mountedRef = useRef(true);
   
@@ -141,10 +145,14 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   // Derived state
   const rankedPlayers = useMemo(() => sortRankedPlayers(leaderboard), [leaderboard]);
   
+  // Load leaders from localStorage cache (rarely changes)
+  const storedLeaders = hydrateFromStorage<typeof leaders>('leaders_v1') ?? [];
+  
   // Context value
   const value = useMemo(() => ({
     leaderboard,
     rankedPlayers,
+    players: leaderboard, // Alias for components expecting 'players'
     activeTournaments,
     systemLocks,
     playerCount,
@@ -152,7 +160,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     dbError,
     isAdmin,
-  }), [leaderboard, rankedPlayers, activeTournaments, systemLocks, playerCount, matchCount, isLoading, dbError, isAdmin]);
+    leaders: storedLeaders.length > 0 ? storedLeaders : [], // Empty if not cached
+  }), [leaderboard, rankedPlayers, activeTournaments, systemLocks, playerCount, matchCount, isLoading, dbError, isAdmin, storedLeaders]);
   
   return (
     <FirebaseContext.Provider value={value}>
