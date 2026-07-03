@@ -7,21 +7,13 @@
  * - Only 1 Firestore read per cold visit (appSnapshot document)
  * - 4-hour localStorage cache
  * - 2-hour memory cache
- * - NO extra reads for leaders, matches, tournaments (computed in snapshot)
+ * - All data computed in snapshot - NO extra reads
  */
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Player, Tournament } from './types';
-import { 
-  sortRankedPlayers,
-  fetchAppSnapshot, 
-  AppSnapshot
-} from './lib/store';
-import { 
-  persistToStorage, 
-  hydrateFromStorage,
-  trackRead 
-} from './lib/cache';
+import { sortRankedPlayers, fetchAppSnapshot, AppSnapshot } from './lib/store';
+import { persistToStorage, hydrateFromStorage } from './lib/cache';
 
 // Cache TTLs
 const MEMORY_CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -31,6 +23,7 @@ const STORAGE_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 interface FirebaseContextType {
   leaderboard: Player[];
   rankedPlayers: Player[];
+  players: Player[]; // Alias for leaderboard
   activeTournaments: Tournament[];
   systemLocks: Record<string, boolean>;
   playerCount: number;
@@ -38,6 +31,7 @@ interface FirebaseContextType {
   isLoading: boolean;
   dbError: string | null;
   isAdmin: boolean;
+  leaders: { id: string; name: string; role: string; initials: string; quote: string; image: string }[];
 }
 
 // Context
@@ -46,6 +40,13 @@ const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined
 // Global cache
 let _cachedSnapshot: AppSnapshot | null = null;
 let _lastFetchTime = 0;
+
+// Static leaders data (rarely changes - embed here to avoid reads)
+const DEFAULT_LEADERS = [
+  { id: '1', name: 'Player 1', role: 'President', initials: 'P1', quote: 'Leadership through excellence.', image: '' },
+  { id: '2', name: 'Player 2', role: 'Captain', initials: 'P2', quote: 'Victory belongs to the persistent.', image: '' },
+  { id: '3', name: 'Player 3', role: 'Vice-Captain', initials: 'P3', quote: 'Teamwork makes the dream work.', image: '' },
+];
 
 export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   // Load from localStorage FIRST (zero reads!)
@@ -72,7 +73,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     
     const now = Date.now();
     
-    // Check memory cache first
+    // Check memory cache first (2 hours)
     if (_cachedSnapshot && _cachedSnapshot.leaderboard.length > 0 && 
         (now - _lastFetchTime) < MEMORY_CACHE_TTL_MS) {
       console.log('[Firebase] Using memory cache');
@@ -84,7 +85,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    // Check localStorage cache
+    // Check localStorage cache (4 hours)
     const localCache = hydrateFromStorage<AppSnapshot>('appSnapshot_v2');
     if (localCache && localCache.leaderboard.length > 0) {
       console.log('[Firebase] Using localStorage cache');
@@ -104,7 +105,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     
     try {
       const snapshot = await fetchAppSnapshot();
-      trackRead(1);
       
       if (snapshot && snapshot.leaderboard.length > 0) {
         _cachedSnapshot = snapshot;
@@ -141,10 +141,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   // Derived state
   const rankedPlayers = useMemo(() => sortRankedPlayers(leaderboard), [leaderboard]);
   
+  // Load leaders from cache or use defaults
+  const leaders = useMemo(() => {
+    const storedLeaders = hydrateFromStorage<typeof DEFAULT_LEADERS>('leaders_v1');
+    return storedLeaders && storedLeaders.length > 0 ? storedLeaders : DEFAULT_LEADERS;
+  }, []);
+  
   // Context value
   const value = useMemo(() => ({
     leaderboard,
     rankedPlayers,
+    players: leaderboard, // Alias for components expecting 'players'
     activeTournaments,
     systemLocks,
     playerCount,
@@ -152,7 +159,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     dbError,
     isAdmin,
-  }), [leaderboard, rankedPlayers, activeTournaments, systemLocks, playerCount, matchCount, isLoading, dbError, isAdmin]);
+    leaders,
+  }), [leaderboard, rankedPlayers, activeTournaments, systemLocks, playerCount, matchCount, isLoading, dbError, isAdmin, leaders]);
   
   return (
     <FirebaseContext.Provider value={value}>
