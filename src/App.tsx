@@ -48,16 +48,25 @@ function PageLoader() {
 
 function Home() {
   const { rankedPlayers, dbError, isLoading } = useFirebase();
-  // Grace period: don't show NO DATA DETECTED for 4s after isLoading flips false
-  // (the 1200ms branding timer can fire before the Firestore fetch completes)
-  const [grace, setGrace] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setGrace(false), 4000);
-    return () => clearTimeout(t);
-  }, []);
-
-  if (!isLoading && rankedPlayers.length === 0 && grace) {
-    // Still within grace window — show a subtle spinner instead of NO DATA
+  
+  // Show homepage INSTANTLY if we have cached data - no waiting!
+  const heroPlayer = rankedPlayers.length > 0 ? rankedPlayers[0] : null;
+  
+  if (heroPlayer) {
+    // We have data - show homepage immediately!
+    return (
+      <>
+        <Hero player={heroPlayer} />
+        <EliteRankings />
+        <Leadership />
+        <Legion />
+      </>
+    );
+  }
+  
+  // No data - show appropriate state
+  if (isLoading) {
+    // Waiting for Firestore - show loading
     return (
       <div className="py-32 flex flex-col items-center justify-center gap-4">
         <div className="flex items-center gap-1.5">
@@ -70,25 +79,13 @@ function Home() {
       </div>
     );
   }
-
-  if (!isLoading && rankedPlayers.length === 0 && !grace) {
-    return (
-      <div className="py-20 text-center">
-        <h2 className="text-2xl font-black text-slate-500 uppercase tracking-widest">NO DATA DETECTED</h2>
-        <p className="text-sm text-slate-400 mt-2">Please visit the Control Center to sync or seed the system.</p>
-      </div>
-    );
-  }
-
-  const heroPlayer = rankedPlayers.length > 0 ? rankedPlayers[0] : null;
-
+  
+  // No loading, no data - either first time setup or truly empty
   return (
-    <>
-      {heroPlayer && <Hero player={heroPlayer} />}
-      <EliteRankings />
-      <Leadership />
-      <Legion />
-    </>
+    <div className="py-20 text-center">
+      <h2 className="text-2xl font-black text-slate-500 uppercase tracking-widest">NO DATA DETECTED</h2>
+      <p className="text-sm text-slate-400 mt-2">Please visit the Control Center to sync or seed the system.</p>
+    </div>
   );
 }
 
