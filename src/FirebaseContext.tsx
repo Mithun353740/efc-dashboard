@@ -12,7 +12,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Player, Tournament } from './types';
-import { sortRankedPlayers, fetchAppSnapshot, AppSnapshot } from './lib/store';
+import { sortRankedPlayers, fetchAppSnapshot, AppSnapshot, ensureSnapshotsExist, fetchPlayersOnce } from './lib/store';
 import { persistToStorage, hydrateFromStorage } from './lib/cache';
 
 // Cache TTLs
@@ -104,7 +104,49 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     
     try {
-      const snapshot = await fetchAppSnapshot();
+      let snapshot = await fetchAppSnapshot();
+      
+      // If snapshot doesn't exist, create it (admin function)
+      if (!snapshot || snapshot.leaderboard.length === 0) {
+        console.log('[Firebase] No snapshot found, trying to create one...');
+        
+        try {
+          await ensureSnapshotsExist();
+          snapshot = await fetchAppSnapshot();
+        } catch (e) {
+          console.log('[Firebase] Could not create snapshot');
+        }
+        
+        // FALLBACK: If still no snapshot, load directly from players collection
+        if (!snapshot || snapshot.leaderboard.length === 0) {
+          console.log('[Firebase] Loading directly from players collection...');
+          try {
+            const players = await fetchPlayersOnce(50);
+            if (players.length > 0) {
+              const ranked = sortRankedPlayers(players);
+              setLeaderboard(ranked);
+              setPlayerCount(players.length);
+              
+              // Cache it
+              const fallbackSnapshot: AppSnapshot = {
+                leaderboard: ranked,
+                activeTournaments: [],
+                playerCount: players.length,
+                matchCount: 0,
+                updatedAt: Date.now(),
+              };
+              persistToStorage('appSnapshot_v2', fallbackSnapshot);
+              _cachedSnapshot = fallbackSnapshot;
+              _lastFetchTime = now;
+              console.log('[Firebase] Loaded', players.length, 'players from collection');
+              setIsLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.error('[Firebase] Could not load players:', e);
+          }
+        }
+      }
       
       if (snapshot && snapshot.leaderboard.length > 0) {
         _cachedSnapshot = snapshot;
@@ -118,6 +160,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         // Persist to localStorage
         persistToStorage('appSnapshot_v2', snapshot);
         console.log('[Firebase] Loaded', snapshot.leaderboard.length, 'players');
+      } else {
+        console.log('[Firebase] No data available - visit Control Center to sync data');
       }
     } catch (error) {
       console.error('[Firebase] Error:', error);
