@@ -18,7 +18,8 @@ import { CLUB_LOGO, CLUB_NAME } from './constants';
 // ── Lazy-loaded route components ────────────────────────────────────────────
 // These are NOT bundled into the initial JS payload — they only download
 // when the user navigates to that route for the first time.
-const Admin       = lazy(() => import('./components/Admin'));
+// AdminProduction is optimized for 50k daily read budget
+const Admin       = lazy(() => import('./components/AdminProduction'));
 const Rankings    = lazy(() => import('./components/Rankings'));
 const PlayerStats = lazy(() => import('./components/PlayerStats'));
 const Login       = lazy(() => import('./components/Login'));
