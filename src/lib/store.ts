@@ -333,7 +333,7 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const CACHE_TTL = 60 * 60 * 1000; // 60 minutes — matches FirebaseContext/localStorage session TTL (reduced from 30 min to cut reads by ~50%)
+const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours — minimizes reads significantly
 const _cache = new Map<string, CacheEntry<any>>();
 const _pendingRequests = new Map<string, Promise<any>>();
 
@@ -3206,8 +3206,8 @@ export async function fetchTournamentsOnce(limitCount = 20): Promise<Tournament[
 // They are read by the frontend on cold start (0 reads if localStorage is fresh).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const APP_SNAPSHOT_CACHE_KEY = 'appSnapshot_v1';
-const CLUB_SNAPSHOT_CACHE_KEY = 'clubSnapshot_v1';
+const APP_SNAPSHOT_CACHE_KEY = 'appSnapshot_v3';
+const CLUB_SNAPSHOT_CACHE_KEY = 'clubSnapshot_v2';
 
 export interface AppSnapshot {
   leaderboard: Player[];       // top-50, pre-sorted by finalScore
@@ -3240,7 +3240,7 @@ export async function fetchAppSnapshot(): Promise<AppSnapshot | null> {
       console.warn('[Snapshot] Could not fetch appSnapshot:', err);
       return null;
     }
-  }, 60 * 60 * 1000); // 60 min in-memory TTL (increased from 30 min to reduce reads)
+  }, CACHE_TTL); // 6 hours
 }
 
 /**
@@ -3258,7 +3258,7 @@ export async function fetchClubSnapshot(): Promise<ClubSnapshot | null> {
       console.warn('[Snapshot] Could not fetch clubSnapshot:', err);
       return null;
     }
-  }, 60 * 60 * 1000); // 60 min in-memory TTL (increased from 30 min to reduce reads)
+  }, CACHE_TTL); // 6 hours
 }
 
 /**

@@ -25,10 +25,10 @@ export default function Navbar() {
   const { playerImage, isClubOwner, isSystemAdmin } = useMemo(() => {
     const isAdminLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
     if (!loggedInPlayerId || !isPlayer) return { playerImage: '', isClubOwner: false, isSystemAdmin: isAdminLoggedIn };
-    const p = players.find(p => p.id === loggedInPlayerId);
+    const foundPlayer = players.find(player => player.id === loggedInPlayerId);
     return { 
-      playerImage: p?.image || '', 
-      isClubOwner: p?.isClubOwner === true,
+      playerImage: foundPlayer?.image || '', 
+      isClubOwner: foundPlayer?.isClubOwner === true,
       isSystemAdmin: isAdminLoggedIn || playerRole === 'admin'
     };
   }, [players, loggedInPlayerId, isPlayer, playerRole]);
