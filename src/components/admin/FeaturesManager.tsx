@@ -72,6 +72,9 @@ function NewsManager() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<NewsArticle | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => { loadNews(); }, []);
 
@@ -80,26 +83,52 @@ function NewsManager() {
     try {
       const articles = await fetchNews(50);
       setNews(articles);
+    } catch (e) {
+      console.error('Error loading news:', e);
     } finally { setLoading(false); }
   };
 
-  const handleSave = async (data: Partial<NewsArticle>) => {
-    if (editing?.id) {
-      await updateNewsArticle(editing.id, data);
-    } else {
-      await createNewsArticle({
-        ...data as any,
-        authorId: 'admin',
-        authorName: 'Admin',
-        featured: false,
-        publishedAt: Date.now(),
-        active: true,
-        pinned: false,
-      });
+  const handleSave = async (data: { title: string; excerpt: string; content: string; category: string; image?: string }) => {
+    if (!data.title.trim()) {
+      setError('Title is required');
+      return;
     }
-    setShowForm(false);
-    setEditing(null);
-    loadNews();
+    if (!data.excerpt.trim()) {
+      setError('Excerpt is required');
+      return;
+    }
+    
+    setSaving(true);
+    setError(null);
+    try {
+      if (editing?.id) {
+        await updateNewsArticle(editing.id, data);
+      } else {
+        await createNewsArticle({
+          title: data.title,
+          excerpt: data.excerpt,
+          content: data.content,
+          category: data.category as NewsArticle['category'],
+          image: data.image,
+          authorId: 'admin',
+          authorName: 'Admin',
+          featured: false,
+          publishedAt: Date.now(),
+          active: true,
+          pinned: false,
+        });
+      }
+      setSuccess(true);
+      setShowForm(false);
+      setEditing(null);
+      loadNews();
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (e: any) {
+      console.error('Error saving article:', e);
+      setError(e?.message || 'Failed to save article');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -111,16 +140,32 @@ function NewsManager() {
 
   return (
     <div>
+      {error && (
+        <div className="mb-4 p-4 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-4 p-4 bg-green-500/20 border border-green-500/30 rounded-xl text-green-400 text-sm">
+          Article saved successfully!
+        </div>
+      )}
+      
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-black text-white">News Articles</h3>
-        <button onClick={() => { setEditing(null); setShowForm(true); }}
+        <button onClick={() => { setEditing(null); setShowForm(true); setError(null); }}
           className="flex items-center gap-2 px-4 py-2 bg-brand-purple text-white rounded-xl text-xs font-black">
           <Plus size={14} /> New Article
         </button>
       </div>
 
       {showForm && (
-        <NewsForm article={editing} onSave={handleSave} onClose={() => { setShowForm(false); setEditing(null); }} />
+        <NewsForm 
+          article={editing} 
+          onSave={handleSave} 
+          onClose={() => { setShowForm(false); setEditing(null); setError(null); }}
+          saving={saving}
+        />
       )}
 
       {loading ? <div className="text-center py-8 text-slate-400">Loading...</div> : (
@@ -139,50 +184,115 @@ function NewsManager() {
                   <p className="text-xs text-slate-400 mt-1">{article.excerpt}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { setEditing(article); setShowForm(true); }} className="p-2 bg-white/5 rounded-lg text-slate-400 hover:text-white"><Edit2 size={14} /></button>
+                  <button onClick={() => { setEditing(article); setShowForm(true); setError(null); }} className="p-2 bg-white/5 rounded-lg text-slate-400 hover:text-white"><Edit2 size={14} /></button>
                   <button onClick={() => handleDelete(article.id)} className="p-2 bg-white/5 rounded-lg text-slate-400 hover:text-rose-500"><Trash2 size={14} /></button>
                 </div>
               </div>
             </div>
           ))}
-          {news.length === 0 && <p className="text-center text-slate-400 py-8">No news articles</p>}
+          {news.length === 0 && <p className="text-center text-slate-400 py-8">No news articles yet. Click "New Article" to create one!</p>}
         </div>
       )}
     </div>
   );
 }
 
-function NewsForm({ article, onSave, onClose }: { article: NewsArticle | null; onSave: (data: Partial<NewsArticle>) => void; onClose: () => void }) {
+function NewsForm({ article, onSave, onClose, saving }: { 
+  article: NewsArticle | null; 
+  onSave: (data: { title: string; excerpt: string; content: string; category: string; image?: string }) => void; 
+  onClose: () => void;
+  saving?: boolean;
+}) {
   const [form, setForm] = useState({
-    title: article?.title || '', excerpt: article?.excerpt || '', content: article?.content || '',
-    category: article?.category || 'general' as NewsArticle['category'], image: article?.image || '',
+    title: article?.title || '', 
+    excerpt: article?.excerpt || '', 
+    content: article?.content || '',
+    category: article?.category || 'general', 
+    image: article?.image || '',
   });
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(form);
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
-      <div className="bg-brand-dark rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-brand-dark rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="p-6 border-b border-white/10 flex justify-between">
-          <h3 className="text-lg font-black text-white">{article ? 'Edit' : 'New'} Article</h3>
-          <button onClick={onClose}><X size={20} /></button>
+          <h3 className="text-lg font-black text-white">{article?.id ? 'Edit' : 'New'} Article</h3>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg"><X size={20} /></button>
         </div>
-        <div className="p-6 space-y-4">
-          <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Title</label>
-            <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" /></div>
-          <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Excerpt</label>
-            <input value={form.excerpt} onChange={e => setForm({...form, excerpt: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" /></div>
-          <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Content</label>
-            <textarea value={form.content} onChange={e => setForm({...form, content: e.target.value})} rows={6} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" /></div>
-          <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Category</label>
-            <select value={form.category} onChange={e => setForm({...form, category: e.target.value as NewsArticle['category']})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white">
-              <option value="match_report">Match Report</option><option value="transfer">Transfer</option><option value="announcement">Announcement</option><option value="award">Award</option><option value="general">General</option>
-            </select></div>
-          <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Image URL</label>
-            <input value={form.image} onChange={e => setForm({...form, image: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" /></div>
-        </div>
-        <div className="p-6 border-t border-white/10 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-slate-400">Cancel</button>
-          <button onClick={() => onSave(form)} className="flex items-center gap-2 px-4 py-2 bg-brand-purple text-white rounded-xl"><Save size={14} /> Save</button>
-        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase mb-2">Title *</label>
+              <input 
+                type="text" 
+                value={form.title} 
+                onChange={e => setForm({...form, title: e.target.value})}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" 
+                placeholder="Enter article title..."
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase mb-2">Excerpt *</label>
+              <input 
+                type="text" 
+                value={form.excerpt} 
+                onChange={e => setForm({...form, excerpt: e.target.value})}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" 
+                placeholder="Short preview text..."
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase mb-2">Content</label>
+              <textarea 
+                value={form.content} 
+                onChange={e => setForm({...form, content: e.target.value})}
+                rows={6} 
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" 
+                placeholder="Full article content..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase mb-2">Category</label>
+              <select 
+                value={form.category} 
+                onChange={e => setForm({...form, category: e.target.value})}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white"
+              >
+                <option value="match_report">Match Report</option>
+                <option value="transfer">Transfer</option>
+                <option value="announcement">Announcement</option>
+                <option value="award">Award</option>
+                <option value="general">General</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase mb-2">Image URL</label>
+              <input 
+                type="url" 
+                value={form.image} 
+                onChange={e => setForm({...form, image: e.target.value})}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" 
+                placeholder="https://..."
+              />
+            </div>
+          </div>
+          <div className="p-6 border-t border-white/10 flex justify-end gap-3">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white">Cancel</button>
+            <button 
+              type="submit" 
+              disabled={saving}
+              className="flex items-center gap-2 px-6 py-2 bg-brand-purple text-white rounded-xl font-black disabled:opacity-50"
+            >
+              <Save size={14} /> {saving ? 'Saving...' : 'Save Article'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -375,19 +485,60 @@ function SettingsManager() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { loadSettings(); }, []);
-  const loadSettings = async () => { setLoading(true); try { setSettings(await fetchAppSettings()); } finally { setLoading(false); } };
-  const handleSave = async (updates: Partial<AppSettings>) => { setSaving(true); try { await updateAppSettings(updates); loadSettings(); } finally { setSaving(false); } };
+  
+  const loadSettings = async () => { 
+    setLoading(true); 
+    try { 
+      const data = await fetchAppSettings(); 
+      setSettings(data); 
+    } catch (e) {
+      console.error('Error loading settings:', e);
+      setError('Failed to load settings');
+    } finally { setLoading(false); } 
+  };
+  
+  const handleSave = async (updates: Partial<AppSettings>) => {
+    if (!settings) return;
+    setSaving(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      const newSettings = { ...settings, ...updates };
+      await updateAppSettings(updates);
+      setSettings(newSettings);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (e: any) {
+      console.error('Error saving settings:', e);
+      setError(e?.message || 'Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) return <div className="text-center py-8 text-slate-400">Loading...</div>;
 
   return (
     <div>
+      {error && (
+        <div className="mb-4 p-4 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-4 p-4 bg-green-500/20 border border-green-500/30 rounded-xl text-green-400 text-sm">
+          Settings saved successfully!
+        </div>
+      )}
+      
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-black text-white">App Settings</h3>
-        <button onClick={() => handleSave(settings!)} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-brand-purple text-white rounded-xl text-xs font-black disabled:opacity-50">
-          <Save size={14} /> {saving ? 'Saving...' : 'Save'}
+        <button onClick={() => handleSave(settings!)} disabled={saving || !settings} className="flex items-center gap-2 px-4 py-2 bg-brand-purple text-white rounded-xl text-xs font-black disabled:opacity-50">
+          <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
 
@@ -404,10 +555,10 @@ function SettingsManager() {
                 </button>
               </div>
               <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Message</label>
-                <input value={settings.announcements.message} onChange={e => handleSave({ announcements: { ...settings.announcements, message: e.target.value } })} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" /></div>
+                <input value={settings.announcements.message} onChange={e => setSettings({ ...settings, announcements: { ...settings.announcements, message: e.target.value } })} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" placeholder="Enter announcement..." /></div>
               <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Type</label>
-                <select value={settings.announcements.type} onChange={e => handleSave({ announcements: { ...settings.announcements, type: e.target.value as AppSettings['announcements']['type'] } })} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white">
-                  <option value="info">Info</option><option value="success">Success</option><option value="warning">Warning</option><option value="error">Error</option>
+                <select value={settings.announcements.type} onChange={e => setSettings({ ...settings, announcements: { ...settings.announcements, type: e.target.value as AppSettings['announcements']['type'] } })} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white">
+                  <option value="info">Info (Purple)</option><option value="success">Success (Green)</option><option value="warning">Warning (Amber)</option><option value="error">Error (Red)</option>
                 </select></div>
             </div>
           </div>

@@ -339,44 +339,40 @@ const _pendingRequests = new Map<string, Promise<any>>();
 
 /**
  * Executes a query with caching and deduplication.
+ * Saves to BOTH memory cache AND localStorage for persistence.
  */
 async function fetchWithCache<T>(key: string, queryFn: () => Promise<T>, ttl = CACHE_TTL): Promise<T> {
   const now = Date.now();
   const cached = _cache.get(key);
   
   if (cached && (now - cached.timestamp < ttl)) {
-    console.log(`[CACHE HIT] ${key} - 0 reads`);
     return cached.data;
   }
 
   // Check localStorage for persistent cache
-  // Extract base key: "players_once_30" -> "players", "matches_once_50" -> "matches"
-  const baseKey = key.split('_')[0];
-  const localCached = hydrateFromStorage<T>(baseKey);
+  // Use full key for storage (not just base) for proper cache separation
+  const localCached = hydrateFromStorage<T>(key);
   if (localCached) {
-    console.log(`[CACHE HIT] ${key} (from localStorage)`);
     _cache.set(key, { data: localCached, timestamp: now });
     return localCached;
   }
 
   if (_pendingRequests.has(key)) {
-    console.log(`[CACHE PENDING] ${key} - waiting for existing request`);
     return _pendingRequests.get(key);
   }
 
-  console.log(`[CACHE MISS] ${key} - fetching from Firestore`);
   const promise = queryFn().finally(() => _pendingRequests.delete(key));
   _pendingRequests.set(key, promise);
 
   try {
     const data = await promise;
     _cache.set(key, { data, timestamp: now });
+    // Save to localStorage for cross-session persistence
+    persistToStorage(key, data);
     // Track reads for quota monitoring
     if (Array.isArray(data)) {
-      console.log(`[FETCH COMPLETE] ${key} - ${data.length} docs read`);
       trackRead(data.length || 1);
     } else {
-      console.log(`[FETCH COMPLETE] ${key} - 1 doc read`);
       trackRead(1);
     }
     return data;
