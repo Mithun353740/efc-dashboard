@@ -15,7 +15,7 @@ import {
   Search, Plus, Trash2, Trophy, Users, LogOut, X, ShieldCheck, 
   Key, History, AlertTriangle, RefreshCw, Zap, Database, Activity,
   LayoutDashboard, Settings as SettingsIcon, Shield, Home, UsersRound,
-  ChevronRight, Pencil, Check
+  ChevronRight, Pencil, Check, Star
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -31,6 +31,7 @@ import { db } from '../firebase';
 import { CLUB_LOGO, CLUB_NAME, VERSION } from '../constants';
 import { trackRead } from '../lib/cache';
 import { collection, query, getDocs, orderBy, limit, doc, setDoc, deleteDoc, writeBatch, where } from 'firebase/firestore';
+import FeaturesManager from './admin/FeaturesManager';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE CONFIRMATION MODAL - CRITICAL SAFETY FEATURE
@@ -195,7 +196,7 @@ export default function AdminProduction() {
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   
   // Active tab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'players' | 'matches' | 'leadership' | 'tournaments' | 'clubs' | 'locks' | 'sync'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'players' | 'matches' | 'leadership' | 'tournaments' | 'clubs' | 'locks' | 'sync' | 'features'>('dashboard');
   
   // Data states
   const [players, setPlayers] = useState<Player[]>([]);
@@ -548,6 +549,7 @@ export default function AdminProduction() {
               { id: 'leadership', label: 'LEADERS', icon: Shield },
               { id: 'tournaments', label: 'TOURNAMENTS', icon: Trophy },
               { id: 'clubs', label: 'CLUBS', icon: UsersRound },
+              { id: 'features', label: 'FEATURES', icon: Star },
               { id: 'locks', label: 'LOCKS', icon: ShieldCheck },
               { id: 'sync', label: 'SYNC', icon: RefreshCw },
             ].map(tab => (
@@ -638,6 +640,9 @@ export default function AdminProduction() {
               isLoading={tabLoading.clubs}
               onRefresh={() => { loadClubs(true); loadClubTournaments(true); }}
             />
+          )}
+          {activeTab === 'features' && (
+            <FeaturesManager />
           )}
           {activeTab === 'locks' && (
             <LocksTab 

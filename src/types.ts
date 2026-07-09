@@ -400,3 +400,118 @@ export interface MatchRecord {
 }
 
 export type { Tournament, Fixture, Team, TournamentFormat } from './types/tournament';
+
+// ─── NEWS & ANNOUNCEMENTS ─────────────────────────────────────────────────────
+
+export interface NewsArticle {
+  id: string;
+  title: string;
+  excerpt: string;          // Short preview (max 150 chars)
+  content: string;          // Full article content (HTML allowed)
+  category: 'match_report' | 'transfer' | 'announcement' | 'award' | 'general';
+  image?: string;           // Optional featured image URL
+  authorId: string;
+  authorName: string;
+  featured: boolean;         // Show in featured carousel
+  publishedAt: number;      // Unix timestamp
+  createdAt: number;
+  updatedAt: number;
+  active: boolean;          // Soft delete - can be toggled off
+  views: number;            // View counter
+  pinned: boolean;          // Sticks to top
+}
+
+// ─── LIVE MATCHES ─────────────────────────────────────────────────────────────
+
+export interface LiveMatch {
+  id: string;
+  tournamentId?: string;
+  tournamentName?: string;
+  p1Id: string;
+  p1Name: string;
+  p1Image?: string;
+  p1Score: number;
+  p2Id?: string;
+  p2Name: string;
+  p2Image?: string;
+  p2Score: number;
+  status: 'upcoming' | 'live' | 'completed';
+  scheduledAt: number;      // Unix timestamp
+  startedAt?: number;
+  endedAt?: number;
+  matchday?: number;
+  isHighlight: boolean;     // Feature in live widget
+  active: boolean;
+  createdAt: number;
+}
+
+// ─── GLOBAL STATISTICS (Pre-computed for minimal reads) ───────────────────────
+
+export interface GlobalStats {
+  id: string;
+  totalPlayers: number;
+  totalMatches: number;
+  totalGoals: number;
+  topScorers: {            // Top 10 goal scorers
+    playerId: string;
+    playerName: string;
+    playerImage: string;
+    goals: number;
+  }[];
+  topWinRates: {            // Min 10 matches
+    playerId: string;
+    playerName: string;
+    playerImage: string;
+    winRate: number;
+    matches: number;
+  }[];
+  recentForm: {             // Last 10 matches results
+    p1Name: string;
+    p2Name: string;
+    p1Score: number;
+    p2Score: number;
+    timestamp: number;
+  }[];
+  weeklyActivity: {         // Matches per day last 7 days
+    date: string;          // "YYYY-MM-DD"
+    count: number;
+  }[];
+  updatedAt: number;
+}
+
+// ─── ACHIEVEMENTS & AWARDS ───────────────────────────────────────────────────
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;             // Lucide icon name
+  category: 'wins' | 'goals' | 'tournament' | 'special' | 'streak';
+  requirement: number;      // Threshold to unlock
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  active: boolean;
+  createdAt: number;
+}
+
+export interface PlayerAchievement {
+  id: string;
+  playerId: string;
+  achievementId: string;
+  unlockedAt: number;
+  progress: number;        // Current progress toward requirement
+}
+
+// ─── SETTINGS SNAPSHOT (All-in-one for minimal reads) ────────────────────────
+
+export interface AppSettings {
+  id: string;
+  announcements: {
+    enabled: boolean;
+    message: string;
+    type: 'info' | 'warning' | 'success' | 'error';
+    dismissible: boolean;
+  };
+  featuredPlayer: string | null;   // Player ID for hero section
+  maintenanceMode: boolean;
+  updatedAt: number;
+}

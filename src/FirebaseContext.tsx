@@ -11,8 +11,8 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Player, Tournament, MatchRecord } from './types';
-import { sortRankedPlayers, fetchAppSnapshot, AppSnapshot, ensureSnapshotsExist, fetchPlayersOnce } from './lib/store';
+import { Player, Tournament, MatchRecord, NewsArticle, LiveMatch, GlobalStats, Achievement, AppSettings } from './types';
+import { sortRankedPlayers, fetchAppSnapshot, AppSnapshot, ensureSnapshotsExist, fetchPlayersOnce, fetchNews, fetchLiveMatches, fetchGlobalStats, fetchAchievements, fetchAppSettings } from './lib/store';
 import { persistToStorage, hydrateFromStorage } from './lib/cache';
 
 // Extended cache TTLs for minimal reads
@@ -36,6 +36,12 @@ interface FirebaseContextType {
   leaders: { id: string; name: string; role: string; initials: string; quote: string; image: string }[];
   appVersion: string;
   hasPendingWrites: boolean;
+  // New features
+  news: NewsArticle[];
+  liveMatches: LiveMatch[];
+  globalStats: GlobalStats | null;
+  achievements: Achievement[];
+  appSettings: AppSettings | null;
 }
 
 // Context
@@ -61,10 +67,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [matchCount, setMatchCount] = useState<number>(storedSnapshot?.matchCount ?? 0);
   const [isLoading, setIsLoading] = useState<boolean>(!storedSnapshot);
   const [dbError, setDbError] = useState<string | null>(null);
-  const [matches] = useState<MatchRecord[]>([]); // Empty by default - loaded only when needed
+  const [matches] = useState<MatchRecord[]>([]);
   const [tournaments] = useState<Tournament[]>(activeTournaments);
   const [systemLocks] = useState<Record<string, boolean>>({});
   const [hasPendingWrites] = useState<boolean>(false);
+  
+  // New features state
+  const [news, setNews] = useState<NewsArticle[]>([]);
+  const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([]);
+  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   
   const mountedRef = useRef(true);
   
@@ -76,13 +89,34 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     return localStorage.getItem('appVersion') || '1.0.0';
   }, []);
 
-  // Leaders from storage
   const leaders = useMemo(() => {
     const storedLeaders = hydrateFromStorage<typeof DEFAULT_LEADERS>('leaders_v1');
     return storedLeaders && storedLeaders.length > 0 ? storedLeaders : DEFAULT_LEADERS;
   }, []);
 
   const rankedPlayers = useMemo(() => sortRankedPlayers(leaderboard), [leaderboard]);
+  
+  // Load new features data (separate from main data to minimize reads)
+  const loadFeatures = useCallback(async () => {
+    if (!mountedRef.current) return;
+    
+    try {
+      // All cached - just load from cache or skip
+      const cachedNews = hydrateFromStorage<NewsArticle[]>('news_v1');
+      if (cachedNews) setNews(cachedNews);
+      
+      const cachedStats = hydrateFromStorage<GlobalStats | null>('globalStats_v1');
+      if (cachedStats) setGlobalStats(cachedStats);
+      
+      const cachedAchievements = hydrateFromStorage<Achievement[]>('achievements_v1');
+      if (cachedAchievements) setAchievements(cachedAchievements);
+      
+      const cachedSettings = hydrateFromStorage<AppSettings | null>('appSettings_v1');
+      if (cachedSettings) setAppSettings(cachedSettings);
+    } catch (e) {
+      // Silently fail - features are optional
+    }
+  }, []);
   
   const loadData = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -92,7 +126,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // Check memory cache first (6 hours)
     if (_cachedSnapshot && _cachedSnapshot.leaderboard.length > 0 && 
         (now - _lastFetchTime) < MEMORY_CACHE_TTL_MS) {
-      console.log('[Firebase] Using memory cache');
       setLeaderboard(_cachedSnapshot.leaderboard);
       setActiveTournaments(_cachedSnapshot.activeTournaments ?? []);
       setPlayerCount(_cachedSnapshot.playerCount ?? 0);
@@ -104,7 +137,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // Check localStorage cache (6 hours)
     const localCache = hydrateFromStorage<AppSnapshot>('appSnapshot_v3');
     if (localCache && localCache.leaderboard.length > 0) {
-      console.log('[Firebase] Using localStorage cache');
       _cachedSnapshot = localCache;
       _lastFetchTime = now;
       setLeaderboard(localCache.leaderboard);
@@ -116,24 +148,20 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
     
     // COLD START - only fetch when no cache
-    console.log('[Firebase] Cold start - fetching appSnapshot');
     setIsLoading(true);
     
     try {
       let snapshot = await fetchAppSnapshot();
       
       if (!snapshot || snapshot.leaderboard.length === 0) {
-        console.log('[Firebase] No snapshot found, trying to create one...');
         try {
           await ensureSnapshotsExist();
           snapshot = await fetchAppSnapshot();
         } catch (e) {
-          // Silently fail - don't show error to user
+          // Silently fail
         }
         
-        // FALLBACK: Load directly from players collection
         if (!snapshot || snapshot.leaderboard.length === 0) {
-          console.log('[Firebase] Loading directly from players collection...');
           try {
             const players = await fetchPlayersOnce(50);
             if (players.length > 0) {
@@ -151,7 +179,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
               persistToStorage('appSnapshot_v3', fallbackSnapshot);
               _cachedSnapshot = fallbackSnapshot;
               _lastFetchTime = now;
-              console.log('[Firebase] Loaded', players.length, 'players from collection');
               setIsLoading(false);
               return;
             }
@@ -169,11 +196,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setPlayerCount(snapshot.playerCount ?? 0);
         setMatchCount(snapshot.matchCount ?? 0);
         persistToStorage('appSnapshot_v3', snapshot);
-        console.log('[Firebase] Loaded', snapshot.leaderboard.length, 'players');
       }
     } catch (error) {
-      // Don't show error to user - use cached data if available
-      console.warn('[Firebase] Error loading data:', error);
       if (error instanceof Error && error.message.includes('quota')) {
         setDbError('QUOTA_EXCEEDED');
       }
@@ -184,8 +208,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   
   useEffect(() => {
     loadData();
+    loadFeatures();
     return () => { mountedRef.current = false; };
-  }, [loadData]);
+  }, [loadData, loadFeatures]);
   
   const value = useMemo(() => ({
     leaderboard,
@@ -203,7 +228,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     leaders,
     appVersion,
     hasPendingWrites,
-  }), [leaderboard, rankedPlayers, matches, activeTournaments, systemLocks, playerCount, matchCount, isLoading, dbError, isAdmin, leaders, appVersion, hasPendingWrites]);
+    news,
+    liveMatches,
+    globalStats,
+    achievements,
+    appSettings,
+  }), [leaderboard, rankedPlayers, matches, activeTournaments, systemLocks, playerCount, matchCount, isLoading, dbError, isAdmin, leaders, appVersion, hasPendingWrites, news, liveMatches, globalStats, achievements, appSettings]);
   
   return (
     <FirebaseContext.Provider value={value}>

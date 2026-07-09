@@ -118,9 +118,9 @@ export async function toggleSystemLock(systemId: string, locked: boolean) {
   }
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // APP VERSIONING (Real-time Sync)
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 export function subscribeToAppVersion(callback: (version: string) => void) {
   const docRef = doc(db, 'settings', 'version');
@@ -145,9 +145,9 @@ export async function updateAppVersion(newVersion: string) {
   }
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // SYSTEM METADATA
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 const META_DOC_PATH = 'settings/meta';
 const CACHE_DOC_PATH = 'settings/meta'; // Unified path for all cache invalidation
@@ -309,7 +309,7 @@ export function calculateOvrHybrid(player: Player, elo: number): number {
   // Factor experience softly
   const gamesFactor = Math.min(totalMatches, 20) / 20;
   const goalDiff = player.goalsScored - player.goalsConceded;
-  // Symmetric cap: ±15 so goal farming and heavy conceding don't over-swing OVR
+  // Symmetric cap: Â±15 so goal farming and heavy conceding don't over-swing OVR
   const gdFactor = Math.max(-15, Math.min(goalDiff, 15));
   
   // Base stat value (gives up to +18 OVR)
@@ -324,16 +324,16 @@ export function calculateOvrHybrid(player: Player, elo: number): number {
 
 export const INITIAL_PLAYERS: Player[] = [];
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // DATA CACHING & DEDUPLICATION
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
 }
 
-const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours — minimizes reads significantly
+const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours â minimizes reads significantly
 const _cache = new Map<string, CacheEntry<any>>();
 const _pendingRequests = new Map<string, Promise<any>>();
 
@@ -455,12 +455,12 @@ export async function fetchTournaments(force = false): Promise<Tournament[]> {
   });
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // PLAYER SELF-REGISTRATION
 // Adds the player as a Team entry in the tournament and records their player ID
 // in registeredPlayerIds. Calls saveTournament() which already bumps the
-// cache-invalidation timestamp G�� all public users will see the update.
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// cache-invalidation timestamp Gïżœïżœ all public users will see the update.
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 export async function registerPlayerInTournament(
   tournament: Tournament,
@@ -499,15 +499,15 @@ export async function registerPlayerInTournament(
   };
 
   await saveTournament(updatedTournament);
-  // saveTournament already calls updateLastUpdated() G�� no need to call it again
+  // saveTournament already calls updateLastUpdated() Gïżœïżœ no need to call it again
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // PLAYER PROFILE UPDATE
 // Updates only the profile fields (image, uid, device) for a player.
-// Uses updateDoc (partial update) G�� cheaper than a full setDoc.
+// Uses updateDoc (partial update) Gïżœïżœ cheaper than a full setDoc.
 // Bumps the cache invalidation timestamp so all users get fresh data.
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 export async function updatePlayerProfile(
   playerId: string,
@@ -536,7 +536,7 @@ export async function updatePlayerProfile(
  * recomputing stats during admin writes.
  */
 async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]> {
-  // Short 2-minute cache — prevents duplicate reads when addMatch/editMatch
+  // Short 2-minute cache â prevents duplicate reads when addMatch/editMatch
   // call this for both p1 and p2 within the same operation.
   const cacheKey = `playerMatches_${playerId}`;
   return fetchWithCache(cacheKey, async () => {
@@ -553,11 +553,11 @@ async function fetchAllMatchesForPlayer(playerId: string): Promise<MatchRecord[]
       }
     });
     return results.sort((a, b) => a.timestamp - b.timestamp);
-  }, 2 * 60 * 1000); // 2-min TTL — short enough to stay accurate, long enough to deduplicate
+  }, 2 * 60 * 1000); // 2-min TTL â short enough to stay accurate, long enough to deduplicate
 }
 
 // Admin-only real-time listener. Limit=200 is sufficient for any club.
-// ⚠️ DEPRECATED: Use fetchPlayersOnce() with polling instead to reduce reads.
+// â ïž DEPRECATED: Use fetchPlayersOnce() with polling instead to reduce reads.
 export function subscribeToPlayers(callback: (players: Player[], hasPending: boolean) => void, limitCount = 200, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'players'), orderBy('ovr', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
@@ -570,7 +570,7 @@ export function subscribeToPlayers(callback: (players: Player[], hasPending: boo
   });
 }
 
-// ⚠️ DEPRECATED: Use fetchLeadersOnce() with polling instead to reduce reads.
+// â ïž DEPRECATED: Use fetchLeadersOnce() with polling instead to reduce reads.
 export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boolean) => void, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'leaders'), orderBy('points', 'desc'), limit(50));
   return onSnapshot(q, (snapshot) => {
@@ -582,7 +582,7 @@ export function subscribeToLeaders(callback: (leaders: Leader[], hasPending: boo
   });
 }
 
-// ⚠️ DEPRECATED: Use fetchMatchesOnce() with polling instead to reduce reads.
+// â ïž DEPRECATED: Use fetchMatchesOnce() with polling instead to reduce reads.
 export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending: boolean) => void, limitCount = 50, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'matches'), orderBy('timestamp', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
@@ -594,7 +594,7 @@ export function subscribeToMatches(callback: (matches: MatchRecord[], hasPending
   });
 }
 
-// ⚠️ DEPRECATED: Use fetchTournamentsOnce() with polling instead to reduce reads.
+// â ïž DEPRECATED: Use fetchTournamentsOnce() with polling instead to reduce reads.
 export function subscribeToTournaments(callback: (tournaments: Tournament[], hasPending: boolean) => void, limitCount = 50, errorCallback?: (err: Error) => void) {
   const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(limitCount));
   return onSnapshot(q, (snapshot) => {
@@ -607,7 +607,7 @@ export function subscribeToTournaments(callback: (tournaments: Tournament[], has
 }
 
 /**
- * One-time fetch of players — replaces onSnapshot for non-real-time use.
+ * One-time fetch of players â replaces onSnapshot for non-real-time use.
  * Cached in memory for 60 minutes to reduce reads.
  */
 export async function fetchPlayersPolling(limitCount = 200): Promise<Player[]> {
@@ -621,7 +621,7 @@ export async function fetchPlayersPolling(limitCount = 200): Promise<Player[]> {
 }
 
 /**
- * One-time fetch of leaders — replaces onSnapshot for non-real-time use.
+ * One-time fetch of leaders â replaces onSnapshot for non-real-time use.
  */
 export async function fetchLeadersPolling(): Promise<Leader[]> {
   return fetchWithCache('leaders_polling', async () => {
@@ -634,7 +634,7 @@ export async function fetchLeadersPolling(): Promise<Leader[]> {
 }
 
 /**
- * One-time fetch of matches — replaces onSnapshot for non-real-time use.
+ * One-time fetch of matches â replaces onSnapshot for non-real-time use.
  */
 export async function fetchMatchesPolling(limitCount = 50): Promise<MatchRecord[]> {
   return fetchWithCache(`matches_polling_${limitCount}`, async () => {
@@ -647,7 +647,7 @@ export async function fetchMatchesPolling(limitCount = 50): Promise<MatchRecord[
 }
 
 /**
- * One-time fetch of tournaments — replaces onSnapshot for non-real-time use.
+ * One-time fetch of tournaments â replaces onSnapshot for non-real-time use.
  */
 export async function fetchTournamentsPolling(limitCount = 50): Promise<Tournament[]> {
   return fetchWithCache(`tournaments_polling_${limitCount}`, async () => {
@@ -659,11 +659,11 @@ export async function fetchTournamentsPolling(limitCount = 50): Promise<Tourname
   }, CACHE_TTL);
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // CORE STAT COMPUTATION ENGINE
-// Pure function G�� no side effects.
+// Pure function Gïżœïżœ no side effects.
 // Produces global stats, seasonStats, and tournamentStats from raw matches.
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 function buildPartialStats(playerMatches: MatchRecord[], playerId: string): PartialPlayerStats {
   let win = 0, loss = 0, draw = 0, goalsScored = 0, goalsConceded = 0;
@@ -687,15 +687,15 @@ function buildPartialStats(playerMatches: MatchRecord[], playerId: string): Part
 }
 
 export function computePlayerStats(player: Player, allMatches: MatchRecord[], elo: number): Player {
-  // G��G�� 1. Filter to this player's matches (sorted asc for correct form order) G��G��
+  // GïżœïżœGïżœïżœ 1. Filter to this player's matches (sorted asc for correct form order) GïżœïżœGïżœïżœ
   const playerMatches = allMatches
     .filter(m => m.p1Id === player.id || m.p2Id === player.id)
     .sort((a, b) => a.timestamp - b.timestamp);
 
-  // G��G�� 2. Global all-time stats G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+  // GïżœïżœGïżœïżœ 2. Global all-time stats GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
   const global = buildPartialStats(playerMatches, player.id);
 
-  // G��G�� 3. Per-season stats G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+  // GïżœïżœGïżœïżœ 3. Per-season stats GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
   const seasonGroups: Record<string, MatchRecord[]> = {};
   playerMatches.forEach(m => {
     const season = getSeasonInfo(new Date(m.timestamp)).name;
@@ -707,7 +707,7 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[], el
     seasonStats[season] = buildPartialStats(matches, player.id);
   });
 
-  // G��G�� 4. Per-tournament stats (keyed by `season__canonicalTournament`) G��G��G��G��G��G��G��
+  // GïżœïżœGïżœïżœ 4. Per-tournament stats (keyed by `season__canonicalTournament`) GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
   const tournamentGroups: Record<string, MatchRecord[]> = {};
   playerMatches.forEach(m => {
     if (!m.tournament || m.tournament === 'Friendly') return;
@@ -722,7 +722,7 @@ export function computePlayerStats(player: Player, allMatches: MatchRecord[], el
     tournamentStats[key] = buildPartialStats(matches, player.id);
   });
 
-  // G��G�� 5. Assemble final Player document G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+  // GïżœïżœGïżœïżœ 5. Assemble final Player document GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
   const updatedPlayer: Player = {
     ...player,
     win: global.win,
@@ -833,8 +833,8 @@ export async function savePlayer(player: Player) {
 
 /**
  * Adds a match and atomically recomputes stats for affected players.
- * Fetches FULL match history per-player from Firestore G�� not from the
- * capped real-time listener G�� guaranteeing correctness regardless of
+ * Fetches FULL match history per-player from Firestore Gïżœïżœ not from the
+ * capped real-time listener Gïżœïżœ guaranteeing correctness regardless of
  * how many total matches exist.
  */
 export async function addMatch(
@@ -1023,7 +1023,7 @@ export async function editMatch(
     batch.set(doc(db, 'players', p2.id), computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200));
   }
 
-  // Dynamic Manager Rating updates (Edit logic) — use targeted queries not full collection fetch
+  // Dynamic Manager Rating updates (Edit logic) â use targeted queries not full collection fetch
   try {
     const [p1ClubSnap, p2ClubSnap] = await Promise.all([
       getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1?.id || ''), limit(1))),
@@ -1113,7 +1113,7 @@ export async function deleteMatchFromHistory(
     batch.set(doc(db, 'players', p2.id), computePlayerStats(p2, p2AllMatches, elos[p2.id] || 1200));
   }
 
-  // Dynamic Manager Rating updates (Delete logic) — use targeted queries not full collection fetch
+  // Dynamic Manager Rating updates (Delete logic) â use targeted queries not full collection fetch
   try {
     const [p1ClubSnap, p2ClubSnap] = await Promise.all([
       getDocs(query(collection(db, 'clubs'), where('squadIds', 'array-contains', p1?.id || ''), limit(1))),
@@ -1331,12 +1331,12 @@ export async function bootstrapData() {
   }
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // CLUB ZONE STORE
-// All reads are one-shot (getDocs/getDoc) G�� NO real-time listeners.
+// All reads are one-shot (getDocs/getDoc) Gïżœïżœ NO real-time listeners.
 // This keeps quota impact minimal: data is only fetched when the Club Zone
 // page is actually open. Each visitor pays at most ~3 reads per page load.
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 export async function fetchClubConfig(force = false): Promise<ClubSystemConfig | null> {
   const cacheKey = 'club_config';
@@ -1378,7 +1378,7 @@ export async function fetchClubs(force = false): Promise<Club[]> {
   });
 }
 
-// ⚠️ DEPRECATED: Use fetchClubsPolling() with polling instead to reduce reads.
+// â ïž DEPRECATED: Use fetchClubsPolling() with polling instead to reduce reads.
 export function subscribeToClubs(callback: (clubs: Club[]) => void, limitCount = 50) {
     const q = query(collection(db, 'clubs'), orderBy('name', 'asc'), limit(limitCount));
   return onSnapshot(q, (snap) => {
@@ -1390,7 +1390,7 @@ export function subscribeToClubs(callback: (clubs: Club[]) => void, limitCount =
 }
 
 /**
- * One-time fetch of clubs — replaces onSnapshot for non-real-time use.
+ * One-time fetch of clubs â replaces onSnapshot for non-real-time use.
  */
 export async function fetchClubsPolling(limitCount = 50): Promise<Club[]> {
   return fetchWithCache(`clubs_polling_${limitCount}`, async () => {
@@ -1547,7 +1547,7 @@ export async function fetchMarketListings(force = false): Promise<MarketListing[
 
 /**
  * Fetch only the matches that are part of the active club season.
- * Uses a targeted `where` query G�� costs 1 read per match doc, never loads
+ * Uses a targeted `where` query Gïżœïżœ costs 1 read per match doc, never loads
  * unrelated matches. Called only when the Club Rankings tab is opened.
  */
 export async function fetchClubSeasonMatches(seasonName: string, force = false): Promise<import('../types').MatchRecord[]> {
@@ -1595,7 +1595,7 @@ export async function delistPlayerFromMarket(listingId: string, playerId: string
 }
 
 /**
- * Purchase a player G�� atomic transfer of player + budget between clubs.
+ * Purchase a player Gïżœïżœ atomic transfer of player + budget between clubs.
  * Uses a single writeBatch: 4 writes total (buyerClub, sellerClub, player, listing).
  */
 export async function purchasePlayer(
@@ -1620,7 +1620,7 @@ export async function purchasePlayer(
     squadIds: sellerClub.squadIds.filter(id => id !== listing.playerId),
   });
 
-  // Update player — reset club-scoped stats & contract so first renewal is direct
+  // Update player â reset club-scoped stats & contract so first renewal is direct
   batch.update(doc(db, 'players', listing.playerId), {
     clubId: buyerClub.id,
     clubName: buyerClub.name,
@@ -1644,7 +1644,7 @@ export async function purchasePlayer(
   }
 }
 
-// G��G��G�� CLUB TOURNAMENTS & FIXTURES G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœ CLUB TOURNAMENTS & FIXTURES GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 export async function fetchClubTournaments(seasonName: string, force = false): Promise<import('../types').ClubTournament[]> {
   const cacheKey = `clubTournaments_${seasonName}`;
@@ -1661,7 +1661,7 @@ export async function fetchClubTournaments(seasonName: string, force = false): P
 }
 
 /**
- * Pure function — no Firestore reads.
+ * Pure function â no Firestore reads.
  * Computes league table standings from completed club fixtures.
  * Goals = sub-match wins (each sub-match is a "goal" for the winning side).
  */
@@ -1866,7 +1866,7 @@ export async function saveClubFixtureResult(
     i === smIndex ? { ...s, p1Score, p2Score, ...(globalMatchId ? { globalMatchId } : {}) } : s
   );
 
-  // 6. Check if all sub-matches now have scores → mark fixture completed
+  // 6. Check if all sub-matches now have scores â mark fixture completed
   const allScored = updatedSubMatches.every((s: any) => s.p1Score !== null && s.p1Score !== undefined);
   const updatedFixture = {
     ...fixture,
@@ -2015,7 +2015,7 @@ export function sortRankedPlayers(players: Player[]): Player[] {
 const AUCTION_DOC = doc(db, 'auctions', 'live');
 
 /** Real-time listener on the single auction document.
- * ⚠️ DEPRECATED: Use fetchAuctionPolling() with smart polling instead to reduce reads.
+ * â ïž DEPRECATED: Use fetchAuctionPolling() with smart polling instead to reduce reads.
  * Smart polling only checks frequently when auction is ACTIVE, otherwise very infrequently.
  */
 export function subscribeToAuction(callback: (state: AuctionState | null) => void) {
@@ -2030,7 +2030,7 @@ export function subscribeToAuction(callback: (state: AuctionState | null) => voi
 }
 
 /**
- * One-time fetch of auction state — replaces onSnapshot for non-real-time use.
+ * One-time fetch of auction state â replaces onSnapshot for non-real-time use.
  * Smart polling: uses 5s interval when auction is active, 60s otherwise.
  */
 export async function fetchAuctionPolling(): Promise<AuctionState | null> {
@@ -2043,7 +2043,7 @@ export async function fetchAuctionPolling(): Promise<AuctionState | null> {
       state.currentPlayer.image = '/default-logo.jpg';
     }
     return state;
-  }, 5 * 1000); // Short TTL for auction — gets updated via polling in components
+  }, 5 * 1000); // Short TTL for auction â gets updated via polling in components
 }
 
 /** Admin: Initialize/reset the auction for a new session. */
@@ -2116,7 +2116,7 @@ export async function adminNextTurn(currentState: AuctionState): Promise<void> {
   }, { merge: true });
 }
 
-/** Club owner: Fold G�� remove from current round. */
+/** Club owner: Fold Gïżœïżœ remove from current round. */
 export async function foldBid(clubId: string, currentState: AuctionState): Promise<void> {
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   const newFolded = [...currentState.foldedClubs, clubId];
@@ -2172,7 +2172,7 @@ export async function foldBid(clubId: string, currentState: AuctionState): Promi
   }, { merge: true });
 }
 
-/** Admin: Confirm the sale — deduct budget from winning club, assign player, apply auto-contract. */
+/** Admin: Confirm the sale â deduct budget from winning club, assign player, apply auto-contract. */
 export async function adminConfirmSold(currentState: AuctionState, winningClub: import('../types').Club, config?: import('../types').ClubSystemConfig | null): Promise<void> {
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   if (!currentState.currentPlayer || !currentState.leadingClubId) return;
@@ -2186,7 +2186,7 @@ export async function adminConfirmSold(currentState: AuctionState, winningClub: 
   const contractType = config?.defaultContractType || 'matches';
   const contractAmount = config?.defaultContractAmount || 5;
   const autoContract = config?.contractsActive !== false ? { type: contractType, amount: contractAmount } : null;
-  // Transfer player to new club — reset club-scoped stats, apply auto-contract
+  // Transfer player to new club â reset club-scoped stats, apply auto-contract
   batch.update(doc(db, 'players', currentState.currentPlayer.id), {
     clubId: winningClub.id,
     clubName: winningClub.name,
@@ -2231,11 +2231,11 @@ export async function adminEndAuction(): Promise<void> {
   await setDoc(AUCTION_DOC, { status: 'ended', currentPlayer: null }, { merge: true });
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // CLUB INBOX / NOTIFICATIONS
 // Each owner has ONE document at clubInbox/{ownerId}.
 // Reading inbox = 1 read. Pushing notification = 1 write (arrayUnion).
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 /** Real-time listener on a club owner's inbox. */
 export function subscribeToInbox(ownerId: string, callback: (messages: ClubInboxMessage[], unreadCount: number) => void) {
@@ -2278,7 +2278,7 @@ export async function markInboxRead(ownerId: string, messages: ClubInboxMessage[
 }
 
 /**
- * POLLING version of subscribeToInbox — replaces persistent onSnapshot.
+ * POLLING version of subscribeToInbox â replaces persistent onSnapshot.
  * Reads once per interval instead of keeping a permanent WebSocket open.
  * Returns unsubscribe function.
  */
@@ -2298,7 +2298,7 @@ export function pollInbox(ownerId: string, callback: (messages: ClubInboxMessage
         callback([], 0);
       }
     } catch {
-      // Non-critical — fail silently
+      // Non-critical â fail silently
     }
   };
 
@@ -2314,7 +2314,7 @@ export function pollInbox(ownerId: string, callback: (messages: ClubInboxMessage
 }
 
 /**
- * POLLING version of subscribeToPlayerInbox — replaces persistent onSnapshot.
+ * POLLING version of subscribeToPlayerInbox â replaces persistent onSnapshot.
  * Reads once per interval instead of keeping a permanent WebSocket open.
  * Returns unsubscribe function.
  */
@@ -2333,7 +2333,7 @@ export function pollPlayerInbox(recipientId: string, callback: (messages: Player
         callback([]);
       }
     } catch {
-      // Non-critical — fail silently
+      // Non-critical â fail silently
     }
   };
 
@@ -2348,9 +2348,9 @@ export function pollPlayerInbox(recipientId: string, callback: (messages: Player
   };
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // TRANSFER NEGOTIATION SYSTEM
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 /** Fetch all active transfer threads for a club (buyer or seller). ~1 read. */
 export async function fetchTransferThreadsForClub(clubId: string, force = false): Promise<TransferThread[]> {
@@ -2405,7 +2405,7 @@ export async function sendTransferProposal(thread: Omit<TransferThread, 'id' | '
   return id;
 }
 
-/** Respond to a proposal G�� accept, decline, or counter. Costs 1-2 writes. */
+/** Respond to a proposal Gïżœïżœ accept, decline, or counter. Costs 1-2 writes. */
 export async function respondToProposal(
   thread: TransferThread,
   action: 'accept' | 'decline' | 'counter',
@@ -2465,7 +2465,7 @@ export async function respondToProposal(
       id: `msg_${now}`, type: 'proposal_accepted',
       from: { clubId: thread.sellerClubId, clubName: thread.sellerClubName },
       relatedPlayerId: thread.playerId, relatedPlayerName: thread.playerName, threadId: thread.id,
-      message: `=��� ${thread.sellerClubName} accepted your proposal! ${thread.playerName} is now yours.`,
+      message: `=ïżœïżœïżœ ${thread.sellerClubName} accepted your proposal! ${thread.playerName} is now yours.`,
       read: false, createdAt: now,
     });
     return;
@@ -2490,9 +2490,9 @@ export async function respondToProposal(
   }
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // RELEASE CLAUSES
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 /** Club owner sets a release clause on one of their players. 1 write. */
 export async function setReleaseClause(playerId: string, clause: ReleaseClause): Promise<void> {
@@ -2508,7 +2508,7 @@ export async function removeReleaseClause(playerId: string): Promise<void> {
   
 }
 
-/** Trigger a release clause G�� instant purchase, no negotiation needed. 1 batch write. */
+/** Trigger a release clause Gïżœïżœ instant purchase, no negotiation needed. 1 batch write. */
 export async function triggerReleaseClause(
   player: import('../types').Player,
   buyerClub: import('../types').Club,
@@ -2528,14 +2528,14 @@ export async function triggerReleaseClause(
 
   const now = Date.now();
   const sellerMsg: ClubInboxMessage = { id: `msg_${now}`, type: 'release_clause_triggered', from: { clubId: buyerClub.id, clubName: buyerClub.name }, relatedPlayerId: player.id, relatedPlayerName: player.name, message: `${buyerClub.name} triggered the release clause for ${player.name} (${amount.toLocaleString()} coins).`, read: false, createdAt: now };
-  const buyerMsg: ClubInboxMessage = { id: `msg_${now + 1}`, type: 'release_clause_triggered', from: { clubId: sellerClub.id, clubName: sellerClub.name }, relatedPlayerId: player.id, relatedPlayerName: player.name, message: `G�� Release clause triggered! ${player.name} has joined ${buyerClub.name}.`, read: false, createdAt: now };
+  const buyerMsg: ClubInboxMessage = { id: `msg_${now + 1}`, type: 'release_clause_triggered', from: { clubId: sellerClub.id, clubName: sellerClub.name }, relatedPlayerId: player.id, relatedPlayerName: player.name, message: `Gïżœïżœ Release clause triggered! ${player.name} has joined ${buyerClub.name}.`, read: false, createdAt: now };
   await Promise.all([pushInboxMessage(sellerClub.ownerId, sellerMsg), pushInboxMessage(buyerClub.ownerId, buyerMsg)]);
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // SHORTLIST
-// Stored on the Club document G�� no extra reads needed.
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// Stored on the Club document Gïżœïżœ no extra reads needed.
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 export async function addToShortlist(clubId: string, playerId: string): Promise<void> {
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
@@ -2544,7 +2544,7 @@ export async function addToShortlist(clubId: string, playerId: string): Promise<
 
 export async function removeFromShortlist(clubId: string, playerId: string): Promise<void> {
   if (isQuotaExceeded) return;
-  // FIX: Use arrayRemove — saves 1 unnecessary getDoc read per shortlist removal
+  // FIX: Use arrayRemove â saves 1 unnecessary getDoc read per shortlist removal
   await setDoc(doc(db, 'clubs', clubId), { shortlistedPlayerIds: arrayRemove(playerId) }, { merge: true });
 }
 
@@ -2571,9 +2571,9 @@ export async function removePlayerFromSquad(clubId: string, playerId: string): P
   await batch.commit();
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // INTERNAL CLUB SEASONS
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 /** Fetch all internal seasons for a global season (e.g., "2026/2027"). */
 export async function fetchClubSeasons(globalSeason: string, force = false): Promise<ClubSeason[]> {
@@ -2607,7 +2607,7 @@ export async function fetchAllActiveClubSeasons(force = false): Promise<ClubSeas
 }
 
 /**
- * One-time fetch for active/upcoming club seasons — replaces the real-time
+ * One-time fetch for active/upcoming club seasons â replaces the real-time
  * subscribeToActiveClubSeasons listener which kept a permanent WebSocket open
  * for every user that visited Admin or Club Zone.
  * Cost: 1 collection read (cached 15 min). Zero ongoing listener overhead.
@@ -2671,7 +2671,7 @@ export async function endClubSeason(seasonId: string, standingsSnapshot: ClubSea
   if (isQuotaExceeded) throw new Error('SYSTEM LOCKED');
   await setDoc(doc(db, 'clubSeasons', seasonId), { status: 'completed', endedAt: Date.now(), standingsSnapshot }, { merge: true });
   await setDoc(doc(db, 'settings', 'clubConfig'), { activeInternalSeasonId: null, activeInternalSeasonLabel: null }, { merge: true });
-  // Bust all season caches — statuses changed across the board
+  // Bust all season caches â statuses changed across the board
   invalidateCache('club_config');
   invalidateCache('clubSeasons_active');
   invalidateCacheByPrefix('clubSeasons_');
@@ -2831,9 +2831,9 @@ export async function deleteClubSeason(seasonId: string): Promise<void> {
   }
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // GLOBAL SEASONS
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 export async function startGlobalSeason(name: string): Promise<GlobalSeason> {
   await ensureAdminSession();
@@ -2881,9 +2881,9 @@ export async function fetchGlobalSeasons(force = false): Promise<GlobalSeason[]>
   }, 15 * 60 * 1000);
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // FRANCHISE REGISTRY (EMPTY CLUBS)
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 export async function assignClubOwner(clubId: string, player: Player): Promise<void> {
   await ensureAdminSession();
@@ -2948,9 +2948,9 @@ export async function unassignClubOwner(clubId: string): Promise<void> {
   invalidateCache('clubs_all');
 }
 
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 // PLAYER INBOX & CONTRACT NEGOTIATIONS
-// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// GïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœGïżœïżœ
 
 export async function sendPlayerInboxMessage(message: Omit<PlayerInboxMessage, 'id' | 'createdAt' | 'status'>): Promise<void> {
   if (isQuotaExceeded) return;
@@ -2972,7 +2972,7 @@ export function subscribeToPlayerInbox(recipientId: string, callback: (messages:
 }
 
 /**
- * One-shot fetch for player inbox — no persistent listener.
+ * One-shot fetch for player inbox â no persistent listener.
  * Replaces subscribeToPlayerInbox for normal users.
  * Cost: 1 read per inbox open (cached for 5 min). Zero ongoing listener overhead.
  */
@@ -3021,7 +3021,7 @@ export async function respondToContractRenewal(msg: PlayerInboxMessage, accepted
       });
     }
 
-    responseMessageBody = `✅ ${msg.data.playerName || 'Player'} accepted the contract renewal for ${msg.data.clubName || 'the club'}!`;
+    responseMessageBody = `â ${msg.data.playerName || 'Player'} accepted the contract renewal for ${msg.data.clubName || 'the club'}!`;
   } else if (!accepted && msg.data?.playerId) {
     // Player rejected: automatically list them on the Transfer Market
     const pSnap = await getDoc(doc(db, 'players', msg.data.playerId));
@@ -3050,9 +3050,9 @@ export async function respondToContractRenewal(msg: PlayerInboxMessage, accepted
         listingPrice: suggestedPrice
       });
 
-      responseMessageBody = `❌ ${msg.data.playerName || p.name} rejected the contract renewal proposal. They have been automatically placed on the Transfer Market for ${suggestedPrice.toLocaleString()} VCC.`;
+      responseMessageBody = `â ${msg.data.playerName || p.name} rejected the contract renewal proposal. They have been automatically placed on the Transfer Market for ${suggestedPrice.toLocaleString()} VCC.`;
     } else {
-      responseMessageBody = `❌ ${msg.data.playerName || 'Player'} rejected the contract renewal proposal.`;
+      responseMessageBody = `â ${msg.data.playerName || 'Player'} rejected the contract renewal proposal.`;
     }
   }
 
@@ -3077,12 +3077,12 @@ export async function respondToContractRenewal(msg: PlayerInboxMessage, accepted
   await batch.commit();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // ADMIN SESSION HELPER
 // Re-registers the current anonymous UID in the admins collection so that
 // Firestore security rules recognize this session as an admin. Must be called
 // at the start of every sensitive write operation to heal drifted sessions.
-// ─────────────────────────────────────────────────────────────────────────────
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 let _adminSessionRegistered = false;
 export async function ensureAdminSession(): Promise<void> {
   if (_adminSessionRegistered) return;
@@ -3124,7 +3124,7 @@ export async function ensureAdminSession(): Promise<void> {
   }
 }
 
-/** One-shot fetch for guests — no real-time listener. */
+/** One-shot fetch for guests â no real-time listener. */
 export async function fetchPlayersOnce(limitCount = 15): Promise<Player[]> {
   const cacheKey = `players_once_${limitCount}`;
   return fetchWithCache(cacheKey, async () => {
@@ -3142,7 +3142,7 @@ export async function fetchPlayersOnce(limitCount = 15): Promise<Player[]> {
   }, 30 * 60 * 1000);
 }
 
-/** One-shot fetch for guests — no real-time listener. */
+/** One-shot fetch for guests â no real-time listener. */
 export async function fetchLeadersOnce(): Promise<Leader[]> {
   return fetchWithCache('leaders_once', async () => {
     try {
@@ -3159,7 +3159,7 @@ export async function fetchLeadersOnce(): Promise<Leader[]> {
   }, 30 * 60 * 1000);
 }
 
-/** One-shot fetch — no real-time listener. Replaces subscribeToMatches for non-admin users. */
+/** One-shot fetch â no real-time listener. Replaces subscribeToMatches for non-admin users. */
 export async function fetchMatchesOnce(limitCount = 50): Promise<MatchRecord[]> {
   const cacheKey = `matches_once_${limitCount}`;
   return fetchWithCache(cacheKey, async () => {
@@ -3174,7 +3174,7 @@ export async function fetchMatchesOnce(limitCount = 50): Promise<MatchRecord[]> 
   }, 30 * 60 * 1000);
 }
 
-/** One-shot fetch — no real-time listener. Replaces subscribeToTournaments for non-admin users. */
+/** One-shot fetch â no real-time listener. Replaces subscribeToTournaments for non-admin users. */
 export async function fetchTournamentsOnce(limitCount = 20): Promise<Tournament[]> {
   const cacheKey = `tournaments_once_${limitCount}`;
   return fetchWithCache(cacheKey, async () => {
@@ -3189,22 +3189,22 @@ export async function fetchTournamentsOnce(limitCount = 20): Promise<Tournament[
   }, 30 * 60 * 1000);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // PHASE 2: SNAPSHOT ARCHITECTURE
 //
 // Two precomputed documents replace hundreds of collection reads:
 //
-//   settings/appSnapshot  → top-50 leaderboard + active tournaments + counts
+//   settings/appSnapshot  â top-50 leaderboard + active tournaments + counts
 //                           Replaces: fetchPlayersOnce(50) + fetchTournamentsOnce(20)
-//                           = 70 reads → 1 read
+//                           = 70 reads â 1 read
 //
-//   settings/clubSnapshot → clubs[] + config + active market listings
+//   settings/clubSnapshot â clubs[] + config + active market listings
 //                           Replaces: fetchClubs(50) + fetchMarketListings(50) + fetchClubConfig()
-//                           = ~101 reads → 1 read
+//                           = ~101 reads â 1 read
 //
 // Both documents are written by admin after any relevant data change.
 // They are read by the frontend on cold start (0 reads if localStorage is fresh).
-// ─────────────────────────────────────────────────────────────────────────────
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 const APP_SNAPSHOT_CACHE_KEY = 'appSnapshot_v3';
 const CLUB_SNAPSHOT_CACHE_KEY = 'clubSnapshot_v2';
@@ -3226,7 +3226,7 @@ export interface ClubSnapshot {
 
 /**
  * Reads the precomputed app snapshot document.
- * 1 Firestore read — replaces fetching players(50) + tournaments(20).
+ * 1 Firestore read â replaces fetching players(50) + tournaments(20).
  * Cached in the store-level in-memory cache for 30 minutes.
  */
 export async function fetchAppSnapshot(): Promise<AppSnapshot | null> {
@@ -3245,7 +3245,7 @@ export async function fetchAppSnapshot(): Promise<AppSnapshot | null> {
 
 /**
  * Reads the precomputed club snapshot document.
- * 1 Firestore read — replaces fetchClubs(50) + fetchMarketListings(50) + fetchClubConfig().
+ * 1 Firestore read â replaces fetchClubs(50) + fetchMarketListings(50) + fetchClubConfig().
  */
 export async function fetchClubSnapshot(): Promise<ClubSnapshot | null> {
   return fetchWithCache(CLUB_SNAPSHOT_CACHE_KEY, async () => {
@@ -3289,7 +3289,7 @@ export async function writeAppSnapshot(
     invalidateCache(APP_SNAPSHOT_CACHE_KEY);
     console.log('[Snapshot] appSnapshot written:', leaderboard.length, 'players');
   } catch (err) {
-    // Non-critical — fail silently so match saving is not blocked
+    // Non-critical â fail silently so match saving is not blocked
     console.warn('[Snapshot] Could not write appSnapshot:', err);
   }
 }
@@ -3404,4 +3404,281 @@ export async function ensureSnapshotsExist(): Promise<{ appSnapshot: boolean; cl
   _cache.set(_snapCheckKey, { data: results, timestamp: _snapNow });
 
   return results;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEWS & ANNOUNCEMENTS - All managed from Control Center
+// ─────────────────────────────────────────────────────────────────────────────
+
+const NEWS_CACHE_KEY = 'news_v1';
+const GLOBAL_STATS_KEY = 'globalStats_v1';
+const ACHIEVEMENTS_KEY = 'achievements_v1';
+const SETTINGS_KEY = 'appSettings_v1';
+
+export async function fetchNews(limit = 10): Promise<import('../types').NewsArticle[]> {
+  return fetchWithCache(NEWS_CACHE_KEY, async () => {
+    const q = query(
+      collection(db, 'news'),
+      where('active', '==', true),
+      orderBy('pinned', 'desc'),
+      orderBy('publishedAt', 'desc'),
+      limit(limit)
+    );
+    const snap = await getDocs(q);
+    trackRead(snap.size);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').NewsArticle));
+  }, CACHE_TTL);
+}
+
+export async function fetchFeaturedNews(): Promise<import('../types').NewsArticle | null> {
+  const q = query(
+    collection(db, 'news'),
+    where('featured', '==', true),
+    where('active', '==', true),
+    orderBy('publishedAt', 'desc'),
+    limit(1)
+  );
+  const snap = await getDocs(q);
+  trackRead(snap.size);
+  if (snap.empty) return null;
+  return { id: snap.docs[0].id, ...snap.docs[0].data() } as import('../types').NewsArticle;
+}
+
+export async function createNewsArticle(data: Omit<import('../types').NewsArticle, 'id' | 'createdAt' | 'updatedAt' | 'views'>): Promise<string> {
+  const id = `news_${Date.now()}`;
+  const now = Date.now();
+  await setDoc(doc(db, 'news', id), {
+    ...data,
+    views: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
+  invalidateCache(NEWS_CACHE_KEY);
+  invalidateStorage(NEWS_CACHE_KEY);
+  return id;
+}
+
+export async function updateNewsArticle(id: string, data: Partial<import('../types').NewsArticle>): Promise<void> {
+  await updateDoc(doc(db, 'news', id), {
+    ...data,
+    updatedAt: Date.now(),
+  });
+  invalidateCache(NEWS_CACHE_KEY);
+  invalidateStorage(NEWS_CACHE_KEY);
+}
+
+export async function deleteNewsArticle(id: string): Promise<void> {
+  await updateDoc(doc(db, 'news', id), { active: false, updatedAt: Date.now() });
+  invalidateCache(NEWS_CACHE_KEY);
+  invalidateStorage(NEWS_CACHE_KEY);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIVE MATCHES - Real-time match tracking
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchLiveMatches(): Promise<import('../types').LiveMatch[]> {
+  const q = query(
+    collection(db, 'liveMatches'),
+    where('active', '==', true),
+    orderBy('scheduledAt', 'asc'),
+    limit(5)
+  );
+  const snap = await getDocs(q);
+  trackRead(snap.size);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').LiveMatch));
+}
+
+export async function createLiveMatch(data: Omit<import('../types').LiveMatch, 'id' | 'createdAt'>): Promise<string> {
+  const id = `live_${Date.now()}`;
+  await setDoc(doc(db, 'liveMatches', id), {
+    ...data,
+    createdAt: Date.now(),
+  });
+  return id;
+}
+
+export async function updateLiveMatch(id: string, data: Partial<import('../types').LiveMatch>): Promise<void> {
+  await updateDoc(doc(db, 'liveMatches', id), data);
+}
+
+export async function endLiveMatch(id: string): Promise<void> {
+  await updateDoc(doc(db, 'liveMatches', id), {
+    status: 'completed',
+    endedAt: Date.now(),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GLOBAL STATISTICS - Pre-computed for minimal reads
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchGlobalStats(): Promise<import('../types').GlobalStats | null> {
+  return fetchWithCache(GLOBAL_STATS_KEY, async () => {
+    const snap = await getDoc(doc(db, 'settings', 'globalStats'));
+    trackRead(1);
+    if (!snap.exists()) return null;
+    return snap.data() as import('../types').GlobalStats;
+  }, CACHE_TTL);
+}
+
+export async function computeAndSaveGlobalStats(players: Player[]): Promise<void> {
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+  
+  // Top scorers
+  const topScorers = [...players]
+    .sort((a, b) => (b.goalsScored || 0) - (a.goalsScored || 0))
+    .slice(0, 10)
+    .map(p => ({
+      playerId: p.id,
+      playerName: p.name,
+      playerImage: p.image || '',
+      goals: p.goalsScored || 0,
+    }));
+
+  // Top win rates (min 10 matches)
+  const topWinRates = [...players]
+    .filter(p => (p.win || 0) + (p.loss || 0) + (p.draw || 0) >= 10)
+    .map(p => {
+      const total = (p.win || 0) + (p.loss || 0) + (p.draw || 0);
+      const wr = total > 0 ? ((p.win || 0) / total) * 100 : 0;
+      return { ...p, winRate: wr, matches: total };
+    })
+    .sort((a, b) => b.winRate - a.winRate)
+    .slice(0, 10)
+    .map(p => ({
+      playerId: p.id,
+      playerName: p.name,
+      playerImage: p.image || '',
+      winRate: Math.round(p.winRate),
+      matches: p.matches,
+    }));
+
+  const stats: import('../types').GlobalStats = {
+    id: 'global',
+    totalPlayers: players.length,
+    totalMatches: players.reduce((sum, p) => sum + (p.win || 0) + (p.loss || 0) + (p.draw || 0), 0) / 2,
+    totalGoals: players.reduce((sum, p) => sum + (p.goalsScored || 0), 0),
+    topScorers,
+    topWinRates,
+    recentForm: [],
+    weeklyActivity: [],
+    updatedAt: now,
+  };
+
+  await setDoc(doc(db, 'settings', 'globalStats'), stats);
+  invalidateCache(GLOBAL_STATS_KEY);
+  invalidateStorage(GLOBAL_STATS_KEY);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACHIEVEMENTS SYSTEM - Gamification
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchAchievements(): Promise<import('../types').Achievement[]> {
+  return fetchWithCache(ACHIEVEMENTS_KEY, async () => {
+    const q = query(
+      collection(db, 'achievements'),
+      where('active', '==', true),
+      orderBy('requirement', 'asc')
+    );
+    const snap = await getDocs(q);
+    trackRead(snap.size);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').Achievement));
+  }, CACHE_TTL);
+}
+
+export async function createAchievement(data: Omit<import('../types').Achievement, 'id' | 'createdAt'>): Promise<string> {
+  const id = `ach_${Date.now()}`;
+  await setDoc(doc(db, 'achievements', id), {
+    ...data,
+    createdAt: Date.now(),
+  });
+  invalidateCache(ACHIEVEMENTS_KEY);
+  invalidateStorage(ACHIEVEMENTS_KEY);
+  return id;
+}
+
+export async function updateAchievement(id: string, data: Partial<import('../types').Achievement>): Promise<void> {
+  await updateDoc(doc(db, 'achievements', id), data);
+  invalidateCache(ACHIEVEMENTS_KEY);
+  invalidateStorage(ACHIEVEMENTS_KEY);
+}
+
+export async function deleteAchievement(id: string): Promise<void> {
+  await updateDoc(doc(db, 'achievements', id), { active: false });
+  invalidateCache(ACHIEVEMENTS_KEY);
+  invalidateStorage(ACHIEVEMENTS_KEY);
+}
+
+export async function fetchPlayerAchievements(playerId: string): Promise<import('../types').PlayerAchievement[]> {
+  const q = query(
+    collection(db, 'playerAchievements'),
+    where('playerId', '==', playerId)
+  );
+  const snap = await getDocs(q);
+  trackRead(snap.size);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').PlayerAchievement));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APP SETTINGS - One-stop settings management
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchAppSettings(): Promise<import('../types').AppSettings | null> {
+  return fetchWithCache(SETTINGS_KEY, async () => {
+    const snap = await getDoc(doc(db, 'settings', 'appConfig'));
+    trackRead(1);
+    if (!snap.exists()) {
+      // Create default settings
+      const defaults: import('../types').AppSettings = {
+        id: 'appConfig',
+        announcements: { enabled: false, message: '', type: 'info', dismissible: true },
+        featuredPlayer: null,
+        maintenanceMode: false,
+        updatedAt: Date.now(),
+      };
+      await setDoc(doc(db, 'settings', 'appConfig'), defaults);
+      return defaults;
+    }
+    return snap.data() as import('../types').AppSettings;
+  }, CACHE_TTL);
+}
+
+export async function updateAppSettings(data: Partial<import('../types').AppSettings>): Promise<void> {
+  await updateDoc(doc(db, 'settings', 'appConfig'), {
+    ...data,
+    updatedAt: Date.now(),
+  });
+  invalidateCache(SETTINGS_KEY);
+  invalidateStorage(SETTINGS_KEY);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BULK OPERATIONS - For Control Center
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function initializeDefaultAchievements(): Promise<void> {
+  const defaults: import('../types').Achievement[] = [
+    { id: 'ach_10wins', name: 'First Steps', description: 'Win 10 matches', icon: 'Trophy', category: 'wins', requirement: 10, rarity: 'common', active: true, createdAt: Date.now() },
+    { id: 'ach_50wins', name: 'Rising Star', description: 'Win 50 matches', icon: 'Star', category: 'wins', requirement: 50, rarity: 'rare', active: true, createdAt: Date.now() },
+    { id: 'ach_100wins', name: 'Centurion', description: 'Win 100 matches', icon: 'Crown', category: 'wins', requirement: 100, rarity: 'epic', active: true, createdAt: Date.now() },
+    { id: 'ach_500wins', name: 'Legend', description: 'Win 500 matches', icon: 'Gem', category: 'wins', requirement: 500, rarity: 'legendary', active: true, createdAt: Date.now() },
+    { id: 'ach_10goals', name: 'First Goal', description: 'Score 10 goals', icon: 'Target', category: 'goals', requirement: 10, rarity: 'common', active: true, createdAt: Date.now() },
+    { id: 'ach_50goals', name: 'Goal Machine', description: 'Score 50 goals', icon: 'Zap', category: 'goals', requirement: 50, rarity: 'rare', active: true, createdAt: Date.now() },
+    { id: 'ach_100goals', name: 'Sharpshooter', description: 'Score 100 goals', icon: 'Crosshair', category: 'goals', requirement: 100, rarity: 'epic', active: true, createdAt: Date.now() },
+    { id: 'ach_1tourney', name: 'Champion', description: 'Win a tournament', icon: 'Award', category: 'tournament', requirement: 1, rarity: 'rare', active: true, createdAt: Date.now() },
+    { id: 'ach_5tourney', name: 'Tournament Master', description: 'Win 5 tournaments', icon: 'Medal', category: 'tournament', requirement: 5, rarity: 'epic', active: true, createdAt: Date.now() },
+    { id: 'ach_10streak', name: 'On Fire', description: 'Win 10 in a row', icon: 'Flame', category: 'streak', requirement: 10, rarity: 'rare', active: true, createdAt: Date.now() },
+  ];
+
+  for (const ach of defaults) {
+    const existing = await getDoc(doc(db, 'achievements', ach.id));
+    if (!existing.exists()) {
+      await setDoc(doc(db, 'achievements', ach.id), ach);
+    }
+  }
+  invalidateCache(ACHIEVEMENTS_KEY);
+  invalidateStorage(ACHIEVEMENTS_KEY);
 }

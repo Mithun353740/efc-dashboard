@@ -12,6 +12,9 @@ import Leadership from './components/Leadership';
 import Legion from './components/Legion';
 import Footer from './components/Footer';
 import AutoUpdater from './components/AutoUpdater';
+import HomeNews from './components/HomeNews';
+import LiveMatchWidget from './components/LiveMatchWidget';
+import StatsDashboard from './components/StatsDashboard';
 import { FirebaseProvider, useFirebase } from './FirebaseContext';
 import { CLUB_LOGO, CLUB_NAME } from './constants';
 
@@ -47,16 +50,33 @@ function PageLoader() {
 }
 
 function Home() {
-  const { rankedPlayers, dbError, isLoading } = useFirebase();
+  const { rankedPlayers, appSettings } = useFirebase();
   
   // Show homepage INSTANTLY if we have cached data - no waiting!
   const heroPlayer = rankedPlayers.length > 0 ? rankedPlayers[0] : null;
+  
+  // Announcement banner
+  const showAnnouncement = appSettings?.announcements?.enabled && appSettings?.announcements?.message;
   
   if (heroPlayer) {
     // We have data - show homepage immediately!
     return (
       <>
+        {/* Announcement Banner */}
+        {showAnnouncement && (
+          <div className={`px-4 py-2 text-center text-xs font-black tracking-widest uppercase ${
+            appSettings?.announcements?.type === 'error' ? 'bg-rose-500 text-white' :
+            appSettings?.announcements?.type === 'warning' ? 'bg-amber-500 text-white' :
+            appSettings?.announcements?.type === 'success' ? 'bg-emerald-500 text-white' :
+            'bg-brand-purple text-white'
+          }`}>
+            {appSettings?.announcements?.message}
+          </div>
+        )}
         <Hero player={heroPlayer} />
+        <LiveMatchWidget />
+        <HomeNews />
+        <StatsDashboard />
         <EliteRankings />
         <Leadership />
         <Legion />
@@ -64,27 +84,22 @@ function Home() {
     );
   }
   
-  // No data - show appropriate state
-  if (isLoading) {
-    // Waiting for Firestore - show loading
-    return (
-      <div className="py-32 flex flex-col items-center justify-center gap-4">
-        <div className="flex items-center gap-1.5">
-          {[0,1,2,3,4].map(i => (
-            <div key={i} className="w-1 bg-brand-purple/40 rounded-full animate-bounce"
-              style={{ height: 20 + (i % 3) * 8 + 'px', animationDelay: i * 0.1 + 's' }} />
-          ))}
-        </div>
-        <p className="text-[10px] font-black text-slate-500 tracking-[0.3em] uppercase">Loading data...</p>
-      </div>
-    );
-  }
-  
-  // No loading, no data - either first time setup or truly empty
+  // Show basic structure without player data
   return (
-    <div className="py-20 text-center">
-      <h2 className="text-2xl font-black text-slate-500 uppercase tracking-widest">NO DATA DETECTED</h2>
-      <p className="text-sm text-slate-400 mt-2">Please visit the Control Center to sync or seed the system.</p>
+    <div className="pt-16">
+      {showAnnouncement && (
+        <div className={`px-4 py-2 text-center text-xs font-black tracking-widest uppercase ${
+          appSettings?.announcements?.type === 'error' ? 'bg-rose-500 text-white' :
+          appSettings?.announcements?.type === 'warning' ? 'bg-amber-500 text-white' :
+          appSettings?.announcements?.type === 'success' ? 'bg-emerald-500 text-white' :
+          'bg-brand-purple text-white'
+        }`}>
+          {appSettings?.announcements?.message}
+        </div>
+      )}
+      <LiveMatchWidget />
+      <HomeNews />
+      <StatsDashboard />
     </div>
   );
 }
