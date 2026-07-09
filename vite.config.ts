@@ -23,14 +23,6 @@ export default defineConfig(({mode}) => {
     build: {
       // Firebase + React apps bundle large — suppress the pre-existing warning.
       chunkSizeWarningLimit: 2000,
-      // Enable minification and tree-shaking optimizations
-      minify: 'terser',
-      terserOptions: {
-        compress: {
-          drop_console: true, // Remove console.logs in production
-          drop_debugger: true,
-        },
-      },
       // Enable CSS code splitting
       cssCodeSplit: true,
       // Generate sourcemaps only in development
